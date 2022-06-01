@@ -20,11 +20,18 @@ sub send_to ($pid, $msg) {
 }
 
 my %processes = (
+    out => [
+        [],
+        {},
+        sub ($env, $msg) {
+            say( "OUT => $msg" );
+        },
+    ],
     ping => [
         [],
         {},
         sub ($env, $msg) {
-            say( "/ping/ => $msg" );
+            send_to( out => "/ping/ => $msg" );
             send_to( pong => $msg + 1 );
         },
     ],
@@ -32,7 +39,7 @@ my %processes = (
         [],
         {},
         sub ($env, $msg) {
-            say( "\\pong\\ => $msg" );
+            send_to( out => "\\pong\\ => $msg" );
             send_to( ping => $msg + 1 );
         },
     ],
@@ -40,7 +47,7 @@ my %processes = (
         [],
         {},
         sub ($env, $msg) {
-            say( "main starting ..." );
+            send_to( out => "main starting ..." );
             send_to( ping => $msg * 0 );
             send_to( ping => $msg * 10 );
             send_to( ping => $msg * 100 );
