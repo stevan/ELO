@@ -62,11 +62,11 @@ my %processes = (
         sub ($env, $msg) {
             my ($timer, $event) = @$msg;
             if ( $timer == 0 ) {
-                send_to( out => "DONE");
+                send_to( out => "!alarm! DONE");
                 send_to( @$event );
             }
             else {
-                send_to( out => "counting down $timer" );
+                send_to( out => "!alarm! counting down $timer" );
                 send_to( alarm => [ $timer - 1, $event ] );
             }
         },
