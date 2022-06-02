@@ -8,6 +8,8 @@ use Test::More;
 use List::Util 'first';
 use Data::Dumper;
 
+use constant DEBUG => $ENV{DEBUG} // 0;
+
 use constant INBOX  => 0;
 use constant OUTBOX => 1;
 
@@ -29,7 +31,9 @@ sub return_to ($msg) {
 
 sub recv_from ($pid=undef) {
     $pid //= $CURRENT_PID;
-    shift $processes{$pid}->[OUTBOX]->@*
+    my $msg = shift $processes{$pid}->[OUTBOX]->@*;
+    return unless $msg;
+    return $msg->[1];
 }
 
 sub loop ( $MAX_TICKS ) {
@@ -109,30 +113,12 @@ sub loop ( $MAX_TICKS ) {
         sub ($env, $msg) {
             my ($timer, $event, $caller) = @$msg;
             if ( $timer == 0 ) {
-                send_to( out => "!timeout! DONE");
+                send_to( out => "!timeout! DONE") if DEBUG;
                 send_to( @$event, $caller );
             }
             else {
-                send_to( out => "!timeout! counting down $timer" );
+                send_to( out => "!timeout! counting down $timer" ) if DEBUG;
                 send_to( timeout => [ $timer - 1, $event, $caller // $CURRENT_CALLER ] );
-            }
-        },
-    ],
-    env => [
-        [],[],
-        {},
-        sub ($env, $msg) {
-            if ( scalar @$msg == 1 ) {
-                my ($key) = @$msg;
-                send_to( out => "fetching {$key}");
-                return_to( $env->{$key} );
-            }
-            elsif ( scalar @$msg == 2 ) {
-                my ($key, $value) = @$msg;
-                send_to( out => "storing $key => $value");
-                $env->{$key} = $value;
-
-                send_to( out => "ENV{ ".(join ', ' => map { join ' => ' => $_, $env->{$_} } keys %$env)." }");
             }
         },
     ],
@@ -149,28 +135,43 @@ sub loop ( $MAX_TICKS ) {
             else {
                 my ($callback) = @$msg;
 
-                my $envelope = recv_from;
+                my $message = recv_from;
 
-                if ($envelope) {
-
-                    my $sender_pid = shift @$envelope;
-                    my $message    = shift @$envelope;
-
-                    send_to( out => "*/ select /* : got message($message) for pid($sender_pid)");
+                if ($message) {
+                    send_to( out => "*/ select /* : got message($message)") if DEBUG;
                     send_to( @$callback, $message );
                 }
                 else {
-                    send_to( out => "*/ select /* : no messages");
+                    send_to( out => "*/ select /* : no messages") if DEBUG;
                     send_to( select => [ $callback ]);
                 }
             }
         }
     ],
+    env => [
+        [],[],
+        {},
+        sub ($env, $msg) {
+            if ( scalar @$msg == 1 ) {
+                my ($key) = @$msg;
+                send_to( out => "fetching {$key}") if DEBUG;
+                return_to( $env->{$key} );
+            }
+            elsif ( scalar @$msg == 2 ) {
+                my ($key, $value) = @$msg;
+                send_to( out => "storing $key => $value") if DEBUG;
+                $env->{$key} = $value;
+
+                send_to( out => "ENV{ ".(join ', ' => map { join ' => ' => $_, $env->{$_} } keys %$env)." }")
+                    if DEBUG;
+            }
+        },
+    ],
     main => [
         [],[],
         {},
         sub ($env, $msg) {
-            send_to( out => "->main starting ..." );
+            send_to( out => "-> main starting ..." );
             send_to( env => [ foo => 10 ] );
             send_to( env => [ bar => 20 ] );
             send_to( select => [
