@@ -5,17 +5,16 @@ use warnings;
 use experimental 'signatures', 'postderef';
 
 use Test::More;
-
-#use ok 'EventLoop';
-#use ok 'EventLoop::Handler';
+use Data::Dumper;
 
 my @msg_queue;
+my %processes;
 
 sub send_to ($pid, $msg) {
     push @msg_queue => [ $pid, $msg ];
 }
 
-sub loop ( $MAX_TICKS, $process_table ) {
+sub loop ( $MAX_TICKS ) {
 
     my $tick = 0;
     while ($tick < $MAX_TICKS) {
@@ -25,10 +24,14 @@ sub loop ( $MAX_TICKS, $process_table ) {
         while (@msg_queue) {
             my $next = shift @msg_queue;
             my ($pid, $m) = $next->@*;
-            push $process_table->{$pid}->[0]->@* => $m;
+            unless (exists $processes{$pid}) {
+                warn "Got message for unknown pid($pid)";
+                next;
+            }
+            push $processes{$pid}->[0]->@* => $m;
         }
 
-        my @active = values %$process_table;
+        my @active = values %processes;
         while (@active) {
             my $active = shift @active;
             my ($mbox, $env, $f) = $active->@*;
@@ -48,7 +51,7 @@ sub loop ( $MAX_TICKS, $process_table ) {
 
 }
 
-my %processes = (
+%processes = (
     out => [
         [],
         {},
@@ -91,7 +94,7 @@ my %processes = (
         [],
         {},
         sub ($env, $msg) {
-            send_to( out => "main starting ..." );
+            send_to( out => "->main starting ..." );
             send_to( alarm => [ 3, [ ping => 0 ] ]);
             send_to( alarm => [ 2, [ ping => 10 ] ]);
             send_to( alarm => [ 1, [ ping => 100 ] ]);
@@ -103,6 +106,6 @@ my %processes = (
 # initialise ...
 send_to( main => 1 );
 # loop ...
-loop( 20, \%processes );
+loop( 20 );
 
 done_testing;

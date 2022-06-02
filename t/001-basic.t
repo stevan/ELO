@@ -5,54 +5,104 @@ use warnings;
 use experimental 'signatures', 'postderef';
 
 use Test::More;
-use JSON 'encode_json';
 use Data::Dumper;
 
-use ok 'EventLoop';
-use ok 'EventLoop::Process';
+my @msg_queue;
+my %processes;
 
-my $loop = EventLoop->new;
+sub send_to ($pid, $msg) {
+    push @msg_queue => [ $pid, $msg ];
+}
 
-my ($proc1, $proc2);
+sub loop ( $MAX_TICKS ) {
 
-$proc1 = EventLoop::Process->new(
-    callback => sub ($proc, $loop, $env, $msg) {
-        warn "In Proc1 :" . ($msg // 'undef') . ' => ' . encode_json($env);
-        if (not $msg) {
-            $env->{count}++ if $env->{started};
+    my $tick = 0;
+    while ($tick < $MAX_TICKS) {
+        $tick++;
+
+        # deliver all the messages in the queue
+        while (@msg_queue) {
+            my $next = shift @msg_queue;
+            my ($pid, $m) = $next->@*;
+            unless (exists $processes{$pid}) {
+                warn "Got message for unknown pid($pid)";
+                next;
+            }
+            push $processes{$pid}->[0]->@* => $m;
         }
-        elsif ( $msg eq 'start' ) {
-            $env->{started}++;
+
+        my @active = values %processes;
+        while (@active) {
+            my $active = shift @active;
+            my ($mbox, $env, $f) = $active->@*;
+
+            if ( $mbox->@* ) {
+                $f->($env, shift $mbox->@* );
+                # if we still have messages
+                if ( $mbox->@* ) {
+                    # handle them in the next loop ...
+                    push @active => $active;
+                }
+            }
         }
-        elsif ( $msg eq 'stop' ) {
-            $loop->enqueue_message_for( $proc2->pid, 'exit' );
-            delete $env->{started};
-            $proc->exit;
-        }
+
+        say "---------------------------- tick($tick)";
     }
+
+}
+
+%processes = (
+    out => [
+        [],
+        {},
+        sub ($env, $msg) {
+            say( "OUT => $msg" );
+        },
+    ],
+    alarm => [
+        [],
+        {},
+        sub ($env, $msg) {
+            my ($timer, $event) = @$msg;
+            if ( $timer == 0 ) {
+                send_to( out => "!alarm! DONE");
+                send_to( @$event );
+            }
+            else {
+                send_to( out => "!alarm! counting down $timer" );
+                send_to( alarm => [ $timer - 1, $event ] );
+            }
+        },
+    ],
+    env => [
+        [],
+        {},
+        sub ($env, $msg) {
+            if ( scalar @$msg == 2 ) {
+                my ($key, $value) = @$msg;
+                send_to( out => "storing $key => $value");
+                $env->{$key} = $value;
+            }
+
+            send_to( out => "ENV{ ".(join ', ' => map { join ' => ' => $_, $env->{$_} } keys %$env)." }");
+        },
+    ],
+    main => [
+        [],
+        {},
+        sub ($env, $msg) {
+            send_to( out => "->main starting ..." );
+            send_to( env => [ foo => 10 ] );
+            send_to( env => [ bar => 20 ] );
+            send_to( alarm => [ 2, [ env => [ baz => 30 ] ]] );
+            send_to( alarm => [ 15, [ env => [ gorch => 50 ] ]] );
+        },
+    ],
 );
 
-$proc2 = EventLoop::Process->new(
-    callback => sub ($proc, $loop, $env, $msg) {
-        warn "In Proc2 :" . ($msg // 'undef') . ' => ' . encode_json($env);
-        if ($msg && $msg eq 'exit') {
-            $proc->exit;
-        }
-        else {
-            $loop->enqueue_message_for( $proc1->pid, 'start' );
-            $proc->sleep_for(10, sub {
-                $loop->enqueue_message_for( $proc1->pid, 'stop' )
-            });
-        }
-    }
-);
-
-
-$loop->add_process( $proc2 );
-$loop->add_process( $proc1 );
-
-my $env = $loop->run;
-
-warn Dumper $env;
+# initialise ...
+send_to( main => 1 );
+# loop ...
+loop( 20 );
 
 done_testing;
