@@ -90,15 +90,28 @@ sub loop ( $MAX_TICKS ) {
             send_to( ping => $msg + 1 );
         },
     ],
+    bounce => [
+        [],
+        {},
+        sub ($env, $msg) {
+            my ($dir, $cnt) = @$msg;
+            send_to( out => "bounce($dir) => $cnt" );
+            send_to( bounce =>
+                    $dir eq 'ping'
+                        ? ['pong',$cnt + 1]
+                        : ['ping',$cnt + 1]
+            );
+        },
+    ],
     main => [
         [],
         {},
         sub ($env, $msg) {
             send_to( out => "->main starting ..." );
             send_to( alarm => [ 3, [ ping => 0 ] ]);
-            send_to( alarm => [ 2, [ ping => 10 ] ]);
+            send_to( alarm => [ 2, [ bounce => [ ping => 10 ] ] ]);
             send_to( alarm => [ 1, [ ping => 100 ] ]);
-            send_to( ping => 1000 );
+            send_to( bounce => [ ping => 1000 ] );
         },
     ],
 );
