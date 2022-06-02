@@ -188,6 +188,6 @@ sub loop ( $MAX_TICKS ) {
 # initialise ...
 send_to( main => 1 );
 # loop ...
-loop( 50 );
+loop( 20 );
 
 done_testing;
