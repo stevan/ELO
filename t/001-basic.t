@@ -51,8 +51,8 @@ sub loop ( $MAX_TICKS ) {
     while ($tick < $MAX_TICKS) {
         $tick++;
 
-        #warn Dumper \@msg_inbox;
-        warn Dumper \@msg_outbox;
+        warn Dumper \@msg_inbox  if DEBUG >= 3;
+        warn Dumper \@msg_outbox if DEBUG >= 1;
 
         # deliver all the messages in the queue
         while (@msg_inbox) {
@@ -103,7 +103,7 @@ sub loop ( $MAX_TICKS ) {
             }
         }
 
-        say "---------------------------- tick($tick)";
+        say "---------------------------- tick($tick)" if DEBUG == -1;
     }
 
 }
@@ -130,7 +130,9 @@ sub loop ( $MAX_TICKS ) {
         [],[],
         {},
         sub ($env, $msg) {
-            print $msg;
+            my $prefix = "IN << ";
+               $prefix = "IN ($CURRENT_CALLER) << " if DEBUG;
+            print $prefix, $msg;
             my $input = <>;
             chomp $input;
             return_to( $input );
@@ -234,17 +236,17 @@ sub loop ( $MAX_TICKS ) {
             # ...
 
             spawn( pipe => [
-                [ in => 'foo > ' ],
+                [ in => 'foo: ' ],
                 [ $e1, [ 'foo' ]]
             ]);
 
             spawn( pipe => [
-                [ in => 'bar > ' ],
+                [ in => 'bar: ' ],
                 [ $e1, [ 'bar' ]]
             ]);
 
             spawn( pipe => [
-                [ in => 'baz > ' ],
+                [ in => 'baz: ' ],
                 [ $e1, [ 'baz' ]]
             ]);
 
@@ -281,6 +283,7 @@ sub loop ( $MAX_TICKS ) {
                 [ $e2 => [ 'foo' ]],
                 [ out => [ 'foo(%s)' ]]
             ]);
+
 
         },
     ],
