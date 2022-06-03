@@ -32,35 +32,13 @@ sub recv_from ($pid=undef) {
     return $msg->[1];
 }
 
-sub selector_loop ($env, $msg) {
-    if ( scalar @$msg == 2 ) {
-        my ($command, $callback) = @$msg;
-        send_to( @$command );
-        send_to( $CURRENT_PID => [ $callback ] );
-    }
-    else {
-        my ($callback) = @$msg;
-
-        my $message = recv_from;
-
-        if ($message) {
-            send_to( out => "*/ select /* : got message($message)") if DEBUG;
-            push $callback->[1]->@*, $message;
-            send_to( @$callback );
-        }
-        else {
-            send_to( out => "*/ select /* : no messages") if DEBUG;
-            send_to( $CURRENT_PID => [ $callback ]);
-        }
-    }
-};
-
-my $WAIT_PID = 0;
-sub wait_for ($command, $callback) {
-    my $pid = 'wait(' . ++$WAIT_PID . ')';
-    my $selector = [ [], [], {}, \&selector_loop ];
-    $processes{ $pid } = $selector;
-    send_to( $pid => [ $command, $callback ] );
+my $PID = 0;
+sub spawn ($pid, $init=undef) {
+    my $process = [ [], [], {}, $processes{$pid}->[-1] ];
+    $pid = sprintf '%03d:%s' => ++$PID, $pid;
+    $processes{ $pid } = $process;
+    send_to( $pid, $init ) if $init;
+    $pid;
 }
 
 sub return_to ($msg) {
@@ -74,7 +52,7 @@ sub loop ( $MAX_TICKS ) {
         $tick++;
 
         #warn Dumper \@msg_inbox;
-        #warn Dumper \@msg_outbox;
+        warn Dumper \@msg_outbox;
 
         # deliver all the messages in the queue
         while (@msg_inbox) {
@@ -102,13 +80,13 @@ sub loop ( $MAX_TICKS ) {
             push $processes{$to}->[OUTBOX]->@* => [ $from, $m ];
         }
 
-        my @active = map [ $_, $processes{$_}->@* ], keys %processes;
+        my @active = map [ $_, $processes{$_}->@* ], sort { $a cmp $b } keys %processes;
         while (@active) {
             my $active = shift @active;
 
             my ($pid, $inbox, $outbox, $env, $f) = $active->@*;
 
-            if ( $inbox->@* ) {
+            while ( $inbox->@* ) {
 
                 my ($from, $msg) = @{ shift $inbox->@* };
 
@@ -118,10 +96,10 @@ sub loop ( $MAX_TICKS ) {
                 $f->($env, $msg);
 
                 # if we still have messages
-                if ( $inbox->@* ) {
-                    # handle them in the next loop ...
-                    push @active => $active;
-                }
+                #if ( $inbox->@* ) {
+                #    # handle them in the next loop ...
+                #    push @active => $active;
+                #}
             }
         }
 
@@ -135,12 +113,16 @@ sub loop ( $MAX_TICKS ) {
         [],[],
         {},
         sub ($env, $msg) {
+
+            my $prefix = "OUT >> ";
+               $prefix = "OUT ($CURRENT_CALLER) >> " if DEBUG;
+
             if ( ref $msg ) {
                 my ($fmt, @msgs) = @$msg;
-                say( "OUT >> ", sprintf $fmt, @msgs );
+                say( $prefix, sprintf $fmt, @msgs );
             }
             else {
-                say( "OUT >> $msg" );
+                say( $prefix, $msg );
             }
         },
     ],
@@ -159,14 +141,66 @@ sub loop ( $MAX_TICKS ) {
             }
         },
     ],
+    wait => [
+        [],[],
+        {},
+        sub ($env, $msg) {
+            my ($command, $callback) = @$msg;
+
+            my $message = recv_from;
+
+            if ($message) {
+                send_to( out => "*/ wait /* : got message($message)") if DEBUG;
+                push $callback->[1]->@*, $message;
+                send_to( @$callback );
+            }
+            else {
+                send_to( out => "*/ wait /* : no messages") if DEBUG;
+                send_to( @$command );
+                send_to( $CURRENT_PID => [ $command, $callback ]);
+            }
+        }
+    ],
+    pipe => [
+        [],[],
+        {},
+        sub ($env, $msg) {
+            if ( scalar @$msg == 2 ) {
+                my ($command, $callback) = @$msg;
+                send_to( out => "*/ pipe /* : sending initial message") if DEBUG;
+                send_to( @$command );
+                send_to( $CURRENT_PID => [ $callback ] );
+            }
+            else {
+                my ($callback) = @$msg;
+
+                my $message = recv_from;
+
+                if ($message) {
+                    send_to( out => "*/ pipe /* : got message($message)") if DEBUG;
+                    push $callback->[1]->@*, $message;
+                    send_to( @$callback );
+                }
+                else {
+                    send_to( out => "*/ pipe /* : no messages") if DEBUG;
+                    send_to( $CURRENT_PID => [ $callback ]);
+                }
+            }
+        }
+    ],
     env => [
         [],[],
         {},
         sub ($env, $msg) {
             if ( scalar @$msg == 1 ) {
                 my ($key) = @$msg;
-                send_to( out => "fetching {$key}") if DEBUG;
-                return_to( $env->{$key} );
+                if ( exists $env->{$key} ) {
+                    send_to( out => "fetching {$key}") if DEBUG;
+                    return_to( $env->{$key} );
+                }
+                else {
+                    send_to( out => "not found {$key}") if DEBUG;
+                }
             }
             elsif ( scalar @$msg == 2 ) {
                 my ($key, $value) = @$msg;
@@ -184,24 +218,46 @@ sub loop ( $MAX_TICKS ) {
         sub ($env, $msg) {
             send_to( out => "-> main starting ..." );
 
-            send_to( env => [ foo => 10 ] );
-            send_to( env => [ bar => 20 ] );
-            send_to( env => [ baz => 30 ] );
+            my $e1 = spawn( 'env' );
+            my $e2 = spawn( 'env' );
 
-            wait_for(
-                [ timeout => [ 5, [ env => [ 'baz' ]]]],
+            send_to( $e1 => [ foo => 10 ] );
+            send_to( $e1 => [ bar => 20 ] );
+            send_to( $e1 => [ baz => 30 ] );
+
+            # ...
+
+            spawn( pipe => [
+                [ timeout => [ 2, [ $e1 => [ 'baz' ]]]],
+                [ $e2, [ 'baz' ]]
+            ]);
+
+            spawn( pipe => [
+                [ timeout => [ 3, [ $e1 => [ 'bar' ]]]],
+                [ $e2, [ 'bar' ]]
+            ]);
+
+            spawn( pipe => [
+                [ timeout => [ 4, [ $e1 => [ 'foo' ]]]],
+                [ $e2, [ 'foo' ]]
+            ]);
+
+            # ...
+
+            spawn( wait => [
+                [ $e2 => [ 'baz' ]],
                 [ out => [ 'baz(%s)' ]]
-            );
+            ]);
 
-            wait_for(
-                [ timeout => [ 1, [ env => [ 'bar' ]]]],
+            spawn( wait => [
+                [ $e2 => [ 'bar' ]],
                 [ out => [ 'bar(%s)' ]]
-            );
+            ]);
 
-            wait_for(
-                [ timeout => [ 3, [ env => [ 'foo' ]]]],
+            spawn( wait => [
+                [ $e2 => [ 'foo' ]],
                 [ out => [ 'foo(%s)' ]]
-            );
+            ]);
         },
     ],
 );
