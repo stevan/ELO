@@ -25,15 +25,46 @@ sub send_to ($pid, $msg, $from=undef) {
     push @msg_inbox => [ $from, $pid, $msg ];
 }
 
-sub return_to ($msg) {
-    push @msg_outbox => [ $CURRENT_PID, $CURRENT_CALLER, $msg ];
-}
-
 sub recv_from ($pid=undef) {
     $pid //= $CURRENT_PID;
     my $msg = shift $processes{$pid}->[OUTBOX]->@*;
     return unless $msg;
     return $msg->[1];
+}
+
+sub selector_loop ($env, $msg) {
+    if ( scalar @$msg == 2 ) {
+        my ($command, $callback) = @$msg;
+        send_to( @$command );
+        send_to( $CURRENT_PID => [ $callback ] );
+    }
+    else {
+        my ($callback) = @$msg;
+
+        my $message = recv_from;
+
+        if ($message) {
+            send_to( out => "*/ select /* : got message($message)") if DEBUG;
+            push $callback->[1]->@*, $message;
+            send_to( @$callback );
+        }
+        else {
+            send_to( out => "*/ select /* : no messages") if DEBUG;
+            send_to( $CURRENT_PID => [ $callback ]);
+        }
+    }
+};
+
+my $WAIT_PID = 0;
+sub wait_for ($command, $callback) {
+    my $pid = 'wait(' . ++$WAIT_PID . ')';
+    my $selector = [ [], [], {}, \&selector_loop ];
+    $processes{ $pid } = $selector;
+    send_to( $pid => [ $command, $callback ] );
+}
+
+sub return_to ($msg) {
+    push @msg_outbox => [ $CURRENT_PID, $CURRENT_CALLER, $msg ];
 }
 
 sub loop ( $MAX_TICKS ) {
@@ -104,7 +135,13 @@ sub loop ( $MAX_TICKS ) {
         [],[],
         {},
         sub ($env, $msg) {
-            say( "OUT => $msg" );
+            if ( ref $msg ) {
+                my ($fmt, @msgs) = @$msg;
+                say( "OUT >> ", sprintf $fmt, @msgs );
+            }
+            else {
+                say( "OUT >> $msg" );
+            }
         },
     ],
     timeout => [
@@ -121,32 +158,6 @@ sub loop ( $MAX_TICKS ) {
                 send_to( timeout => [ $timer - 1, $event, $caller // $CURRENT_CALLER ] );
             }
         },
-    ],
-    select => [
-        [], [],
-        {},
-        sub ($env, $msg) {
-
-            if ( scalar @$msg == 2 ) {
-                my ($command, $callback) = @$msg;
-                send_to( @$command );
-                send_to( select => [ $callback ] );
-            }
-            else {
-                my ($callback) = @$msg;
-
-                my $message = recv_from;
-
-                if ($message) {
-                    send_to( out => "*/ select /* : got message($message)") if DEBUG;
-                    send_to( @$callback, $message );
-                }
-                else {
-                    send_to( out => "*/ select /* : no messages") if DEBUG;
-                    send_to( select => [ $callback ]);
-                }
-            }
-        }
     ],
     env => [
         [],[],
@@ -172,16 +183,25 @@ sub loop ( $MAX_TICKS ) {
         {},
         sub ($env, $msg) {
             send_to( out => "-> main starting ..." );
+
             send_to( env => [ foo => 10 ] );
             send_to( env => [ bar => 20 ] );
-            send_to( select => [
-                [ timeout => [ 5, [ env => [ 'foo' ]]]],
-                [ 'out' ]
-            ] );
-            send_to( select => [
-                [ timeout => [ 3, [ env => [ 'bar' ]]]],
-                [ 'out' ]
-            ] );
+            send_to( env => [ baz => 30 ] );
+
+            wait_for(
+                [ timeout => [ 5, [ env => [ 'baz' ]]]],
+                [ out => [ 'baz(%s)' ]]
+            );
+
+            wait_for(
+                [ timeout => [ 1, [ env => [ 'bar' ]]]],
+                [ out => [ 'bar(%s)' ]]
+            );
+
+            wait_for(
+                [ timeout => [ 3, [ env => [ 'foo' ]]]],
+                [ out => [ 'foo(%s)' ]]
+            );
         },
     ],
 );
