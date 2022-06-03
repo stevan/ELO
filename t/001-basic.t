@@ -169,7 +169,7 @@ sub loop ( $MAX_TICKS ) {
 
             my $message = recv_from;
 
-            if ($message) {
+            if (defined $message) {
                 send_to( out => "*/ wait /* : got message($message)") if DEBUG;
                 push $callback->[1]->@*, $message;
                 send_to( @$callback );
@@ -196,7 +196,7 @@ sub loop ( $MAX_TICKS ) {
 
                 my $message = recv_from;
 
-                if ($message) {
+                if (defined $message) {
                     send_to( out => "*/ pipe /* : got message($message)") if DEBUG;
                     push $callback->[1]->@*, $message;
                     send_to( @$callback );
@@ -266,9 +266,9 @@ sub loop ( $MAX_TICKS ) {
 
             # ...
 
-            await( [ $e2 => [ 'baz' ]], [ out => [ 'baz(%s)' ]] );
-            await( [ $e2 => [ 'bar' ]], [ out => [ 'bar(%s)' ]] );
             await( [ $e2 => [ 'foo' ]], [ out => [ 'foo(%s)' ]] );
+            await( [ $e2 => [ 'bar' ]], [ out => [ 'bar(%s)' ]] );
+            await( [ $e2 => [ 'baz' ]], [ out => [ 'baz(%s)' ]] );
 
         },
     ],
