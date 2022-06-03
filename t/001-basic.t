@@ -41,6 +41,10 @@ sub spawn ($pid, $init=undef) {
     $pid;
 }
 
+sub sync ($input, $output) {
+    spawn( pipe => [ $input, $output ] );
+}
+
 sub return_to ($msg) {
     push @msg_outbox => [ $CURRENT_PID, $CURRENT_CALLER, $msg ];
 }
@@ -103,7 +107,7 @@ sub loop ( $MAX_TICKS ) {
             }
         }
 
-        say "---------------------------- tick($tick)" if DEBUG == -1;
+        say "---------------------------- tick($tick)" if DEBUG;
     }
 
 }
@@ -235,37 +239,26 @@ sub loop ( $MAX_TICKS ) {
 
             # ...
 
-            spawn( pipe => [
-                [ in => 'foo: ' ],
-                [ $e1, [ 'foo' ]]
-            ]);
-
-            spawn( pipe => [
-                [ in => 'bar: ' ],
-                [ $e1, [ 'bar' ]]
-            ]);
-
-            spawn( pipe => [
-                [ in => 'baz: ' ],
-                [ $e1, [ 'baz' ]]
-            ]);
+            sync( [ in => 'foo: ' ], [ $e1, [ 'foo' ]] );
+            sync( [ in => 'bar: ' ], [ $e1, [ 'bar' ]] );
+            sync( [ in => 'baz: ' ], [ $e1, [ 'baz' ]] );
 
             # ...
 
-            spawn( pipe => [
+            sync(
                 [ timeout => [ 2, [ $e1 => [ 'baz' ]]]],
                 [ $e2, [ 'baz' ]]
-            ]);
+            );
 
-            spawn( pipe => [
+            sync(
                 [ timeout => [ 3, [ $e1 => [ 'bar' ]]]],
                 [ $e2, [ 'bar' ]]
-            ]);
+            );
 
-            spawn( pipe => [
+            sync(
                 [ timeout => [ 4, [ $e1 => [ 'foo' ]]]],
                 [ $e2, [ 'foo' ]]
-            ]);
+            );
 
             # ...
 
