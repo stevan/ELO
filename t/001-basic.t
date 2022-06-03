@@ -32,6 +32,10 @@ sub recv_from ($pid=undef) {
     return $msg->[1];
 }
 
+sub return_to ($msg) {
+    push @msg_outbox => [ $CURRENT_PID, $CURRENT_CALLER, $msg ];
+}
+
 my $PID = 0;
 sub spawn ($pid, $init=undef) {
     my $process = [ [], [], {}, $processes{$pid}->[-1] ];
@@ -45,8 +49,8 @@ sub sync ($input, $output) {
     spawn( pipe => [ $input, $output ] );
 }
 
-sub return_to ($msg) {
-    push @msg_outbox => [ $CURRENT_PID, $CURRENT_CALLER, $msg ];
+sub await ($input, $output) {
+    spawn( wait => [ $input, $output ] );
 }
 
 sub loop ( $MAX_TICKS ) {
@@ -262,21 +266,9 @@ sub loop ( $MAX_TICKS ) {
 
             # ...
 
-            spawn( wait => [
-                [ $e2 => [ 'baz' ]],
-                [ out => [ 'baz(%s)' ]]
-            ]);
-
-            spawn( wait => [
-                [ $e2 => [ 'bar' ]],
-                [ out => [ 'bar(%s)' ]]
-            ]);
-
-            spawn( wait => [
-                [ $e2 => [ 'foo' ]],
-                [ out => [ 'foo(%s)' ]]
-            ]);
-
+            await( [ $e2 => [ 'baz' ]], [ out => [ 'baz(%s)' ]] );
+            await( [ $e2 => [ 'bar' ]], [ out => [ 'bar(%s)' ]] );
+            await( [ $e2 => [ 'foo' ]], [ out => [ 'foo(%s)' ]] );
 
         },
     ],
