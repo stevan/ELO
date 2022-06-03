@@ -126,6 +126,16 @@ sub loop ( $MAX_TICKS ) {
             }
         },
     ],
+    in => [
+        [],[],
+        {},
+        sub ($env, $msg) {
+            print $msg;
+            my $input = <>;
+            chomp $input;
+            return_to( $input );
+        },
+    ],
     timeout => [
         [],[],
         {},
@@ -221,9 +231,22 @@ sub loop ( $MAX_TICKS ) {
             my $e1 = spawn( 'env' );
             my $e2 = spawn( 'env' );
 
-            send_to( $e1 => [ foo => 10 ] );
-            send_to( $e1 => [ bar => 20 ] );
-            send_to( $e1 => [ baz => 30 ] );
+            # ...
+
+            spawn( pipe => [
+                [ in => 'foo > ' ],
+                [ $e1, [ 'foo' ]]
+            ]);
+
+            spawn( pipe => [
+                [ in => 'bar > ' ],
+                [ $e1, [ 'bar' ]]
+            ]);
+
+            spawn( pipe => [
+                [ in => 'baz > ' ],
+                [ $e1, [ 'baz' ]]
+            ]);
 
             # ...
 
@@ -258,6 +281,7 @@ sub loop ( $MAX_TICKS ) {
                 [ $e2 => [ 'foo' ]],
                 [ out => [ 'foo(%s)' ]]
             ]);
+
         },
     ],
 );
