@@ -19,8 +19,24 @@ my %processes;
 
 our $CURRENT_PID;
 our $CURRENT_CALLER;
+
+## .. i/o
+
 our $IN;
 our $OUT;
+our $ERR;
+
+## ... sugar
+
+sub match ($msg, $table) {
+    my ($action, $body) = @$msg;
+    my $cb = $table->{$action} // die "No match for $action";
+    $cb->($body);
+}
+
+sub timeout ($ticks, $callback) {
+    [ spawn( '!timeout' ) => [ $ticks, $callback ]];
+}
 
 ## ... message delivery
 
@@ -61,16 +77,13 @@ sub await ($input, $output) {
     spawn( '!await' => [ $input, $output ] );
 }
 
-sub timeout ($ticks, $callback) {
-    [ '!__timeout__' => [ $ticks, $callback ]];
-}
-
 ## ...
 
 sub loop ( $MAX_TICKS ) {
 
     local $IN  = spawn( '!in' );
     local $OUT = spawn( '!out' );
+    local $ERR = spawn( '!err' );
 
     my $tick = 0;
     while ($tick < $MAX_TICKS) {
@@ -129,56 +142,71 @@ sub loop ( $MAX_TICKS ) {
 }
 
 %processes = (
+    '!err' => [
+        [],[],
+        {},
+        sub ($env, $msg) {
+            my $prefix = DEBUG ? "ERR ($CURRENT_CALLER) >> " : "ERR >> ";
+
+            match $msg, +{
+                printf => sub ($body) {
+                    my ($fmt, @values) = @$body;
+                    warn( $prefix, sprintf $fmt, @values, "\n" );
+                },
+                print => sub ($body) {
+                    warn( $prefix, @$body, "\n" );
+                }
+            };
+        },
+    ],
     '!out' => [
         [],[],
         {},
         sub ($env, $msg) {
-            my ($action, $body) = @$msg;
+            my $prefix = DEBUG ? "OUT ($CURRENT_CALLER) >> " : "OUT >> ";
 
-            my $prefix = "OUT >> ";
-               $prefix = "OUT ($CURRENT_CALLER) >> " if DEBUG;
-
-            if ( $action eq 'printf' ) {
-                my ($fmt, @values) = @$body;
-                say( $prefix, sprintf $fmt, @values );
-            }
-            elsif ( $action eq 'print' ) {
-                say( $prefix, @$body );
-            }
+            match $msg, +{
+                printf => sub ($body) {
+                    my ($fmt, @values) = @$body;
+                    say( $prefix, sprintf $fmt, @values );
+                },
+                print => sub ($body) {
+                    say( $prefix, @$body );
+                }
+            };
         },
     ],
     '!in' => [
         [],[],
         {},
         sub ($env, $msg) {
-            my ($action, $body) = @$msg;
+            my $prefix = DEBUG ? "IN ($CURRENT_CALLER) << " : "IN << ";
 
-            die unless $action eq 'read';
+            match $msg, +{
+                read => sub ($body) {
+                    my ($prompt) = @$body;
+                    $prompt //= '';
 
-            my ($prompt) = @$body;
-            $prompt //= '';
-
-            my $prefix = "IN << ";
-               $prefix = "IN ($CURRENT_CALLER) << " if DEBUG;
-
-            print $prefix, $prompt;
-            my $input = <>;
-            chomp $input;
-            return_to( $input );
+                    print $prefix, $prompt;
+                    my $input = <>;
+                    chomp $input;
+                    return_to( $input );
+                }
+            };
         },
     ],
-    '!__timeout__' => [
+    '!timeout' => [
         [],[],
         {},
         sub ($env, $msg) {
             my ($timer, $event, $caller) = @$msg;
 
             if ( $timer == 0 ) {
-                send_to( $OUT => [ print => ["!timeout! DONE"] ]) if DEBUG;
+                send_to( $ERR => [ print => ["*/ !timeout! /* : DONE"] ]) if DEBUG;
                 send_to( @$event, $caller );
             }
             else {
-                send_to( $OUT => [ print => ["!timeout! counting down $timer"] ] ) if DEBUG;
+                send_to( $ERR => [ print => ["*/ !timeout! /* : counting down $timer"] ] ) if DEBUG;
                 send_to( $CURRENT_PID => [ $timer - 1, $event, $caller // $CURRENT_CALLER ] );
             }
         },
@@ -192,12 +220,12 @@ sub loop ( $MAX_TICKS ) {
             my $message = recv_from;
 
             if (defined $message) {
-                send_to( $OUT => [ print => ["*/ await /* : got message($message)"]]) if DEBUG;
+                send_to( $ERR => [ print => ["*/ !await /* : got message($message)"]]) if DEBUG;
                 push $callback->[1]->[1]->@*, $message;
                 send_to( @$callback );
             }
             else {
-                send_to( $OUT => [ print => ["*/ await /* : no messages"]]) if DEBUG;
+                send_to( $ERR => [ print => ["*/ !await /* : no messages"]]) if DEBUG;
                 send_to( @$command );
                 send_to( $CURRENT_PID => [ $command, $callback ]);
             }
@@ -209,7 +237,7 @@ sub loop ( $MAX_TICKS ) {
         sub ($env, $msg) {
             if ( scalar @$msg == 2 ) {
                 my ($command, $callback) = @$msg;
-                send_to( $OUT => [ print => ["*/ sync /* : sending initial message"]]) if DEBUG;
+                send_to( $ERR => [ print => ["*/ !sync /* : sending initial message"]]) if DEBUG;
                 #warn Dumper $command;
                 send_to( @$command );
                 send_to( $CURRENT_PID => [ $callback ] );
@@ -220,13 +248,13 @@ sub loop ( $MAX_TICKS ) {
                 my $message = recv_from;
 
                 if (defined $message) {
-                    send_to( $OUT => [ print => ["*/ sync /* : got message($message)"]]) if DEBUG;
+                    send_to( $ERR => [ print => ["*/ !sync /* : got message($message)"]]) if DEBUG;
                     #warn Dumper $callback;
                     push $callback->[1]->[1]->@*, $message;
                     send_to( @$callback );
                 }
                 else {
-                    send_to( $OUT => [ print => ["*/ sync /* : no messages"]]) if DEBUG;
+                    send_to( $ERR => [ print => ["*/ !sync /* : no messages"]]) if DEBUG;
                     send_to( $CURRENT_PID => [ $callback ]);
                 }
             }
@@ -237,25 +265,26 @@ sub loop ( $MAX_TICKS ) {
         [],[],
         {},
         sub ($env, $msg) {
-            my ($action, $body) = @$msg;
-            if ( $action eq 'get' ) {
-                my ($key) = @$body;
-                if ( exists $env->{$key} ) {
-                    send_to( $OUT => [ print => ["fetching {$key}"]]) if DEBUG;
-                    return_to( $env->{$key} );
-                }
-                else {
-                    send_to( $OUT => [ print => ["not found {$key}"]]) if DEBUG;
-                }
-            }
-            if ( $action eq 'set' ) {
-                my ($key, $value) = @$body;
-                send_to( $OUT => [ print => ["storing $key => $value"]]) if DEBUG;
-                $env->{$key} = $value;
+            match $msg, +{
+                get => sub ($body) {
+                    my ($key) = @$body;
+                    if ( exists $env->{$key} ) {
+                        send_to( $ERR => [ print => ["fetching {$key}"]]) if DEBUG;
+                        return_to( $env->{$key} );
+                    }
+                    else {
+                        send_to( $ERR => [ print => ["not found {$key}"]]) if DEBUG;
+                    }
+                },
+                set => sub ($body) {
+                    my ($key, $value) = @$body;
+                    send_to( $ERR => [ print => ["storing $key => $value"]]) if DEBUG;
+                    $env->{$key} = $value;
 
-                send_to( $OUT => [ print => ["ENV{ ".(join ', ' => map { join ' => ' => $_, $env->{$_} } keys %$env)." }"]])
-                    if DEBUG;
-            }
+                    send_to( $ERR => [ print => ["ENV{ ".(join ', ' => map { join ' => ' => $_, $env->{$_} } keys %$env)." }"]])
+                        if DEBUG;
+                }
+            };
         },
     ],
     main => [
@@ -270,16 +299,9 @@ sub loop ( $MAX_TICKS ) {
             # ...
 
             sync(
-                [ $IN => [ read => ['foo: '] ]],
-                [ $e1,  [ set  => ['foo']   ]] );
-
-            sync(
-                [ $IN => [ read => ['bar: '] ]],
-                [ $e1,  [ set  => ['bar']   ]] );
-
-            sync(
-                [ $IN => [ read => ['baz: '] ]],
-                [ $e1,  [ set  => ['baz']   ]] );
+                [ $IN => [ read => ["$_: "] ]],
+                [ $e1,   [ set  => [ $_   ] ]]
+            ) foreach qw[ foo bar baz ];
 
             # ...
 
