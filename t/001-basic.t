@@ -103,11 +103,6 @@ sub loop ( $MAX_TICKS ) {
 
                 $f->($env, $msg);
 
-                # if we still have messages
-                #if ( $inbox->@* ) {
-                #    # handle them in the next loop ...
-                #    push @active => $active;
-                #}
             }
         }
 
