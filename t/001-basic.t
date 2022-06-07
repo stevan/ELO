@@ -116,16 +116,17 @@ sub loop ( $MAX_TICKS ) {
         [],[],
         {},
         sub ($env, $msg) {
+            my ($action, $body) = @$msg;
 
             my $prefix = "OUT >> ";
                $prefix = "OUT ($CURRENT_CALLER) >> " if DEBUG;
 
-            if ( ref $msg ) {
-                my ($fmt, @msgs) = @$msg;
-                say( $prefix, sprintf $fmt, @msgs );
+            if ( $action eq 'printf' ) {
+                my ($fmt, @values) = @$body;
+                say( $prefix, sprintf $fmt, @values );
             }
-            else {
-                say( $prefix, $msg );
+            elsif ( $action eq 'print' ) {
+                say( $prefix, @$body );
             }
         },
     ],
@@ -133,9 +134,17 @@ sub loop ( $MAX_TICKS ) {
         [],[],
         {},
         sub ($env, $msg) {
+            my ($action, $body) = @$msg;
+
+            die unless $action eq 'read';
+
+            my ($prompt) = @$body;
+            $prompt //= '';
+
             my $prefix = "IN << ";
                $prefix = "IN ($CURRENT_CALLER) << " if DEBUG;
-            print $prefix, $msg;
+
+            print $prefix, $prompt;
             my $input = <>;
             chomp $input;
             return_to( $input );
@@ -147,11 +156,11 @@ sub loop ( $MAX_TICKS ) {
         sub ($env, $msg) {
             my ($timer, $event, $caller) = @$msg;
             if ( $timer == 0 ) {
-                send_to( out => "!timeout! DONE") if DEBUG;
+                send_to( out => [ print => ["!timeout! DONE"] ]) if DEBUG;
                 send_to( @$event, $caller );
             }
             else {
-                send_to( out => "!timeout! counting down $timer" ) if DEBUG;
+                send_to( out => [ print => ["!timeout! counting down $timer"] ] ) if DEBUG;
                 send_to( timeout => [ $timer - 1, $event, $caller // $CURRENT_CALLER ] );
             }
         },
@@ -165,12 +174,12 @@ sub loop ( $MAX_TICKS ) {
             my $message = recv_from;
 
             if (defined $message) {
-                send_to( out => "*/ wait /* : got message($message)") if DEBUG;
-                push $callback->[1]->@*, $message;
+                send_to( out => [ print => ["*/ wait /* : got message($message)"]]) if DEBUG;
+                push $callback->[1]->[1]->@*, $message;
                 send_to( @$callback );
             }
             else {
-                send_to( out => "*/ wait /* : no messages") if DEBUG;
+                send_to( out => [ print => ["*/ wait /* : no messages"]]) if DEBUG;
                 send_to( @$command );
                 send_to( $CURRENT_PID => [ $command, $callback ]);
             }
@@ -182,7 +191,7 @@ sub loop ( $MAX_TICKS ) {
         sub ($env, $msg) {
             if ( scalar @$msg == 2 ) {
                 my ($command, $callback) = @$msg;
-                send_to( out => "*/ pipe /* : sending initial message") if DEBUG;
+                send_to( out => [ print => ["*/ pipe /* : sending initial message"]]) if DEBUG;
                 send_to( @$command );
                 send_to( $CURRENT_PID => [ $callback ] );
             }
@@ -192,12 +201,13 @@ sub loop ( $MAX_TICKS ) {
                 my $message = recv_from;
 
                 if (defined $message) {
-                    send_to( out => "*/ pipe /* : got message($message)") if DEBUG;
-                    push $callback->[1]->@*, $message;
+                    send_to( out => [ print => ["*/ pipe /* : got message($message)"]]) if DEBUG;
+                    #warn Dumper $callback;
+                    push $callback->[1]->[1]->@*, $message;
                     send_to( @$callback );
                 }
                 else {
-                    send_to( out => "*/ pipe /* : no messages") if DEBUG;
+                    send_to( out => [ print => ["*/ pipe /* : no messages"]]) if DEBUG;
                     send_to( $CURRENT_PID => [ $callback ]);
                 }
             }
@@ -207,22 +217,23 @@ sub loop ( $MAX_TICKS ) {
         [],[],
         {},
         sub ($env, $msg) {
-            if ( scalar @$msg == 1 ) {
-                my ($key) = @$msg;
+            my ($action, $body) = @$msg;
+            if ( $action eq 'get' ) {
+                my ($key) = @$body;
                 if ( exists $env->{$key} ) {
-                    send_to( out => "fetching {$key}") if DEBUG;
+                    send_to( out => [ print => ["fetching {$key}"]]) if DEBUG;
                     return_to( $env->{$key} );
                 }
                 else {
-                    send_to( out => "not found {$key}") if DEBUG;
+                    send_to( out => [ print => ["not found {$key}"]]) if DEBUG;
                 }
             }
-            elsif ( scalar @$msg == 2 ) {
-                my ($key, $value) = @$msg;
-                send_to( out => "storing $key => $value") if DEBUG;
+            if ( $action eq 'set' ) {
+                my ($key, $value) = @$body;
+                send_to( out => [ print => ["storing $key => $value"]]) if DEBUG;
                 $env->{$key} = $value;
 
-                send_to( out => "ENV{ ".(join ', ' => map { join ' => ' => $_, $env->{$_} } keys %$env)." }")
+                send_to( out => [ print => ["ENV{ ".(join ', ' => map { join ' => ' => $_, $env->{$_} } keys %$env)." }"]])
                     if DEBUG;
             }
         },
@@ -231,39 +242,44 @@ sub loop ( $MAX_TICKS ) {
         [],[],
         {},
         sub ($env, $msg) {
-            send_to( out => "-> main starting ..." );
+            send_to( out => [ print => ["-> main starting ..."]] );
 
             my $e1 = spawn( 'env' );
             my $e2 = spawn( 'env' );
 
             # ...
 
-            sync( [ in => 'foo: ' ], [ $e1, [ 'foo' ]] );
-            sync( [ in => 'bar: ' ], [ $e1, [ 'bar' ]] );
-            sync( [ in => 'baz: ' ], [ $e1, [ 'baz' ]] );
+            sync(
+                [ in => [ read => ['foo: '] ]],
+                [ $e1,  [ set  => ['foo']   ]] );
+
+            sync(
+                [ in => [ read => ['bar: '] ]],
+                [ $e1,  [ set  => ['bar']   ]] );
+
+            sync(
+                [ in => [ read => ['baz: '] ]],
+                [ $e1,  [ set  => ['baz']   ]] );
 
             # ...
 
             sync(
-                [ timeout => [ 2, [ $e1 => [ 'baz' ]]]],
-                [ $e2, [ 'baz' ]]
-            );
+                [ timeout => [ 2, [ $e1 => [ get => ['baz'] ]]]],
+                [ $e2, [ set => ['baz'] ]]);
 
             sync(
-                [ timeout => [ 3, [ $e1 => [ 'bar' ]]]],
-                [ $e2, [ 'bar' ]]
-            );
+                [ timeout => [ 3, [ $e1 => [ get => ['bar'] ]]]],
+                [ $e2, [ set => ['bar'] ]]);
 
             sync(
-                [ timeout => [ 4, [ $e1 => [ 'foo' ]]]],
-                [ $e2, [ 'foo' ]]
-            );
+                [ timeout => [ 4, [ $e1 => [ get => ['foo'] ]]]],
+                [ $e2, [ set => ['foo'] ]]);
 
             # ...
 
-            await( [ $e2 => [ 'foo' ]], [ out => [ 'foo(%s)' ]] );
-            await( [ $e2 => [ 'bar' ]], [ out => [ 'bar(%s)' ]] );
-            await( [ $e2 => [ 'baz' ]], [ out => [ 'baz(%s)' ]] );
+            await( [ $e2 => [ get => ['foo'] ]], [ out => [ printf => [ 'foo(%s)' ] ]] );
+            await( [ $e2 => [ get => ['bar'] ]], [ out => [ printf => [ 'bar(%s)' ] ]] );
+            await( [ $e2 => [ get => ['baz'] ]], [ out => [ printf => [ 'baz(%s)' ] ]] );
 
         },
     ],
