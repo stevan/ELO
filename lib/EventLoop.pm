@@ -91,19 +91,21 @@ sub match ($msg, $table) {
 }
 
 sub timeout ($ticks, $callback) {
-    [ spawn( '!timeout' ) => [ $ticks, $callback ]];
+    [ spawn( '!timeout' ) => [ start => [ $ticks, $callback ]]];
 }
 
 ## ... message delivery
 
-sub send_to ($pid, $msg, $from=undef) {
-    $from //= $CURRENT_PID;
+sub send_to ($pid, $msg) {
+    push @msg_inbox => [ $CURRENT_PID, $pid, $msg ];
+}
+
+sub send_from ($from, $pid, $msg) {
     push @msg_inbox => [ $from, $pid, $msg ];
 }
 
-sub recv_from ($pid=undef) {
-    $pid //= $CURRENT_PID;
-    my $msg = shift $processes{$pid}->[OUTBOX]->@*;
+sub recv_from () {
+    my $msg = shift $processes{$CURRENT_PID}->[OUTBOX]->@*;
     return unless $msg;
     return $msg->[1];
 }
@@ -143,7 +145,7 @@ sub loop ( $MAX_TICKS, $start_pid ) {
 
     # initialise ...
     my $start = spawn( $start_pid );
-    send_to( $start => [], INIT_PID );
+    send_from( INIT_PID, $start => [] );
 
     my $tick = 0;
     while ($tick < $MAX_TICKS) {
@@ -255,16 +257,26 @@ actor '!in' => sub ($env, $msg) {
 };
 
 actor '!timeout' => sub ($env, $msg) {
-    my ($timer, $event, $caller) = @$msg;
 
-    if ( $timer == 0 ) {
-        send_to( $ERR => [ print => ["*/ !timeout! /* : DONE"] ]) if DEBUG;
-        send_to( @$event, $caller );
-    }
-    else {
-        send_to( $ERR => [ print => ["*/ !timeout! /* : counting down $timer"] ] ) if DEBUG;
-        send_to( $CURRENT_PID => [ $timer - 1, $event, $caller // $CURRENT_CALLER ] );
-    }
+    match $msg, +{
+        start => sub ($body) {
+            my ($timer, $event) = @$body;
+            send_to( $ERR => [ print => ["*/ !timeout! /* : starting $timer"] ] ) if DEBUG;
+            send_to( $CURRENT_PID => [ countdown => [ $timer - 1, $event, $CURRENT_CALLER ] ] );
+        },
+        countdown => sub ($body) {
+            my ($timer, $event, $caller) = @$body;
+
+            if ( $timer == 0 ) {
+                send_to( $ERR => [ print => ["*/ !timeout! /* : DONE"] ]) if DEBUG;
+                send_from( $caller, @$event );
+            }
+            else {
+                send_to( $ERR => [ print => ["*/ !timeout! /* : counting down $timer"] ] ) if DEBUG;
+                send_to( $CURRENT_PID => [ countdown => [ $timer - 1, $event, $caller ]] );
+            }
+        }
+    };
 };
 
 actor '!await' => sub ($env, $msg) {
@@ -274,17 +286,17 @@ actor '!await' => sub ($env, $msg) {
             my ($command, $callback) = @$body;
             send_to( $ERR => [ print => ["*/ !await /* : sending message"]]) if DEBUG;
             send_to( @$command );
-            send_to( $CURRENT_PID => [ recv => [ $command, $callback ]]);
+            send_to( $CURRENT_PID => [ recv => [ $command, $callback, $CURRENT_CALLER ]]);
         },
         recv => sub ($body) {
-            my ($command, $callback) = @$body;
+            my ($command, $callback, $caller) = @$body;
 
             my $message = recv_from;
 
             if (defined $message) {
                 send_to( $ERR => [ print => ["*/ !await /* : recieve message($message)"]]) if DEBUG;
                 push $callback->[1]->[1]->@*, $message;
-                send_to( @$callback );
+                send_from( $caller, @$callback );
             }
             else {
                 send_to( $ERR => [ print => ["*/ !await /* : no messages"]]) if DEBUG;
@@ -301,10 +313,10 @@ actor '!sync' => sub ($env, $msg) {
             my ($command, $callback) = @$body;
             send_to( $ERR => [ print => ["*/ !sync /* : sending message"]]) if DEBUG;
             send_to( @$command );
-            send_to( $CURRENT_PID => [ recv => [ $callback ] ] );
+            send_to( $CURRENT_PID => [ recv => [ $callback, $CURRENT_CALLER ] ] );
         },
         recv => sub ($body) {
-            my ($callback) = @$body;
+            my ($callback, $caller) = @$body;
 
             my $message = recv_from;
 
@@ -312,7 +324,7 @@ actor '!sync' => sub ($env, $msg) {
                 send_to( $ERR => [ print => ["*/ !sync /* : recieve message($message)"]]) if DEBUG;
                 #warn Dumper $callback;
                 push $callback->[1]->[1]->@*, $message;
-                send_to( @$callback );
+                send_from( $caller, @$callback );
             }
             else {
                 send_to( $ERR => [ print => ["*/ !sync /* : no messages"]]) if DEBUG;
