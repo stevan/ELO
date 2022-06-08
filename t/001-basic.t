@@ -13,37 +13,46 @@ use EventLoop;
 # ... userland ...
 actor env => sub ($env, $msg) {
     match $msg, +{
+        set_all => sub ($body) {
+            my ($new_env) = @$body;
+            %$env = ();
+            $env->{$_} = $new_env->{$_} foreach keys $new_env;
+            send_to( ERR, [ print => ["new env set => ENV{ ".(join ', ' => map { join ' => ' => $_, $env->{$_} } keys %$env)." }"]])
+                if DEBUG;
+        },
         get => sub ($body) {
             my ($key) = @$body;
             if ( exists $env->{$key} ) {
-                send_to( ERR ,=> [ print => ["fetching {$key}"]]) if DEBUG;
+                send_to( ERR, [ print => ["fetching {$key}"]]) if DEBUG;
                 return_to( $env->{$key} );
             }
             else {
-                send_to( ERR ,=> [ print => ["not found {$key}"]]) if DEBUG;
+                send_to( ERR, [ print => ["not found {$key}"]]) if DEBUG;
             }
         },
         set => sub ($body) {
             my ($key, $value) = @$body;
-            send_to( ERR ,=> [ print => ["storing $key => $value"]]) if DEBUG;
+            send_to( ERR, [ print => ["storing $key => $value"]]) if DEBUG;
             $env->{$key} = $value;
 
-            send_to( ERR ,=> [ print => ["ENV{ ".(join ', ' => map { join ' => ' => $_, $env->{$_} } keys %$env)." }"]])
+            send_to( ERR, [ print => ["env is now => ENV{ ".(join ', ' => map { join ' => ' => $_, $env->{$_} } keys %$env)." }"]])
                 if DEBUG;
         }
     };
 };
 
 actor main => sub ($env, $msg) {
-    send_to( OUT ,=> [ print => ["-> main starting ..."]] );
+    send_to( OUT, [ print => ["-> main starting ..."]] );
 
     my $e1 = spawn( 'env' );
     my $e2 = spawn( 'env' );
 
     # ...
 
+    send_to( $e1, [ set_all => [{ foo => 100, bar => 200, baz => 300 }] ])
+
     sync(
-        [ IN ,=> [ read => ["$_: "] ]],
+        [ IN, [ read => ["$_: "] ]],
         [ $e1,   [ set  => [ $_   ] ]]
     ) foreach qw[ foo bar baz ];
 
@@ -63,9 +72,9 @@ actor main => sub ($env, $msg) {
 
     # ...
 
-    await( [ $e2 => [ get => ['foo'] ]], [ OUT ,=> [ printf => [ 'foo(%s)' ] ]] );
-    await( [ $e2 => [ get => ['bar'] ]], [ OUT ,=> [ printf => [ 'bar(%s)' ] ]] );
-    await( [ $e2 => [ get => ['baz'] ]], [ OUT ,=> [ printf => [ 'baz(%s)' ] ]] );
+    await( [ $e2 => [ get => ['foo'] ]], [ OUT, [ printf => [ 'foo(%s)' ] ]] );
+    await( [ $e2 => [ get => ['bar'] ]], [ OUT, [ printf => [ 'bar(%s)' ] ]] );
+    await( [ $e2 => [ get => ['baz'] ]], [ OUT, [ printf => [ 'baz(%s)' ] ]] );
 
 };
 
