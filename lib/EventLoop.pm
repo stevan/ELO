@@ -274,17 +274,17 @@ actor '!await' => sub ($env, $msg) {
             my ($command, $callback) = @$body;
             send_to( $ERR => [ print => ["*/ !await /* : sending message"]]) if DEBUG;
             send_to( @$command );
-            send_to( $CURRENT_PID => [ recv => [ $command, $callback, $CURRENT_CALLER ]]);
+            send_to( $CURRENT_PID => [ recv => [ $command, $callback ]]);
         },
         recv => sub ($body) {
-            my ($command, $callback, $caller) = @$body;
+            my ($command, $callback) = @$body;
 
             my $message = recv_from;
 
             if (defined $message) {
                 send_to( $ERR => [ print => ["*/ !await /* : recieve message($message)"]]) if DEBUG;
                 push $callback->[1]->[1]->@*, $message;
-                send_to( @$callback, $caller );
+                send_to( @$callback );
             }
             else {
                 send_to( $ERR => [ print => ["*/ !await /* : no messages"]]) if DEBUG;
@@ -301,10 +301,10 @@ actor '!sync' => sub ($env, $msg) {
             my ($command, $callback) = @$body;
             send_to( $ERR => [ print => ["*/ !sync /* : sending message"]]) if DEBUG;
             send_to( @$command );
-            send_to( $CURRENT_PID => [ recv => [ $callback, $CURRENT_CALLER ] ] );
+            send_to( $CURRENT_PID => [ recv => [ $callback ] ] );
         },
         recv => sub ($body) {
-            my ($callback, $caller) = @$body;
+            my ($callback) = @$body;
 
             my $message = recv_from;
 
@@ -312,7 +312,7 @@ actor '!sync' => sub ($env, $msg) {
                 send_to( $ERR => [ print => ["*/ !sync /* : recieve message($message)"]]) if DEBUG;
                 #warn Dumper $callback;
                 push $callback->[1]->[1]->@*, $message;
-                send_to( @$callback, $caller );
+                send_to( @$callback );
             }
             else {
                 send_to( $ERR => [ print => ["*/ !sync /* : no messages"]]) if DEBUG;
