@@ -117,22 +117,21 @@ sub return_to ($msg) {
 ## ... process creation
 
 my $PID = 0;
-sub spawn ($name, $init=undef) {
+sub spawn ($name) {
     my $process = [ [], [], {}, $actors{$name} ];
     my $pid = sprintf '%03d:%s' => ++$PID, $name;
     $processes{ $pid } = $process;
-    send_to( $pid, $init ) if $init;
     $pid;
 }
 
 ## ... currency control
 
 sub sync ($input, $output) {
-    spawn( '!sync' => [ send => [ $input, $output ] ] );
+    send_to( spawn( '!sync' ) => [ send => [ $input, $output ] ] );
 }
 
 sub await ($input, $output) {
-    spawn( '!await' => [ send => [ $input, $output ] ] );
+    send_to( spawn( '!await' ) => [ send => [ $input, $output ] ] );
 }
 
 ## ...

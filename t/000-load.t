@@ -28,7 +28,7 @@ actor bounce => sub ($env, $msg) {
 actor main => sub ($env, $msg) {
     send_to( OUT, [ print => ["-> main starting ..."]] );
 
-    spawn( 'bounce', [ up => [ 1 ]] );
+    send_to( spawn( 'bounce' ), [ up => [ 1 ]] );
 };
 
 # loop ...
