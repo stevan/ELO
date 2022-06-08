@@ -73,6 +73,6 @@ actor main => sub ($env, $msg) {
 };
 
 # loop ...
-loop( 20, 'main' );
+ok loop( 20, 'main' );
 
 done_testing;

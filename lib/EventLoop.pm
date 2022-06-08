@@ -199,6 +199,7 @@ sub loop ( $MAX_TICKS, $start_pid ) {
         }
     }
 
+    return 1;
 }
 
 ## create the core actors

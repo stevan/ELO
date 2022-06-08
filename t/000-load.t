@@ -8,165 +8,34 @@ use Test::More;
 use List::Util 'first';
 use Data::Dumper;
 
-use constant DEBUG => $ENV{DEBUG} // 0;
+use EventLoop;
 
-use constant INBOX  => 0;
-use constant OUTBOX => 1;
-
-my @msg_inbox;
-my @msg_outbox;
-my %processes;
-
-our $CURRENT_PID;
-our $CURRENT_CALLER;
-
-sub send_to ($pid, $msg, $from=undef) {
-    $from //= $CURRENT_PID;
-    push @msg_inbox => [ $from, $pid, $msg ];
-}
-
-sub return_to ($msg) {
-    push @msg_outbox => [ $CURRENT_PID, $CURRENT_CALLER, $msg ];
-}
-
-sub recv_from ($pid=undef) {
-    $pid //= $CURRENT_PID;
-    my $msg = shift $processes{$pid}->[OUTBOX]->@*;
-    return unless $msg;
-    return $msg->[1];
-}
-
-sub loop ( $MAX_TICKS ) {
-
-    my $tick = 0;
-    while ($tick < $MAX_TICKS) {
-        $tick++;
-
-        #warn Dumper \@msg_inbox;
-        #warn Dumper \@msg_outbox;
-
-        # deliver all the messages in the queue
-        while (@msg_inbox) {
-            my $next = shift @msg_inbox;
-
-            my $from = shift $next->@*;
-            my ($to, $m) = $next->@*;
-            unless (exists $processes{$to}) {
-                warn "Got message for unknown pid($to)";
-                next;
-            }
-            push $processes{$to}->[INBOX]->@* => [ $from, $m ];
+actor bounce => sub ($env, $msg) {
+    match $msg, +{
+        up => sub ($body) {
+            my ($cnt) = @$body;
+            send_to( OUT, [ print => ["bounce(UP) => $cnt"]] );
+            send_to( PID, [ down => [ $cnt+1 ] ])
+        },
+        down => sub ($body) {
+            my ($cnt) = @$body;
+            send_to( OUT, [ print => ["bounce(DOWN) => $cnt"]] );
+            send_to( PID, [ up => [ $cnt+1 ] ])
         }
+    };
+};
 
-        # deliver all the messages in the queue
-        while (@msg_outbox) {
-            my $next = shift @msg_outbox;
+actor main => sub ($env, $msg) {
+    send_to( OUT, [ print => ["-> main starting ..."]] );
 
-            my $from = shift $next->@*;
-            my ($to, $m) = $next->@*;
-            unless (exists $processes{$to}) {
-                warn "Got message for unknown pid($to)";
-                next;
-            }
-            push $processes{$to}->[OUTBOX]->@* => [ $from, $m ];
-        }
+    my $bounce = spawn( 'bounce' );
 
-        my @active = map [ $_, $processes{$_}->@* ], keys %processes;
-        while (@active) {
-            my $active = shift @active;
+    send_to( $bounce, [ up => [ 1 ]] );
 
-            my ($pid, $inbox, $outbox, $env, $f) = $active->@*;
+};
 
-            if ( $inbox->@* ) {
-
-                my ($from, $msg) = @{ shift $inbox->@* };
-
-                local $CURRENT_PID    = $pid;
-                local $CURRENT_CALLER = $from;
-
-                $f->($env, $msg);
-
-                # if we still have messages
-                if ( $inbox->@* ) {
-                    # handle them in the next loop ...
-                    push @active => $active;
-                }
-            }
-        }
-
-        say "---------------------------- tick($tick)";
-    }
-
-}
-
-%processes = (
-    out => [
-        [],[],
-        {},
-        sub ($env, $msg) {
-            say( "OUT => $msg" );
-        },
-    ],
-    timeout => [
-        [],[],
-        {},
-        sub ($env, $msg) {
-            my ($timer, $event, $caller) = @$msg;
-            if ( $timer == 0 ) {
-                send_to( out => "!timeout! DONE") if DEBUG;
-                send_to( @$event, $caller );
-            }
-            else {
-                send_to( out => "!timeout! counting down $timer" ) if DEBUG;
-                send_to( timeout => [ $timer - 1, $event, $caller // $CURRENT_CALLER ] );
-            }
-        },
-    ],
-    ping => [
-        [],[],
-        {},
-        sub ($env, $msg) {
-            send_to( out => "/ping/ => $msg" );
-            send_to( pong => $msg + 1 );
-        },
-    ],
-    pong => [
-        [],[],
-        {},
-        sub ($env, $msg) {
-            send_to( out => "\\pong\\ => $msg" );
-            send_to( ping => $msg + 1 );
-        },
-    ],
-    bounce => [
-        [],[],
-        {},
-        sub ($env, $msg) {
-            my ($dir, $cnt) = @$msg;
-            send_to( out => "bounce($dir) => $cnt" );
-            send_to( bounce =>
-                    $dir eq 'ping'
-                        ? ['pong',$cnt + 1]
-                        : ['ping',$cnt + 1]
-            );
-        },
-    ],
-    main => [
-        [],[],
-        {},
-        sub ($env, $msg) {
-            send_to( out => "->main starting ..." );
-            send_to( timeout => [ 3, [ ping => 0 ] ]);
-            send_to( timeout => [ 2, [ bounce => [ ping => 10 ] ] ]);
-            send_to( timeout => [ 1, [ ping => 100 ] ]);
-            send_to( bounce => [ ping => 1000 ] );
-        },
-    ],
-);
-
-# initialise ...
-send_to( main => 1 );
 # loop ...
-loop( 20 );
+ok loop( 20, 'main' );
 
 done_testing;
+
