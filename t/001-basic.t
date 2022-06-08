@@ -13,11 +13,10 @@ use EventLoop;
 # ... userland ...
 actor env => sub ($env, $msg) {
     match $msg, +{
-        set_all => sub ($body) {
+        init => sub ($body) {
             my ($new_env) = @$body;
-            %$env = ();
-            $env->{$_} = $new_env->{$_} foreach keys $new_env;
-            send_to( ERR, [ print => ["new env set => ENV{ ".(join ', ' => map { join ' => ' => $_, $env->{$_} } keys %$env)." }"]])
+            $env->{$_} = $new_env->{$_} foreach keys %$new_env;
+            send_to( ERR, [ print => ["env initialized to => ENV{ ".(join ', ' => map { join ' => ' => $_, $env->{$_} } keys %$env)." }"]])
                 if DEBUG;
         },
         get => sub ($body) {
@@ -49,7 +48,7 @@ actor main => sub ($env, $msg) {
 
     # ...
 
-    send_to( $e1, [ set_all => [{ foo => 100, bar => 200, baz => 300 }] ])
+    send_to( $e1, [ init => [{ foo => 100, bar => 200, baz => 300 }] ]);
 
     sync(
         [ IN, [ read => ["$_: "] ]],
@@ -58,23 +57,18 @@ actor main => sub ($env, $msg) {
 
     # ...
 
+    my $timout_length = 2;
     sync(
-        timeout( 2 => [ $e1 => [ get => ['baz'] ]] ),
-        [ $e2, [ set => ['baz'] ]]);
-
-    sync(
-        timeout( 3 => [ $e1 => [ get => ['bar'] ]] ),
-        [ $e2, [ set => ['bar'] ]]);
-
-    sync(
-        timeout( 4 => [ $e1 => [ get => ['foo'] ]] ),
-        [ $e2, [ set => ['foo'] ]]);
+        timeout( $timout_length++ => [ $e1 => [ get => [$_] ]] ),
+        [ $e2, [ set => [$_] ]]
+    ) foreach qw[ baz bar foo ];
 
     # ...
 
-    await( [ $e2 => [ get => ['foo'] ]], [ OUT, [ printf => [ 'foo(%s)' ] ]] );
-    await( [ $e2 => [ get => ['bar'] ]], [ OUT, [ printf => [ 'bar(%s)' ] ]] );
-    await( [ $e2 => [ get => ['baz'] ]], [ OUT, [ printf => [ 'baz(%s)' ] ]] );
+    await(
+        [ $e2 => [ get => [$_] ]],
+        [ OUT, [ printf => [ $_.'(%s)' ] ]]
+    ) foreach qw[ foo bar baz ];
 
 };
 

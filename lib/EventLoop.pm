@@ -47,7 +47,7 @@ use constant OUTBOX => 1;
 
 use constant DEBUG => $ENV{DEBUG} // 0;
 
-use constant INIT_PID => '(-1):init';
+use constant INIT_PID => '-1:init';
 
 # stuff
 
@@ -147,6 +147,8 @@ sub loop ( $MAX_TICKS, $start_pid ) {
 
     my $tick = 0;
     while ($tick < $MAX_TICKS) {
+        say FAINT '('.INIT_PID.')', ('-' x 50), "tick($tick)", RESET if DEBUG;
+
         $tick++;
 
         warn Dumper \@msg_inbox  if DEBUG >= 3;
@@ -195,8 +197,6 @@ sub loop ( $MAX_TICKS, $start_pid ) {
 
             }
         }
-
-        say FAINT "---------------------------- tick($tick)", RESET if DEBUG;
     }
 
 }
