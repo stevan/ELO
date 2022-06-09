@@ -9,30 +9,31 @@ use List::Util 'first';
 use Data::Dumper;
 
 use EventLoop;
-use Actors;
+use EventLoop::Actors;
+use EventLoop::IO;
 
 actor bounce => sub ($env, $msg) {
     match $msg, +{
         up => sub ($body) {
             my ($cnt) = @$body;
-            send_to( OUT, print => ["bounce(UP) => $cnt"] );
+            out::print("bounce(UP) => $cnt");
             send_to( PID, down => [$cnt+1] )
         },
         down => sub ($body) {
             my ($cnt) = @$body;
-            send_to( OUT, print => ["bounce(DOWN) => $cnt"] );
+            out::print("bounce(DOWN) => $cnt");
             send_to( PID, up => [$cnt+1] );
         }
     };
 };
 
 actor main => sub ($env, $msg) {
-    send_to( OUT, print => ["-> main starting ..."] );
+    out::print("-> main starting ...");
 
     my $bounce = spawn( 'bounce' );
     send_to( $bounce, up => [1] );
 
-    timeout( 10, [ OUT, print => ["JELLO"]]);
+    timeout( 10, out::print("JELLO"));
     timeout( 12, [ SYS, kill => [$bounce]]);
 };
 

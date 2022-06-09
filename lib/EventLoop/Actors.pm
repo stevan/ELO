@@ -1,4 +1,4 @@
-package Actors;
+package EventLoop::Actors;
 
 use v5.24;
 use warnings;

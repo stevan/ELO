@@ -9,10 +9,11 @@ use List::Util 'first';
 use Data::Dumper;
 
 use EventLoop;
-use Actors;
+use EventLoop::Actors;
+use EventLoop::IO;
 
 actor main => sub ($env, $msg) {
-    send_to( OUT, print => ["-> main starting ..."] );
+    print_out("-> main starting ...");
 
     my $ident = spawn('!ident');
 
@@ -26,9 +27,9 @@ actor main => sub ($env, $msg) {
             [
                 spawn('!sequence'),
                 next => [
-                    [ OUT, print => ["hello from then"]],
-                    [ OUT, print => ["hello from then again"]],
-                    [ OUT, print => ["hello from then last"]]
+                    print_out("hello from then"),
+                    print_out("hello from then again"),
+                    print_out("hello from then last")
                 ]
             ]
         ]
@@ -37,7 +38,7 @@ actor main => sub ($env, $msg) {
 };
 
 # loop ...
-ok loop( 100, 'main' );
+ok loop( 20, 'main' );
 
 done_testing;
 

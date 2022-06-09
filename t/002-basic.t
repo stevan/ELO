@@ -9,7 +9,8 @@ use List::Util 'first';
 use Data::Dumper;
 
 use EventLoop;
-use Actors;
+use EventLoop::Actors;
+use EventLoop::IO;
 
 actor TestBuilder => sub ($env, $msg) {
     state $counter = 0;
@@ -19,13 +20,13 @@ actor TestBuilder => sub ($env, $msg) {
             my ($value, $msg) = @$body;
             $counter++;
             my $ok = $value ? 'ok' : 'not ok';
-            send_to( OUT, print => ["$ok $counter $msg"] );
+            print_out("$ok $counter $msg");
         },
     };
 };
 
 actor main => sub ($env, $msg) {
-    send_to( OUT, print => ["-> main starting ..."] );
+    print_out("-> main starting ...");
 
     my $builder = spawn( 'TestBuilder' );
 
