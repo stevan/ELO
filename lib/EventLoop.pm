@@ -22,13 +22,14 @@ our @EXPORT = qw[
     return_to
 
     spawn
+    quit
 
     sync
     await
 
     loop
 
-    IN OUT ERR
+    IN OUT ERR SYS
 
     PID CALLER
 
@@ -42,11 +43,11 @@ use constant OUTBOX => 1;
 
 use constant DEBUG => $ENV{DEBUG} // 0;
 
-use constant INIT_PID => '-1:init';
-
 # stuff
 
 ## .. process info
+
+our $INIT_PID = '000:<init>';
 
 our $CURRENT_PID;
 our $CURRENT_CALLER;
@@ -72,6 +73,8 @@ sub ERR () { $ERR }
 
 sub PID    () { $CURRENT_PID    }
 sub CALLER () { $CURRENT_CALLER }
+
+sub SYS () { $INIT_PID }
 
 ## ... message delivery
 
@@ -103,6 +106,13 @@ sub spawn ($name) {
     $pid;
 }
 
+sub despawn ($pid) {
+    @msg_inbox  = grep { $_->[1] ne $pid } @msg_inbox;
+    @msg_outbox = grep { $_->[1] ne $pid } @msg_outbox;
+
+    delete $processes{ $pid };
+}
+
 ## ... currency control
 
 sub timeout ($ticks, $callback) {
@@ -124,17 +134,37 @@ sub await ($input, $output) {
 
 sub loop ( $MAX_TICKS, $start_pid ) {
 
+    $processes{ $INIT_PID } = [ [], [], {}, sub ($env, $msg) {
+        my $prefix = DEBUG
+            ? ON_MAGENTA "SYS ($CURRENT_CALLER) ::". RESET " "
+            : ON_MAGENTA "SYS ::". RESET " ";
+
+        match $msg, +{
+            kill => sub ($body) {
+                my ($pid) = @$body;
+                warn( $prefix, "killing {$pid}\n" );
+                despawn($pid);
+            }
+        };
+    }];
+
     local $IN  = spawn( '!in' );
     local $OUT = spawn( '!out' );
     local $ERR = spawn( '!err' );
 
     # initialise ...
     my $start = spawn( $start_pid );
-    send_from( INIT_PID, $start => '_' => [] );
+
+    # not the the number of created pids
+    my $PID_FLOOR = scalar keys %processes;
+
+    send_from( $INIT_PID, $start => '_' => [] );
+
+    say FAINT '('.$INIT_PID.')', ('-' x 50), "start", RESET if DEBUG;
 
     my $tick = 0;
     while ($tick < $MAX_TICKS) {
-        say FAINT '('.INIT_PID.')', ('-' x 50), "tick($tick)", RESET if DEBUG;
+        say FAINT '('.$INIT_PID.')', ('-' x 50), "tick($tick)", RESET if DEBUG;
 
         $tick++;
 
@@ -167,7 +197,10 @@ sub loop ( $MAX_TICKS, $start_pid ) {
             push $processes{$to}->[OUTBOX]->@* => [ $from, $m ];
         }
 
-        my @active = map [ $_, $processes{$_}->@* ], sort { $a cmp $b } keys %processes;
+        my @active =
+            map  [ $_, $processes{$_}->@* ],
+            sort { $a cmp $b } keys %processes;
+
         while (@active) {
             my $active = shift @active;
 
@@ -184,6 +217,15 @@ sub loop ( $MAX_TICKS, $start_pid ) {
 
             }
         }
+
+        #warn Dumper [ $PID_FLOOR, scalar keys %processes, [ keys %processes ] ];
+
+        if ($PID_FLOOR >= scalar keys %processes) {
+            say FAINT '('.$INIT_PID.')', ('-' x 50), "end", RESET if DEBUG;
+            last;
+        }
+
+        warn Dumper \%processes if DEBUG >= 3;
     }
 
     return 1;
@@ -193,7 +235,7 @@ sub loop ( $MAX_TICKS, $start_pid ) {
 
 actor '!err' => sub ($env, $msg) {
     my $prefix = DEBUG
-        ? ON_RED "ERR (". BOLD $CURRENT_CALLER .") !!". RESET " "
+        ? ON_RED "ERR ($CURRENT_CALLER) !!". RESET " "
         : ON_RED "ERR !!". RESET " ";
 
     match $msg, +{
@@ -209,7 +251,7 @@ actor '!err' => sub ($env, $msg) {
 
 actor '!out' => sub ($env, $msg) {
     my $prefix = DEBUG
-        ? ON_GREEN "OUT (". BOLD $CURRENT_CALLER .") >>". RESET " "
+        ? ON_GREEN "OUT ($CURRENT_CALLER) >>". RESET " "
         : ON_GREEN "OUT >>". RESET " ";
 
     match $msg, +{
@@ -225,7 +267,7 @@ actor '!out' => sub ($env, $msg) {
 
 actor '!in' => sub ($env, $msg) {
     my $prefix = DEBUG
-        ? ON_CYAN "IN (". BOLD $CURRENT_CALLER .") <<". RESET " "
+        ? ON_CYAN "IN ($CURRENT_CALLER) <<". RESET " "
         : ON_CYAN "IN <<". RESET " ";
 
     match $msg, +{
@@ -255,6 +297,7 @@ actor '!timeout' => sub ($env, $msg) {
             if ( $timer == 0 ) {
                 send_to( $ERR => print => ["*/ !timeout! /* : DONE"] ) if DEBUG;
                 send_from( $caller, @$event );
+                despawn( $CURRENT_PID );
             }
             else {
                 send_to( $ERR => print => ["*/ !timeout! /* : counting down $timer"] ) if DEBUG;
@@ -282,6 +325,7 @@ actor '!await' => sub ($env, $msg) {
                 send_to( $ERR => print => ["*/ !await /* : recieve message($message)"]) if DEBUG;
                 push $callback->[-1]->@*, $message;
                 send_from( $caller, @$callback );
+                despawn( $CURRENT_PID );
             }
             else {
                 send_to( $ERR => print => ["*/ !await /* : no messages"]) if DEBUG;
@@ -310,6 +354,7 @@ actor '!sync' => sub ($env, $msg) {
                 #warn Dumper $callback;
                 push $callback->[-1]->@*, $message;
                 send_from( $caller, @$callback );
+                despawn( $CURRENT_PID );
             }
             else {
                 send_to( $ERR => print => ["*/ !sync /* : no messages"]) if DEBUG;

@@ -33,6 +33,7 @@ actor main => sub ($env, $msg) {
     send_to( $bounce, up => [1] );
 
     timeout( 10, [ OUT, print => ["JELLO"]]);
+    timeout( 12, [ SYS, kill => [$bounce]]);
 };
 
 # loop ...

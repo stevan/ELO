@@ -34,7 +34,6 @@ sub match ($msg, $table) {
 }
 
 
-
 1;
 
 __END__

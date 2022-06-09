@@ -21,6 +21,9 @@ actor env => sub ($env, $msg) {
             send_to( ERR, print => ["env initialized to => ENV{ ".(join ', ' => map { join ' => ' => $_, $env->{$_} } keys %$env)." }"])
                 if DEBUG;
         },
+        destroy => sub ($body) {
+            EventLoop::despawn(PID);
+        },
         get => sub ($body) {
             my ($key) = @$body;
             if ( exists $env->{$key} ) {
@@ -72,6 +75,10 @@ actor main => sub ($env, $msg) {
         [ OUT, printf => [ $_.'(%s)' ]]
     ) foreach qw[ foo bar baz ];
 
+    # ...
+
+    timeout( 15 => [ SYS, kill => [$e1]] );
+    timeout( 15 => [ SYS, kill => [$e2]] );
 };
 
 # loop ...
