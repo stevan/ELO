@@ -9,6 +9,7 @@ use List::Util 'first';
 use Data::Dumper;
 
 use EventLoop;
+use Actors;
 
 actor bounce => sub ($env, $msg) {
     match $msg, +{

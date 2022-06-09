@@ -9,6 +9,8 @@ use List::Util 'first';
 use Data::Dumper;
 
 use EventLoop;
+use Actors;
+
 
 # ... userland ...
 actor env => sub ($env, $msg) {

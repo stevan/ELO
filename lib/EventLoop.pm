@@ -7,19 +7,14 @@ use experimental 'signatures', 'postderef';
 our $VERSION   = '0.01';
 our $AUTHORITY = 'cpan:STEVAN';
 
-use Carp         'confess';
-use Scalar::Util 'blessed';
-use List::Util   ();
 use Data::Dumper 'Dumper';
-
 use Term::ANSIColor ':constants';
+
+use Actors;
 
 use Exporter 'import';
 
 our @EXPORT = qw[
-    match
-    actor
-
     timeout
 
     send_to
@@ -67,12 +62,7 @@ our $ERR;
 my @msg_inbox;
 my @msg_outbox;
 
-my %actors;
 my %processes;
-
-sub actor ($name, $recieve) {
-    $actors{$name} = $recieve;
-}
 
 ## ... sugar
 
@@ -82,17 +72,6 @@ sub ERR () { $ERR }
 
 sub PID    () { $CURRENT_PID    }
 sub CALLER () { $CURRENT_CALLER }
-
-sub match ($msg, $table) {
-    my ($action, $body) = @$msg;
-    #warn Dumper [$msg, $table];
-    my $cb = $table->{$action} // die "No match for $action";
-    $cb->($body);
-}
-
-sub timeout ($ticks, $callback) {
-    [ spawn( '!timeout' ), start => [ $ticks, $callback ]];
-}
 
 ## ... message delivery
 
@@ -118,13 +97,17 @@ sub return_to ($msg) {
 
 my $PID = 0;
 sub spawn ($name) {
-    my $process = [ [], [], {}, $actors{$name} ];
+    my $process = [ [], [], {}, Actors::get_actor($name) ];
     my $pid = sprintf '%03d:%s' => ++$PID, $name;
     $processes{ $pid } = $process;
     $pid;
 }
 
 ## ... currency control
+
+sub timeout ($ticks, $callback) {
+    [ spawn( '!timeout' ), start => [ $ticks, $callback ]];
+}
 
 sub sync ($input, $output) {
     send_to( spawn( '!sync' ), send => [ $input, $output ] );
