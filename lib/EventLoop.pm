@@ -294,33 +294,40 @@ actor '!timeout' => sub ($env, $msg) {
     match $msg, +{
         start => sub ($body) {
             my ($timer, $event) = @$body;
-            send_to( $ERR => print => ["*/ !timeout! /* : starting $timer"] ) if DEBUG;
+            send_to( $ERR => print => ["*/ !timeout! /* : starting $timer for ($CURRENT_CALLER)"] ) if DEBUG;
             send_to( $CURRENT_PID => countdown => [ $timer - 1, $event, $CURRENT_CALLER ] );
         },
         countdown => sub ($body) {
             my ($timer, $event, $caller) = @$body;
 
             if ( $timer == 0 ) {
-                send_to( $ERR => print => ["*/ !timeout! /* : DONE"] ) if DEBUG;
+                send_to( $ERR => print => ["*/ !timeout! /* : timer for ($caller) DONE"] ) if DEBUG;
                 send_from( $caller, @$event );
                 despawn( $CURRENT_PID );
             }
             else {
-                send_to( $ERR => print => ["*/ !timeout! /* : counting down $timer"] ) if DEBUG;
+                send_to( $ERR => print => ["*/ !timeout! /* : counting down $timer for ($caller)"] ) if DEBUG;
                 send_to( $CURRENT_PID => countdown => [ $timer - 1, $event, $caller ] );
             }
         }
     };
 };
 
+
+# NOTE:
+# this is a bit redundant with sync ... consider
+# removing it and rethinking
+#
+# THIS DOES: send a message, if ! recv, loop resend the message ...
 actor '!await' => sub ($env, $msg) {
 
     match $msg, +{
         send => sub ($body) {
             my ($command, $callback, $caller) = @$body;
-            send_to( $ERR => print => ["*/ !await /* : sending message"]) if DEBUG;
+            $caller //= $CURRENT_CALLER;
+            send_to( $ERR => print => ["*/ !await /* : sending message for ($caller)"]) if DEBUG;
             send_to( @$command );
-            send_to( $CURRENT_PID => recv => [ $command, $callback, $caller // $CURRENT_CALLER ]);
+            send_to( $CURRENT_PID => recv => [ $command, $callback, $caller ]);
         },
         recv => sub ($body) {
             my ($command, $callback, $caller) = @$body;
@@ -328,25 +335,26 @@ actor '!await' => sub ($env, $msg) {
             my $message = recv_from;
 
             if (defined $message) {
-                send_to( $ERR => print => ["*/ !await /* : recieve message($message)"]) if DEBUG;
+                send_to( $ERR => print => ["*/ !await /* : recieve message($message) for ($caller)"]) if DEBUG;
                 push $callback->[-1]->@*, $message;
                 send_from( $caller, @$callback );
                 despawn( $CURRENT_PID );
             }
             else {
-                send_to( $ERR => print => ["*/ !await /* : no messages"]) if DEBUG;
+                send_to( $ERR => print => ["*/ !await /* : no messages for ($caller)"]) if DEBUG;
                 send_to( $CURRENT_PID => send => $body );
             }
         }
     };
 };
 
+# THIS DOES: send a message, and loop on recv ...
 actor '!sync' => sub ($env, $msg) {
 
     match $msg, +{
         send => sub ($body) {
             my ($command, $callback) = @$body;
-            send_to( $ERR => print => ["*/ !sync /* : sending message"]) if DEBUG;
+            send_to( $ERR => print => ["*/ !sync /* : sending message for ($CURRENT_CALLER)"]) if DEBUG;
             send_to( @$command );
             send_to( $CURRENT_PID => recv => [ $callback, $CURRENT_CALLER ] );
         },
@@ -356,14 +364,14 @@ actor '!sync' => sub ($env, $msg) {
             my $message = recv_from;
 
             if (defined $message) {
-                send_to( $ERR => print => ["*/ !sync /* : recieve message($message)"]) if DEBUG;
+                send_to( $ERR => print => ["*/ !sync /* : recieve message($message) for ($caller)"]) if DEBUG;
                 #warn Dumper $callback;
                 push $callback->[-1]->@*, $message;
                 send_from( $caller, @$callback );
                 despawn( $CURRENT_PID );
             }
             else {
-                send_to( $ERR => print => ["*/ !sync /* : no messages"]) if DEBUG;
+                send_to( $ERR => print => ["*/ !sync /* : no messages for ($caller)"]) if DEBUG;
                 send_to( $CURRENT_PID => recv => $body );
             }
         }
