@@ -14,21 +14,21 @@ actor bounce => sub ($env, $msg) {
     match $msg, +{
         up => sub ($body) {
             my ($cnt) = @$body;
-            send_to( OUT, [ print => ["bounce(UP) => $cnt"]] );
-            send_to( PID, [ down => [ $cnt+1 ] ])
+            send_to( OUT, print => "bounce(UP) => $cnt" );
+            send_to( PID, down => $cnt+1 )
         },
         down => sub ($body) {
             my ($cnt) = @$body;
-            send_to( OUT, [ print => ["bounce(DOWN) => $cnt"]] );
-            send_to( PID, [ up => [ $cnt+1 ] ])
+            send_to( OUT, print => "bounce(DOWN) => $cnt" );
+            send_to( PID, up => $cnt+1 );
         }
     };
 };
 
 actor main => sub ($env, $msg) {
-    send_to( OUT, [ print => ["-> main starting ..."]] );
+    send_to( OUT, print => "-> main starting ..." );
 
-    send_to( spawn( 'bounce' ), [ up => [ 1 ]] );
+    send_to( spawn( 'bounce' ), up => 1 );
 };
 
 # loop ...
