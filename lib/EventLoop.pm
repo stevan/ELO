@@ -123,11 +123,17 @@ sub timeout ($ticks, $callback) {
 }
 
 sub sync ($input, $output) {
-    send_to( spawn( '!sync' ), send => [ $input, $output ] );
+    my @args = ( spawn( '!sync' ), send => [ $input, $output ] );
+    defined wantarray
+        ? \@args
+        : send_to( @args );
 }
 
 sub await ($input, $output) {
-    send_to( spawn( '!await' ), send => [ $input, $output ] );
+    my @args = ( spawn( '!await' ), send => [ $input, $output ] );
+    defined wantarray
+        ? \@args
+        : send_to( @args );
 }
 
 ## ...
