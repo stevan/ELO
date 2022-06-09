@@ -23,14 +23,21 @@ actor main => sub ($env, $msg) {
                 timeout( 2, [ $ident, id => [ 1 ] ]),
                 [ $ident, id => [] ]
             ),
-            [ OUT, print => ["hello from then"]]
+            [
+                spawn('!sequence'),
+                next => [
+                    [ OUT, print => ["hello from then"]],
+                    [ OUT, print => ["hello from then again"]],
+                    [ OUT, print => ["hello from then last"]]
+                ]
+            ]
         ]
     );
 
 };
 
 # loop ...
-ok loop( 20, 'main' );
+ok loop( 100, 'main' );
 
 done_testing;
 

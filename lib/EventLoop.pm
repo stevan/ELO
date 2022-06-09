@@ -220,7 +220,6 @@ sub loop ( $MAX_TICKS, $start_pid ) {
                 local $CURRENT_CALLER = $from;
 
                 $f->($env, $msg);
-
             }
         }
 
@@ -234,10 +233,16 @@ sub loop ( $MAX_TICKS, $start_pid ) {
         warn Dumper \%processes if DEBUG >= 3;
     }
 
+    if (DEBUG) {
+        warn Dumper [ keys %processes ];
+    }
+
     return 1;
 }
 
 ## create the core actors
+
+my %INDENTS;
 
 actor '!err' => sub ($env, $msg) {
     my $prefix = DEBUG
@@ -250,7 +255,19 @@ actor '!err' => sub ($env, $msg) {
             warn( $prefix, sprintf $fmt, @values, "\n" );
         },
         print => sub ($body) {
-            warn( $prefix, @$body, "\n" );
+            my ($msg, $caller) = @$body;
+
+            if ($caller) {
+                $INDENTS{ $CURRENT_CALLER } = ($INDENTS{ $caller } // 0) + 1
+                    unless exists $INDENTS{ $CURRENT_CALLER };
+
+                $prefix = FAINT
+                    RED
+                        ('->[' x $INDENTS{ $CURRENT_CALLER })
+                    . RESET $prefix;
+            }
+
+            warn( $prefix, $msg, "\n" );
         }
     };
 };
@@ -294,19 +311,19 @@ actor '!timeout' => sub ($env, $msg) {
     match $msg, +{
         start => sub ($body) {
             my ($timer, $event) = @$body;
-            send_to( $ERR => print => ["*/ !timeout! /* : starting $timer for ($CURRENT_CALLER)"] ) if DEBUG;
+            send_to( $ERR => print => ["*/ !timeout! /* : starting $timer for ($CURRENT_CALLER)", $CURRENT_CALLER] ) if DEBUG;
             send_to( $CURRENT_PID => countdown => [ $timer - 1, $event, $CURRENT_CALLER ] );
         },
         countdown => sub ($body) {
             my ($timer, $event, $caller) = @$body;
 
             if ( $timer == 0 ) {
-                send_to( $ERR => print => ["*/ !timeout! /* : timer for ($caller) DONE"] ) if DEBUG;
+                send_to( $ERR => print => ["*/ !timeout! /* : timer for ($caller) DONE", $caller] ) if DEBUG;
                 send_from( $caller, @$event );
                 despawn( $CURRENT_PID );
             }
             else {
-                send_to( $ERR => print => ["*/ !timeout! /* : counting down $timer for ($caller)"] ) if DEBUG;
+                send_to( $ERR => print => ["*/ !timeout! /* : counting down $timer for ($caller)", $caller] ) if DEBUG;
                 send_to( $CURRENT_PID => countdown => [ $timer - 1, $event, $caller ] );
             }
         }
@@ -325,7 +342,7 @@ actor '!await' => sub ($env, $msg) {
         send => sub ($body) {
             my ($command, $callback, $caller) = @$body;
             $caller //= $CURRENT_CALLER;
-            send_to( $ERR => print => ["*/ !await /* : sending message for ($caller)"]) if DEBUG;
+            send_to( $ERR => print => ["*/ !await /* : sending message for ($caller)", $caller]) if DEBUG;
             send_to( @$command );
             send_to( $CURRENT_PID => recv => [ $command, $callback, $caller ]);
         },
@@ -335,13 +352,13 @@ actor '!await' => sub ($env, $msg) {
             my $message = recv_from;
 
             if (defined $message) {
-                send_to( $ERR => print => ["*/ !await /* : recieve message($message) for ($caller)"]) if DEBUG;
+                send_to( $ERR => print => ["*/ !await /* : recieve message($message) for ($caller)", $caller]) if DEBUG;
                 push $callback->[-1]->@*, $message;
                 send_from( $caller, @$callback );
                 despawn( $CURRENT_PID );
             }
             else {
-                send_to( $ERR => print => ["*/ !await /* : no messages for ($caller)"]) if DEBUG;
+                send_to( $ERR => print => ["*/ !await /* : no messages for ($caller)", $caller]) if DEBUG;
                 send_to( $CURRENT_PID => send => $body );
             }
         }
@@ -354,7 +371,7 @@ actor '!sync' => sub ($env, $msg) {
     match $msg, +{
         send => sub ($body) {
             my ($command, $callback) = @$body;
-            send_to( $ERR => print => ["*/ !sync /* : sending message for ($CURRENT_CALLER)"]) if DEBUG;
+            send_to( $ERR => print => ["*/ !sync /* : sending message for ($CURRENT_CALLER)", $CURRENT_CALLER]) if DEBUG;
             send_to( @$command );
             send_to( $CURRENT_PID => recv => [ $callback, $CURRENT_CALLER ] );
         },
@@ -364,14 +381,14 @@ actor '!sync' => sub ($env, $msg) {
             my $message = recv_from;
 
             if (defined $message) {
-                send_to( $ERR => print => ["*/ !sync /* : recieve message($message) for ($caller)"]) if DEBUG;
+                send_to( $ERR => print => ["*/ !sync /* : recieve message($message) for ($caller)", $caller]) if DEBUG;
                 #warn Dumper $callback;
                 push $callback->[-1]->@*, $message;
                 send_from( $caller, @$callback );
                 despawn( $CURRENT_PID );
             }
             else {
-                send_to( $ERR => print => ["*/ !sync /* : no messages for ($caller)"]) if DEBUG;
+                send_to( $ERR => print => ["*/ !sync /* : no messages for ($caller)", $caller]) if DEBUG;
                 send_to( $CURRENT_PID => recv => $body );
             }
         }
@@ -391,26 +408,42 @@ actor '!cond' => sub ($env, $msg) {
     match $msg, +{
         if => sub ($body) {
             my ($if, $then) = @$body;
-            send_to( $ERR, print => ["*/ !cond /* entering if condition for ($CURRENT_CALLER)"] );
+            send_to( $ERR, print => ["*/ !cond /* entering if condition for ($CURRENT_CALLER)", $CURRENT_CALLER] );
             sync( $if, [ $CURRENT_PID, cond => [ $then, $CURRENT_CALLER ]] );
         },
         cond => sub ($body) {
             my ($then, $caller, $result) = @$body;
             if ( $result ) {
-                send_to( $ERR, print => ["*/ !cond /* condition successful for ($caller)"] );
+                send_to( $ERR, print => ["*/ !cond /* condition successful for ($caller)", $caller] );
                 send_to( $CURRENT_PID, then => [ $then, $caller ] );
             }
             else {
-                send_to( $ERR, print => ["*/ !cond /* condition failed for ($caller)"] );
+                send_to( $ERR, print => ["*/ !cond /* condition failed for ($caller)", $caller] );
                 despawn( $CURRENT_PID );
             }
         },
         then => sub ($body) {
             my ($then, $caller) = @$body;
-            send_to( $ERR, print => ["*/ !cond /* entering then for ($caller)"] );
+            send_to( $ERR, print => ["*/ !cond /* entering then for ($caller)", $caller] );
             send_from( $caller, @$then );
             despawn( $CURRENT_PID );
         }
+    };
+};
+
+actor '!sequence' => sub ($env, $msg) {
+    match $msg, +{
+        next => sub ($body) {
+            if ( my $statement = shift @$body ) {
+                send_to( $ERR, print => ["*/ !sequence /* calling 1 of ".(1+(scalar @$body))." for ($CURRENT_CALLER)", $CURRENT_CALLER] );
+                send_from( $CURRENT_CALLER, @$statement );
+                send_from( $CURRENT_CALLER, $CURRENT_PID, next => $body );
+            }
+            else {
+                send_to( $ERR, print => ["*/ !sequence /* finished for ($CURRENT_CALLER)", $CURRENT_CALLER] );
+                despawn( $CURRENT_PID );
+            }
+        },
     };
 };
 
