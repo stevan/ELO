@@ -106,7 +106,10 @@ sub spawn ($name) {
 ## ... currency control
 
 sub timeout ($ticks, $callback) {
-    [ spawn( '!timeout' ), start => [ $ticks, $callback ]];
+    my @args = (spawn( '!timeout' ), start => [ $ticks, $callback ]);
+    defined wantarray
+        ? \@args
+        : send_to( @args );
 }
 
 sub sync ($input, $output) {
