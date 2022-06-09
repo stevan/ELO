@@ -378,6 +378,41 @@ actor '!sync' => sub ($env, $msg) {
     };
 };
 
+actor '!ident' => sub ($env, $msg) {
+    match $msg, +{
+        id => sub ($body) {
+            my ($val) = @$body;
+            return_to $val;
+        },
+    };
+};
+
+actor '!cond' => sub ($env, $msg) {
+    match $msg, +{
+        if => sub ($body) {
+            my ($if, $then) = @$body;
+            send_to( $ERR, print => ["*/ !cond /* entering if condition for ($CURRENT_CALLER)"] );
+            sync( $if, [ $CURRENT_PID, cond => [ $then, $CURRENT_CALLER ]] );
+        },
+        cond => sub ($body) {
+            my ($then, $caller, $result) = @$body;
+            if ( $result ) {
+                send_to( $ERR, print => ["*/ !cond /* condition successful for ($caller)"] );
+                send_to( $CURRENT_PID, then => [ $then, $caller ] );
+            }
+            else {
+                send_to( $ERR, print => ["*/ !cond /* condition failed for ($caller)"] );
+                despawn( $CURRENT_PID );
+            }
+        },
+        then => sub ($body) {
+            my ($then, $caller) = @$body;
+            send_to( $ERR, print => ["*/ !cond /* entering then for ($caller)"] );
+            send_from( $caller, @$then );
+            despawn( $CURRENT_PID );
+        }
+    };
+};
 
 1;
 
