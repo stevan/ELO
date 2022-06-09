@@ -13,7 +13,7 @@ use EventLoop::Actors;
 use EventLoop::IO;
 
 actor main => sub ($env, $msg) {
-    print_out("-> main starting ...");
+    out::print("-> main starting ...");
 
     my $ident = spawn('!ident');
 
@@ -27,9 +27,9 @@ actor main => sub ($env, $msg) {
             [
                 spawn('!sequence'),
                 next => [
-                    print_out("hello from then"),
-                    print_out("hello from then again"),
-                    print_out("hello from then last")
+                    out::print("hello from then"),
+                    out::print("hello from then again"),
+                    out::print("hello from then last")
                 ]
             ]
         ]

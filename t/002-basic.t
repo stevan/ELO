@@ -20,13 +20,13 @@ actor TestBuilder => sub ($env, $msg) {
             my ($value, $msg) = @$body;
             $counter++;
             my $ok = $value ? 'ok' : 'not ok';
-            print_out("$ok $counter $msg");
+            out::print("$ok $counter $msg");
         },
     };
 };
 
 actor main => sub ($env, $msg) {
-    print_out("-> main starting ...");
+    out::print("-> main starting ...");
 
     my $builder = spawn( 'TestBuilder' );
 

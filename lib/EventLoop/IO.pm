@@ -11,29 +11,29 @@ use Data::Dumper 'Dumper';
 
 ## ... i/o
 
-sub err::log ($msg, $caller=$CURRENT_CALLER) {
-    my $args = [ $ERR, print => [ $msg, $caller ]];
-    defined wantarray ? $args : send_to( @$args );
+sub err::log ($msg, $caller=$EventLoop::CURRENT_CALLER) {
+    my $args = [ $EventLoop::ERR, print => [ $msg, $caller ]];
+    defined wantarray ? $args : EventLoop::send_to( @$args );
 }
 
-sub err::logf ($fmt, $msg, $caller=$CURRENT_CALLER) {
-    my $args = [ $ERR, printf => [ $fmt, $msg, $caller ]];
-    defined wantarray ? $args : send_to( @$args );
+sub err::logf ($fmt, $msg, $caller=$EventLoop::CURRENT_CALLER) {
+    my $args = [ $EventLoop::ERR, printf => [ $fmt, $msg, $caller ]];
+    defined wantarray ? $args : EventLoop::send_to( @$args );
 }
 
 sub out::print ($msg=undef) {
-    my $args = [ $OUT, print => [ $msg // () ]];
-    defined wantarray ? $args : send_to( @$args );
+    my $args = [ $EventLoop::OUT, print => [ $msg // () ]];
+    defined wantarray ? $args : EventLoop::send_to( @$args );
 }
 
 sub out::printf ($fmt, $msg=undef) {
-    my $args = [ $OUT, printf => [ $fmt, $msg // () ]];
-    defined wantarray ? $args : send_to( @$args );
+    my $args = [ $EventLoop::OUT, printf => [ $fmt, $msg // () ]];
+    defined wantarray ? $args : EventLoop::send_to( @$args );
 }
 
 sub in::read ($prompt=undef) {
-    my $args = [ $IN, read => [ $prompt // () ]];
-    defined wantarray ? $args : send_to( @$args );
+    my $args = [ $EventLoop::IN, read => [ $prompt // () ]];
+    defined wantarray ? $args : EventLoop::send_to( @$args );
 }
 
 1;

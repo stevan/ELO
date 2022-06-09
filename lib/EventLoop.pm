@@ -97,7 +97,7 @@ sub return_to ($msg) {
 
 my $PID = 0;
 sub spawn ($name) {
-    my $process = [ [], [], {}, Actors::get_actor($name) ];
+    my $process = [ [], [], {}, EventLoop::Actors::get_actor($name) ];
     my $pid = sprintf '%03d:%s' => ++$PID, $name;
     $processes{ $pid } = $process;
     $pid;
@@ -145,7 +145,7 @@ sub loop ( $MAX_TICKS, $start_pid ) {
         match $msg, +{
             kill => sub ($body) {
                 my ($pid) = @$body;
-                warn( $prefix, "killing {$pid}\n" );
+                warn( $prefix, "killing {$pid}\n" ) if DEBUG;
                 despawn($pid);
             }
         };
@@ -157,9 +157,6 @@ sub loop ( $MAX_TICKS, $start_pid ) {
 
     # initialise ...
     my $start = spawn( $start_pid );
-
-    # not the the number of created pids
-    my $PID_FLOOR = scalar keys %processes;
 
     send_from( $INIT_PID, $start => '_' => [] );
 
@@ -218,13 +215,6 @@ sub loop ( $MAX_TICKS, $start_pid ) {
 
                 $f->($env, $msg);
             }
-        }
-
-        #warn Dumper [ $PID_FLOOR, scalar keys %processes, [ keys %processes ] ];
-
-        if ($PID_FLOOR >= scalar keys %processes) {
-            say FAINT '('.$INIT_PID.')', ('-' x 50), "end", RESET if DEBUG;
-            last;
         }
 
         warn Dumper \%processes if DEBUG >= 3;
