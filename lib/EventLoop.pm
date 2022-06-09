@@ -97,7 +97,6 @@ sub timeout ($ticks, $callback) {
 ## ... message delivery
 
 sub send_to ($pid, $action, $msg) {
-    $msg = [$msg] unless ref $msg;
     push @msg_inbox => [ $CURRENT_PID, $pid, [ $action, $msg ] ];
 }
 
@@ -261,18 +260,18 @@ actor '!timeout' => sub ($env, $msg) {
     match $msg, +{
         start => sub ($body) {
             my ($timer, $event) = @$body;
-            send_to( $ERR => print => "*/ !timeout! /* : starting $timer" ) if DEBUG;
+            send_to( $ERR => print => ["*/ !timeout! /* : starting $timer"] ) if DEBUG;
             send_to( $CURRENT_PID => countdown => [ $timer - 1, $event, $CURRENT_CALLER ] );
         },
         countdown => sub ($body) {
             my ($timer, $event, $caller) = @$body;
 
             if ( $timer == 0 ) {
-                send_to( $ERR => print => "*/ !timeout! /* : DONE" ) if DEBUG;
+                send_to( $ERR => print => ["*/ !timeout! /* : DONE"] ) if DEBUG;
                 send_from( $caller, @$event );
             }
             else {
-                send_to( $ERR => print => "*/ !timeout! /* : counting down $timer" ) if DEBUG;
+                send_to( $ERR => print => ["*/ !timeout! /* : counting down $timer"] ) if DEBUG;
                 send_to( $CURRENT_PID => countdown => [ $timer - 1, $event, $caller ] );
             }
         }
@@ -284,7 +283,7 @@ actor '!await' => sub ($env, $msg) {
     match $msg, +{
         send => sub ($body) {
             my ($command, $callback, $caller) = @$body;
-            send_to( $ERR => print => "*/ !await /* : sending message") if DEBUG;
+            send_to( $ERR => print => ["*/ !await /* : sending message"]) if DEBUG;
             send_to( @$command );
             send_to( $CURRENT_PID => recv => [ $command, $callback, $caller // $CURRENT_CALLER ]);
         },
@@ -294,12 +293,12 @@ actor '!await' => sub ($env, $msg) {
             my $message = recv_from;
 
             if (defined $message) {
-                send_to( $ERR => print => "*/ !await /* : recieve message($message)") if DEBUG;
+                send_to( $ERR => print => ["*/ !await /* : recieve message($message)"]) if DEBUG;
                 push $callback->[-1]->@*, $message;
                 send_from( $caller, @$callback );
             }
             else {
-                send_to( $ERR => print => "*/ !await /* : no messages") if DEBUG;
+                send_to( $ERR => print => ["*/ !await /* : no messages"]) if DEBUG;
                 send_to( $CURRENT_PID => send => $body );
             }
         }
@@ -311,7 +310,7 @@ actor '!sync' => sub ($env, $msg) {
     match $msg, +{
         send => sub ($body) {
             my ($command, $callback) = @$body;
-            send_to( $ERR => print => "*/ !sync /* : sending message") if DEBUG;
+            send_to( $ERR => print => ["*/ !sync /* : sending message"]) if DEBUG;
             send_to( @$command );
             send_to( $CURRENT_PID => recv => [ $callback, $CURRENT_CALLER ] );
         },
@@ -321,13 +320,13 @@ actor '!sync' => sub ($env, $msg) {
             my $message = recv_from;
 
             if (defined $message) {
-                send_to( $ERR => print => "*/ !sync /* : recieve message($message)") if DEBUG;
+                send_to( $ERR => print => ["*/ !sync /* : recieve message($message)"]) if DEBUG;
                 #warn Dumper $callback;
                 push $callback->[-1]->@*, $message;
                 send_from( $caller, @$callback );
             }
             else {
-                send_to( $ERR => print => "*/ !sync /* : no messages") if DEBUG;
+                send_to( $ERR => print => ["*/ !sync /* : no messages"]) if DEBUG;
                 send_to( $CURRENT_PID => recv => $body );
             }
         }

@@ -16,32 +16,32 @@ actor env => sub ($env, $msg) {
         init => sub ($body) {
             my ($new_env) = @$body;
             $env->{$_} = $new_env->{$_} foreach keys %$new_env;
-            send_to( ERR, print => "env initialized to => ENV{ ".(join ', ' => map { join ' => ' => $_, $env->{$_} } keys %$env)." }")
+            send_to( ERR, print => ["env initialized to => ENV{ ".(join ', ' => map { join ' => ' => $_, $env->{$_} } keys %$env)." }"])
                 if DEBUG;
         },
         get => sub ($body) {
             my ($key) = @$body;
             if ( exists $env->{$key} ) {
-                send_to( ERR, print => "fetching {$key}") if DEBUG;
+                send_to( ERR, print => ["fetching {$key}"]) if DEBUG;
                 return_to( $env->{$key} );
             }
             else {
-                send_to( ERR, print => "not found {$key}") if DEBUG;
+                send_to( ERR, print => ["not found {$key}"]) if DEBUG;
             }
         },
         set => sub ($body) {
             my ($key, $value) = @$body;
-            send_to( ERR, print => "storing $key => $value") if DEBUG;
+            send_to( ERR, print => ["storing $key => $value"]) if DEBUG;
             $env->{$key} = $value;
 
-            send_to( ERR, print => "env is now => ENV{ ".(join ', ' => map { join ' => ' => $_, $env->{$_} } keys %$env)." }")
+            send_to( ERR, print => ["env is now => ENV{ ".(join ', ' => map { join ' => ' => $_, $env->{$_} } keys %$env)." }"])
                 if DEBUG;
         }
     };
 };
 
 actor main => sub ($env, $msg) {
-    send_to( OUT, print => "-> main starting ..." );
+    send_to( OUT, print => ["-> main starting ..."] );
 
     my $e1 = spawn( 'env' );
     my $e2 = spawn( 'env' );
