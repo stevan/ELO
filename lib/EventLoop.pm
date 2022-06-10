@@ -28,7 +28,10 @@ our @EXPORT = qw[
 
     sync
     await
+
     ident
+    sequence
+    cond
 
     loop
 
@@ -140,6 +143,16 @@ sub await ($input, $output) {
 
 sub ident ($val=undef) {
     my $args = [ spawn( '!ident' ), id => [ $val // () ] ];
+    defined wantarray ? $args : send_to( @$args );
+}
+
+sub sequence (@statements) {
+    my $args = [ spawn( '!seq' ), next => [ @statements ] ];
+    defined wantarray ? $args : send_to( @$args );
+}
+
+sub cond ($cond, $then) {
+    my $args = [ spawn( '!cond' ), if => [ $cond, $then ] ];
     defined wantarray ? $args : send_to( @$args );
 }
 
