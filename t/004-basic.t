@@ -21,13 +21,13 @@ actor counter => sub ($env, $msg) {
     };
 };
 
-actor stream => sub ($env, $msg) {
+actor take_10_and_sync => sub ($env, $msg) {
     state $i = 0;
 
     match $msg, +{
         each => sub ($body) {
             my ($producer, $consumer) = @$body;
-            sync( $producer, $consumer );
+            sync( timeout( 10 - $i, [$producer, next => []] ), $consumer );
             $i++;
             send_to( PID, each => $body ) if $i < 10;
         },
@@ -37,12 +37,12 @@ actor stream => sub ($env, $msg) {
 actor main => sub ($env, $msg) {
     out::print("-> main starting ...");
 
-    my $s = spawn('stream');
+    my $s = spawn('take_10_and_sync');
 
     send_to(
         $s,
         each => [
-            [ spawn('counter'), next => [] ],
+            spawn('counter'),
             out::print()
         ]
     );
