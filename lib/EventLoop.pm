@@ -104,11 +104,20 @@ sub spawn ($name) {
     $pid;
 }
 
+my %to_be_despawned;
 sub despawn ($pid) {
-    @msg_inbox  = grep { $_->[1] ne $pid } @msg_inbox;
-    @msg_outbox = grep { $_->[1] ne $pid } @msg_outbox;
+    $to_be_despawned{$pid}++;
+}
 
-    delete $processes{ $pid };
+sub despawn_all () {
+    foreach my $pid (keys %to_be_despawned) {
+        @msg_inbox  = grep { $_->[1] ne $pid } @msg_inbox;
+        @msg_outbox = grep { $_->[1] ne $pid } @msg_outbox;
+
+        delete $processes{ $pid };
+    }
+
+    %to_be_despawned = ();
 }
 
 ## ... currency control
@@ -218,6 +227,8 @@ sub loop ( $MAX_TICKS, $start_pid ) {
                 $f->($env, $msg);
             }
         }
+
+        despawn_all;
 
         warn Dumper \%processes if DEBUG >= 3;
     }
