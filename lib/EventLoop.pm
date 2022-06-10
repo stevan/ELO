@@ -28,6 +28,7 @@ our @EXPORT = qw[
 
     sync
     await
+    ident
 
     loop
 
@@ -136,6 +137,10 @@ sub await ($input, $output) {
     my $args = [ spawn( '!await' ), send => [ $input, $output ] ];
     defined wantarray ? $args : send_to( @$args );
 }
+
+sub ident ($val=undef) {
+    my $args = [ spawn( '!ident' ), id => [ $val // () ] ];
+    defined wantarray ? $args : send_to( @$args );
 }
 
 ## ...
@@ -330,7 +335,9 @@ actor '!ident' => sub ($env, $msg) {
     match $msg, +{
         id => sub ($body) {
             my ($val) = @$body;
+            err::log("*/ !ident /* returning val($val)") if DEBUG;
             return_to $val;
+            despawn( $CURRENT_PID );
         },
     };
 };

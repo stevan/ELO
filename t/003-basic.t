@@ -15,14 +15,12 @@ use EventLoop::IO;
 actor main => sub ($env, $msg) {
     out::print("-> main starting ...");
 
-    my $ident = spawn('!ident');
-
     send_to(
         spawn('!cond'),
         if => [
             sync(
-                timeout( 2, [ $ident, id => [ 1 ] ]),
-                [ $ident, id => [] ]
+                timeout( 2, ident(1)),
+                ident(),
             ),
             [
                 spawn('!seq'),
