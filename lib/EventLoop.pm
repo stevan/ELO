@@ -83,6 +83,11 @@ sub SYS () { $INIT_PID }
 
 ## ... message delivery
 
+sub copy_msg ($msg, @additional_args) {
+    my ($pid, $action, $body) = @$msg;
+    [ $pid, $action, [ @$body, @additional_args ] ]
+}
+
 sub send_to ($pid, $action, $msg) {
     push @msg_inbox => [ $CURRENT_PID, $pid, [ $action, $msg ] ];
 }
@@ -337,7 +342,7 @@ actor '!await' => sub ($env, $msg) {
 
             if (defined $message) {
                 err::log("*/ !await /* : recieve message($message)", $caller) if DEBUG;
-                push $callback->[-1]->@*, $message;
+                $callback = copy_msg($callback, $message);
                 send_from( $caller, @$callback );
                 despawn( $CURRENT_PID );
             }
@@ -367,7 +372,7 @@ actor '!sync' => sub ($env, $msg) {
             if (defined $message) {
                 err::log("*/ !sync /* : recieve message($message)") if DEBUG;
                 #warn Dumper $output;
-                push $output->[-1]->@*, $message;
+                $output = copy_msg($output, $message);
                 send_from( $CURRENT_CALLER, @$output );
                 despawn( $CURRENT_PID );
             }
