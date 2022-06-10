@@ -33,8 +33,11 @@ actor main => sub ($env, $msg) {
     my $bounce = spawn( 'bounce' );
     send_to( $bounce, up => [1] );
 
-    timeout( 10, out::print("JELLO"));
-    timeout( 12, [ SYS, kill => [$bounce]]);
+    timeout( 10,
+        sequence(
+            out::print("JELLO!"),
+            [ SYS, kill => [$bounce]]
+        ));
 };
 
 # loop ...
