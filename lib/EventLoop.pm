@@ -241,7 +241,7 @@ sub loop ( $MAX_TICKS, $start_pid ) {
         warn Dumper { active_processes => \@active_processes } if DEBUG >= 3;
 
         if ( scalar @active_processes == 0 ) {
-            say FAINT (join ' ' => $init_pid_prefix, map { ('-' x ($term_width - length $_)) . " $_" } ("exit(0)")), RESET if DEBUG;
+            say FAINT (join ' ' => $init_pid_prefix, map { ('-' x ($term_width - length $_)) . " $_" } ("exit($tick)")), RESET if DEBUG;
             last;
         }
     }
