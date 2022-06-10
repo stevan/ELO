@@ -25,7 +25,7 @@ actor main => sub ($env, $msg) {
                 [ $ident, id => [] ]
             ),
             [
-                spawn('!sequence'),
+                spawn('!seq'),
                 next => [
                     out::print("hello from then"),
                     out::print("hello from then again"),

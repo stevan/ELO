@@ -9,6 +9,7 @@ our $AUTHORITY = 'cpan:STEVAN';
 
 use Data::Dumper 'Dumper';
 use Term::ANSIColor ':constants';
+use Term::ReadKey 'GetTerminalSize';
 
 use EventLoop::Actors;
 use EventLoop::IO;
@@ -151,20 +152,21 @@ sub loop ( $MAX_TICKS, $start_pid ) {
         };
     }];
 
-    local $IN  = spawn( '!in' );
-    local $OUT = spawn( '!out' );
-    local $ERR = spawn( '!err' );
-
     # initialise ...
     my $start = spawn( $start_pid );
 
     send_from( $INIT_PID, $start => '_' => [] );
 
-    say FAINT '('.$INIT_PID.')', ('-' x 50), "start", RESET if DEBUG;
+    my ($term_width) = GetTerminalSize();
+    my $init_pid_prefix = '('.$INIT_PID.')';
+    $term_width -= length $init_pid_prefix;
+    $term_width -= 2 ;
+
+    say FAINT (join ' ' => $init_pid_prefix, map { (' ' x ($term_width - length $_)) . " $_" } ("start")), RESET if DEBUG;
 
     my $tick = 0;
     while ($tick < $MAX_TICKS) {
-        say FAINT '('.$INIT_PID.')', ('-' x 50), "tick($tick)", RESET if DEBUG;
+        say FAINT (join ' ' => $init_pid_prefix, map { ('-' x ($term_width - length $_)) . " $_" } ("tick($tick)")), RESET if DEBUG;
 
         $tick++;
 
@@ -227,83 +229,6 @@ sub loop ( $MAX_TICKS, $start_pid ) {
     return 1;
 }
 
-## create the core actors
-
-my %INDENTS;
-
-actor '!err' => sub ($env, $msg) {
-    my $prefix = DEBUG
-        ? ON_RED "ERR ($CURRENT_CALLER) !!". RESET " "
-        : ON_RED "ERR !!". RESET " ";
-
-    match $msg, +{
-        printf => sub ($body) {
-            my ($fmt, $values, $caller) = @$body;
-
-            if ($caller) {
-                $INDENTS{ $CURRENT_CALLER } = ($INDENTS{ $caller } // 0) + 1
-                    unless exists $INDENTS{ $CURRENT_CALLER };
-
-                $prefix = FAINT
-                    RED
-                        ('-' x $INDENTS{ $CURRENT_CALLER }).'> '
-                    . RESET $prefix;
-            }
-
-            warn( $prefix, (sprintf $fmt, @$values), " from($caller)\n" );
-        },
-        print => sub ($body) {
-            my ($msg, $caller) = @$body;
-
-            if ($caller) {
-                $INDENTS{ $CURRENT_CALLER } = ($INDENTS{ $caller } // 0) + 1
-                    unless exists $INDENTS{ $CURRENT_CALLER };
-
-                $prefix = FAINT
-                    RED
-                        ('-' x $INDENTS{ $CURRENT_CALLER }).'> '
-                    . RESET $prefix;
-            }
-
-            warn( $prefix, $msg, " from($caller)\n" );
-        }
-    };
-};
-
-actor '!out' => sub ($env, $msg) {
-    my $prefix = DEBUG
-        ? ON_GREEN "OUT ($CURRENT_CALLER) >>". RESET " "
-        : ON_GREEN "OUT >>". RESET " ";
-
-    match $msg, +{
-        printf => sub ($body) {
-            my ($fmt, @values) = @$body;
-            say( $prefix, sprintf $fmt, @values );
-        },
-        print => sub ($body) {
-            say( $prefix, @$body );
-        }
-    };
-};
-
-actor '!in' => sub ($env, $msg) {
-    my $prefix = DEBUG
-        ? ON_CYAN "IN ($CURRENT_CALLER) <<". RESET " "
-        : ON_CYAN "IN <<". RESET " ";
-
-    match $msg, +{
-        read => sub ($body) {
-            my ($prompt) = @$body;
-            $prompt //= '';
-
-            print( $prefix, $prompt );
-            my $input = <>;
-            chomp $input;
-            return_to( $input );
-        }
-    };
-};
-
 ## controls ...
 
 actor '!timeout' => sub ($env, $msg) {
@@ -312,19 +237,19 @@ actor '!timeout' => sub ($env, $msg) {
         start => sub ($body) {
             my ($timer, $event) = @$body;
             err::log( "*/ !timeout! /* : starting $timer" ) if DEBUG;
-            send_to( $CURRENT_PID => countdown => [ $timer - 1, $event, $CURRENT_CALLER ] );
+            send_from( $CURRENT_CALLER, $CURRENT_PID => countdown => [ $timer - 1, $event ] );
         },
         countdown => sub ($body) {
-            my ($timer, $event, $caller) = @$body;
+            my ($timer, $event) = @$body;
 
             if ( $timer == 0 ) {
-                err::log( "*/ !timeout! /* : timer DONE", $caller) if DEBUG;
-                send_from( $caller, @$event );
+                err::log( "*/ !timeout! /* : timer DONE") if DEBUG;
+                send_from( $CURRENT_CALLER, @$event );
                 despawn( $CURRENT_PID );
             }
             else {
-                err::log("*/ !timeout! /* : counting down $timer", $caller ) if DEBUG;
-                send_to( $CURRENT_PID => countdown => [ $timer - 1, $event, $caller ] );
+                err::log("*/ !timeout! /* : counting down $timer") if DEBUG;
+                send_from( $CURRENT_CALLER, $CURRENT_PID => countdown => [ $timer - 1, $event ] );
             }
         }
     };
@@ -431,16 +356,16 @@ actor '!cond' => sub ($env, $msg) {
     };
 };
 
-actor '!sequence' => sub ($env, $msg) {
+actor '!seq' => sub ($env, $msg) {
     match $msg, +{
         next => sub ($body) {
             if ( my $statement = shift @$body ) {
-                err::log("*/ !sequence /* calling statement, ".(scalar @$body)." remain" ) if DEBUG;
+                err::log("*/ !seq /* calling, ".(scalar @$body)." remain" ) if DEBUG;
                 send_from( $CURRENT_CALLER, @$statement );
                 send_from( $CURRENT_CALLER, $CURRENT_PID, next => $body );
             }
             else {
-                err::log("*/ !sequence /* finished") if DEBUG;
+                err::log("*/ !seq /* finished") if DEBUG;
                 despawn( $CURRENT_PID );
             }
         },
