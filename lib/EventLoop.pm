@@ -190,6 +190,7 @@ sub loop ( $MAX_TICKS, $start_pid ) {
     say FAINT (join ' ' => $init_pid_prefix, map { (' ' x ($term_width - length $_)) . " $_" } ("start(0)")), RESET if DEBUG;
 
     my $should_exit = 0;
+    my $has_exited  = 0;
 
     my $tick = 0;
     while ($tick < $MAX_TICKS) {
@@ -262,14 +263,14 @@ sub loop ( $MAX_TICKS, $start_pid ) {
         } if DEBUG >= 3;
 
         if ($should_exit) {
-            say FAINT (join ' ' => $init_pid_prefix, map { ('-' x ($term_width - length $_)) . " $_" } ("exit($tick)")), RESET if DEBUG;
+            $has_exited++;
             last;
         }
 
         if ( scalar @active_processes == 0 ) {
             # loop one last time to flush any I/O
             if ( scalar @msg_inbox == 0 ) {
-                say FAINT (join ' ' => $init_pid_prefix, map { ('-' x ($term_width - length $_)) . " $_" } ("exit($tick)")), RESET if DEBUG;
+                $has_exited++;
                 last;
             }
             else {
@@ -277,6 +278,12 @@ sub loop ( $MAX_TICKS, $start_pid ) {
                 $should_exit++;
             }
         }
+    }
+
+    if ( $has_exited ) {
+        say FAINT (join ' ' => $init_pid_prefix, map { ('-' x ($term_width - length $_)) . " $_" } ("exit($tick)")), RESET if DEBUG;
+    } else {
+        say FAINT (join ' ' => $init_pid_prefix, map { ('-' x ($term_width - length $_)) . " $_" } ("halt($tick)")), RESET if DEBUG;
     }
 
     if (DEBUG) {
