@@ -76,6 +76,9 @@ my %processes;
 sub PID    () { $CURRENT_PID    }
 sub CALLER () { $CURRENT_CALLER }
 
+# TODO:
+# Make Sys into Signals
+
 sub SYS () { $INIT_PID }
 
 ## ... message delivery
@@ -407,6 +410,7 @@ actor '!cond' => sub ($env, $msg) {
     };
 };
 
+# not sure this is actually useful ...
 actor '!seq' => sub ($env, $msg) {
     match $msg, +{
         next => sub ($body) {
