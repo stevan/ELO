@@ -231,6 +231,19 @@ sub loop ( $MAX_TICKS, $start_pid ) {
         despawn_all;
 
         warn Dumper \%processes if DEBUG >= 3;
+
+        my @active_processes =
+            grep !/^\d\d\d:\#/,     # ignore I/O pids
+            grep $_ ne $start,     # ignore start pid
+            grep $_ ne $INIT_PID,  # ignore init pid
+            keys %processes;
+
+        warn Dumper { active_processes => \@active_processes } if DEBUG >= 3;
+
+        if ( scalar @active_processes == 0 ) {
+            say FAINT (join ' ' => $init_pid_prefix, map { ('-' x ($term_width - length $_)) . " $_" } ("exit(0)")), RESET if DEBUG;
+            last;
+        }
     }
 
     if (DEBUG) {

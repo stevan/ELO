@@ -18,31 +18,31 @@ our $OUT;
 our $ERR;
 
 sub err::log ($msg, $caller=$EventLoop::CURRENT_CALLER) {
-    $ERR //= EventLoop::spawn('!err');
+    $ERR //= EventLoop::spawn('#err');
     my $args = [ $ERR, print => [ $msg, $caller ]];
     defined wantarray ? $args : EventLoop::send_to( @$args );
 }
 
 sub err::logf ($fmt, $msg, $caller=$EventLoop::CURRENT_CALLER) {
-    $ERR //= EventLoop::spawn('!err');
+    $ERR //= EventLoop::spawn('#err');
     my $args = [ $ERR, printf => [ $fmt, $msg, $caller ]];
     defined wantarray ? $args : EventLoop::send_to( @$args );
 }
 
 sub out::print ($msg=undef) {
-    $OUT //= EventLoop::spawn('!out');
+    $OUT //= EventLoop::spawn('#out');
     my $args = [ $OUT, print => [ $msg // () ]];
     defined wantarray ? $args : EventLoop::send_to( @$args );
 }
 
 sub out::printf ($fmt, $msg=undef) {
-    $OUT //= EventLoop::spawn('!out');
+    $OUT //= EventLoop::spawn('#out');
     my $args = [ $OUT, printf => [ $fmt, $msg // () ]];
     defined wantarray ? $args : EventLoop::send_to( @$args );
 }
 
 sub in::read ($prompt=undef) {
-    $IN //= EventLoop::spawn('!in');
+    $IN //= EventLoop::spawn('#in');
     my $args = [ $IN, read => [ $prompt // () ]];
     defined wantarray ? $args : EventLoop::send_to( @$args );
 }
@@ -51,7 +51,7 @@ sub in::read ($prompt=undef) {
 
 my %INDENTS;
 
-actor '!err' => sub ($env, $msg) {
+actor '#err' => sub ($env, $msg) {
     my $prefix = EventLoop::DEBUG()
         ? ON_RED "ERR (".$EventLoop::CURRENT_CALLER.") !!". RESET " "
         : ON_RED "ERR !!". RESET " ";
@@ -100,7 +100,7 @@ actor '!err' => sub ($env, $msg) {
     };
 };
 
-actor '!out' => sub ($env, $msg) {
+actor '#out' => sub ($env, $msg) {
     my $prefix = EventLoop::DEBUG()
         ? ON_GREEN "OUT (".$EventLoop::CURRENT_CALLER.") >>". RESET " "
         : ON_GREEN "OUT >>". RESET " ";
@@ -116,7 +116,7 @@ actor '!out' => sub ($env, $msg) {
     };
 };
 
-actor '!in' => sub ($env, $msg) {
+actor '#in' => sub ($env, $msg) {
     my $prefix = EventLoop::DEBUG()
         ? ON_CYAN "IN (".$EventLoop::CURRENT_CALLER.") <<". RESET " "
         : ON_CYAN "IN <<". RESET " ";
