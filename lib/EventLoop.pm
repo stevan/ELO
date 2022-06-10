@@ -166,7 +166,7 @@ sub loop ( $MAX_TICKS, $start_pid ) {
     $term_width -= length $init_pid_prefix;
     $term_width -= 2 ;
 
-    say FAINT (join ' ' => $init_pid_prefix, map { (' ' x ($term_width - length $_)) . " $_" } ("start")), RESET if DEBUG;
+    say FAINT (join ' ' => $init_pid_prefix, map { (' ' x ($term_width - length $_)) . " $_" } ("start(0)")), RESET if DEBUG;
 
     my $tick = 0;
     while ($tick < $MAX_TICKS) {
