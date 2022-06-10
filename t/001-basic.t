@@ -53,8 +53,10 @@ actor main => sub ($env, $msg) {
 
     send_to( $e1, init => [{ foo => 100, bar => 200, baz => 300 }] );
 
+    my $val = 0;
     sync(
-        in::read( "$_: " ),
+        # in:read( "$_ : " ),
+        ident($val += 10),
         [ $e1, set => [$_]]
     ) foreach qw[ foo bar baz ];
 
