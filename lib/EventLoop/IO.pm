@@ -53,8 +53,8 @@ my %INDENTS;
 
 actor '#err' => sub ($env, $msg) {
     my $prefix = EventLoop::DEBUG()
-        ? ON_RED "ERR (".$EventLoop::CURRENT_CALLER.") !!". RESET " "
-        : ON_RED "ERR !!". RESET " ";
+        ? ON_RED "LOG (".$EventLoop::CURRENT_CALLER.") !!". RESET " "
+        : ON_RED "LOG !!". RESET " ";
 
     match $msg, +{
         printf => sub ($body) {
