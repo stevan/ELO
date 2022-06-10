@@ -123,24 +123,19 @@ sub despawn_all () {
 ## ... currency control
 
 sub timeout ($ticks, $callback) {
-    my @args = (spawn( '!timeout' ), start => [ $ticks, $callback ]);
-    defined wantarray
-        ? \@args
-        : send_to( @args );
+    my $args = [ spawn( '!timeout' ), start => [ $ticks, $callback ] ];
+    defined wantarray ? $args : send_to( @$args );
 }
 
 sub sync ($input, $output) {
-    my @args = ( spawn( '!sync' ), send => [ $input, $output ] );
-    defined wantarray
-        ? \@args
-        : send_to( @args );
+    my $args = [ spawn( '!sync' ), send => [ $input, $output ] ];
+    defined wantarray ? $args : send_to( @$args );
 }
 
 sub await ($input, $output) {
-    my @args = ( spawn( '!await' ), send => [ $input, $output ] );
-    defined wantarray
-        ? \@args
-        : send_to( @args );
+    my $args = [ spawn( '!await' ), send => [ $input, $output ] ];
+    defined wantarray ? $args : send_to( @$args );
+}
 }
 
 ## ...
