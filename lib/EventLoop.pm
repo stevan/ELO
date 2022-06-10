@@ -344,26 +344,26 @@ actor '!sync' => sub ($env, $msg) {
 
     match $msg, +{
         send => sub ($body) {
-            my ($command, $callback) = @$body;
+            my ($input, $output) = @$body;
             err::log("*/ !sync /* : sending message") if DEBUG;
-            send_to( @$command );
-            send_to( $CURRENT_PID => recv => [ $callback, $CURRENT_CALLER ] );
+            send_to( @$input );
+            send_from( $CURRENT_CALLER, $CURRENT_PID => recv => [ $output ] );
         },
         recv => sub ($body) {
-            my ($callback, $caller) = @$body;
+            my ($output) = @$body;
 
             my $message = recv_from;
 
             if (defined $message) {
-                err::log("*/ !sync /* : recieve message($message)", $caller) if DEBUG;
-                #warn Dumper $callback;
-                push $callback->[-1]->@*, $message;
-                send_from( $caller, @$callback );
+                err::log("*/ !sync /* : recieve message($message)") if DEBUG;
+                #warn Dumper $output;
+                push $output->[-1]->@*, $message;
+                send_from( $CURRENT_CALLER, @$output );
                 despawn( $CURRENT_PID );
             }
             else {
-                err::log("*/ !sync /* : no messages", $caller) if DEBUG;
-                send_to( $CURRENT_PID => recv => $body );
+                err::log("*/ !sync /* : no messages") if DEBUG;
+                send_from( $CURRENT_CALLER, $CURRENT_PID => recv => $body );
             }
         }
     };
