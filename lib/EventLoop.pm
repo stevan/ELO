@@ -168,7 +168,7 @@ sub loop ( $MAX_TICKS, $start_pid ) {
         match $msg, +{
             kill => sub ($body) {
                 my ($pid) = @$body;
-                warn( $prefix, "killing {$pid}\n" ) if DEBUG;
+                warn( $prefix, "killing ... {$pid}\n" ) if DEBUG;
                 despawn($pid);
             }
         };
@@ -186,9 +186,11 @@ sub loop ( $MAX_TICKS, $start_pid ) {
 
     say FAINT (join ' ' => $init_pid_prefix, map { (' ' x ($term_width - length $_)) . " $_" } ("start(0)")), RESET if DEBUG;
 
+    my $should_exit = 0;
+
     my $tick = 0;
     while ($tick < $MAX_TICKS) {
-        say FAINT (join ' ' => $init_pid_prefix, map { ('-' x ($term_width - length $_)) . " $_" } ("tick($tick)")), RESET if DEBUG;
+        say FAINT (join ' ' => $init_pid_prefix, map { ('-' x ($term_width - length $_)) . " $_" } ("tick($tick)")), RESET if DEBUG && !$should_exit;
 
         $tick++;
 
@@ -251,11 +253,26 @@ sub loop ( $MAX_TICKS, $start_pid ) {
             grep $_ ne $INIT_PID,  # ignore init pid
             keys %processes;
 
-        warn Dumper { active_processes => \@active_processes } if DEBUG >= 3;
+        warn Dumper {
+            active_processes => \@active_processes,
+            msg_inbox        => \@msg_inbox,
+        } if DEBUG >= 3;
 
-        if ( scalar @active_processes == 0 ) {
+        if ($should_exit) {
             say FAINT (join ' ' => $init_pid_prefix, map { ('-' x ($term_width - length $_)) . " $_" } ("exit($tick)")), RESET if DEBUG;
             last;
+        }
+
+        if ( scalar @active_processes == 0 ) {
+            # loop one last time to flush any I/O
+            if ( scalar @msg_inbox == 0 ) {
+                say FAINT (join ' ' => $init_pid_prefix, map { ('-' x ($term_width - length $_)) . " $_" } ("exit($tick)")), RESET if DEBUG;
+                last;
+            }
+            else {
+                say FAINT (join ' ' => $init_pid_prefix, map { ('-' x ($term_width - length $_)) . " $_" } ("flushing($tick)")), RESET if DEBUG;
+                $should_exit++;
+            }
         }
     }
 
