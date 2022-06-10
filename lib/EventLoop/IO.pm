@@ -8,7 +8,7 @@ our $VERSION   = '0.01';
 our $AUTHORITY = 'cpan:STEVAN';
 
 use Data::Dumper 'Dumper';
-use Term::ANSIColor ':constants', ':constants256';
+use Term::ANSIColor ':constants';
 
 # use EventLoop; ... but not, so as to avoid the circular dep
 use EventLoop::Actors;
