@@ -124,7 +124,7 @@ sub despawn_all () {
 ## ... currency control
 
 sub timeout ($ticks, $callback) {
-    my $args = [ spawn( '!timeout' ), start => [ $ticks, $callback ] ];
+    my $args = [ spawn( '!timeout' ), countdown => [ $ticks, $callback ] ];
     defined wantarray ? $args : send_to( @$args );
 }
 
@@ -258,11 +258,6 @@ sub loop ( $MAX_TICKS, $start_pid ) {
 actor '!timeout' => sub ($env, $msg) {
 
     match $msg, +{
-        start => sub ($body) {
-            my ($timer, $event) = @$body;
-            err::log( "*/ !timeout! /* : starting $timer" ) if DEBUG;
-            send_from( $CURRENT_CALLER, $CURRENT_PID => countdown => [ $timer - 1, $event ] );
-        },
         countdown => sub ($body) {
             my ($timer, $event) = @$body;
 
