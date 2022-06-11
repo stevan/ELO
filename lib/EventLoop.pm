@@ -208,7 +208,22 @@ sub loop ( $MAX_TICKS, $start_pid ) {
                 my ($pid) = @$body;
                 warn( $prefix, "killing ... {$pid}\n" ) if DEBUG;
                 despawn($pid);
-            }
+            },
+            waitpids => sub ($body) {
+                my ($pids, $callback) = @$body;
+
+                my @active = grep { exists $processes{$_} } @$pids;
+
+                if (@active) {
+                    warn( $prefix, "waiting for ".(scalar @$pids)." pids, found ".(scalar @active)." active" ) if DEBUG;
+                    send_from( $CURRENT_CALLER, $CURRENT_PID, waitpids => [ \@active, $callback ] );
+                }
+                else {
+                    warn( $prefix, "no more active pids" ) if DEBUG;
+                    send_from( $CURRENT_CALLER, @$callback );
+                }
+
+            },
         };
     }];
 
