@@ -135,33 +135,63 @@ sub despawn_all () {
 ## ... currency control
 
 sub timeout ($ticks, $callback) {
-    my $args = [ spawn( '!timeout' ), countdown => [ $ticks, $callback ] ];
-    defined wantarray ? $args : send_to( @$args );
+    my $pid  = spawn( '!timeout' );
+    my $args = [ $pid, countdown => [ $ticks, $callback ] ];
+    defined wantarray
+        ? (wantarray
+            ? $args
+            : do { send_to( @$args ); $pid })
+        : send_to( @$args );
 }
 
 sub sync ($input, $output) {
-    my $args = [ spawn( '!sync' ), send => [ $input, $output ] ];
-    defined wantarray ? $args : send_to( @$args );
+    my $pid  = spawn( '!sync' );
+    my $args = [ $pid, send => [ $input, $output ] ];
+    defined wantarray
+        ? (wantarray
+            ? $args
+            : do { send_to( @$args ); $pid })
+        : send_to( @$args );
 }
 
 sub await ($input, $output) {
-    my $args = [ spawn( '!await' ), send => [ $input, $output ] ];
-    defined wantarray ? $args : send_to( @$args );
+    my $pid  = spawn( '!await' );
+    my $args = [ $pid, send => [ $input, $output ] ];
+    defined wantarray
+        ? (wantarray
+            ? $args
+            : do { send_to( @$args ); $pid })
+        : send_to( @$args );
 }
 
 sub ident ($val=undef) {
-    my $args = [ spawn( '!ident' ), id => [ $val // () ] ];
-    defined wantarray ? $args : send_to( @$args );
+    my $pid  = spawn( '!ident' );
+    my $args = [ $pid, id => [ $val // () ] ];
+    defined wantarray
+        ? (wantarray
+            ? $args
+            : do { send_to( @$args ); $pid })
+        : send_to( @$args );
 }
 
 sub sequence (@statements) {
-    my $args = [ spawn( '!seq' ), next => [ @statements ] ];
-    defined wantarray ? $args : send_to( @$args );
+    my $pid  = spawn( '!seq' );
+    my $args = [ $pid, next => [ @statements ] ];
+    defined wantarray
+        ? (wantarray
+            ? $args
+            : do { send_to( @$args ); $pid })
+        : send_to( @$args );
 }
 
 sub cond ($cond, $then) {
-    my $args = [ spawn( '!cond' ), if => [ $cond, $then ] ];
-    defined wantarray ? $args : send_to( @$args );
+    my $pid  = spawn( '!cond' );
+    my $args = [ $pid, if => [ $cond, $then ] ];
+    defined wantarray
+        ? (wantarray
+            ? $args
+            : do { send_to( @$args ); $pid })
+        : send_to( @$args );
 }
 
 ## ...
@@ -203,8 +233,8 @@ sub loop ( $MAX_TICKS, $start_pid ) {
 
         $tick++;
 
-        warn Dumper \@msg_inbox  if DEBUG >= 3;
-        warn Dumper \@msg_outbox if DEBUG >= 2;
+        warn Dumper \@msg_inbox  if DEBUG >= 5;
+        warn Dumper \@msg_outbox if DEBUG >= 4;
 
         # deliver all the messages in the queue
         while (@msg_inbox) {
@@ -232,9 +262,7 @@ sub loop ( $MAX_TICKS, $start_pid ) {
             push $processes{$to}->[OUTBOX]->@* => [ $from, $m ];
         }
 
-        my @active =
-            map  [ $_, $processes{$_}->@* ],
-            sort { $a cmp $b } keys %processes;
+        my @active = map [ $_, $processes{$_}->@* ], keys %processes;
 
         while (@active) {
             my $active = shift @active;
