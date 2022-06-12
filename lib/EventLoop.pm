@@ -109,8 +109,8 @@ sub return_to ($msg) {
 ## ... process creation
 
 my $PID = 0;
-sub spawn ($name) {
-    my $process = [ [], [], {}, EventLoop::Actors::get_actor($name) ];
+sub spawn ($name, %env) {
+    my $process = [ [], [], { %env }, EventLoop::Actors::get_actor($name) ];
     my $pid = sprintf '%03d:%s' => ++$PID, $name;
     $processes{ $pid } = $process;
     $pid;

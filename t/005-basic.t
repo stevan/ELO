@@ -12,29 +12,33 @@ use EventLoop;
 use EventLoop::Actors;
 use EventLoop::IO;
 
-actor Observer => sub ($env, $msg) {
-    state $got = {};
+actor MapObserver => sub ($env, $msg) {
+
+    my $observer = $env->{observer};
+    my $f        = $env->{f};
 
     match $msg, +{
         on_next => sub ($msg) {
             my ($val) = @$msg;
-            out::print("Observer got val($val)");
-            $got->{$val}++;
+            out::print("MapObserver got val($val)");
+            send_to( $observer, on_next => [ $f->($val) ]);
         },
         on_error => sub ($msg) {
             my ($e) = @$msg;
-            err::log("Observer got error($e)");
+            err::log("MapObserver got error($e)");
+            send_to( $observer, on_error => [ $e ]);
         },
         on_completed => sub ($msg) {
-            err::log("Observer completed");
-            err::log("Observed values: [" . (join ', ' => sort { $a <=> $b } keys $got->%*) . "]");
+            err::log("MapObserver completed");
+            send_to( $observer, on_completed => []);
             send_to( SYS, kill => [PID] );
         }
     };
 };
 
-actor Observer => sub ($env, $msg) {
-    state $got = {};
+actor DebugObserver => sub ($env, $msg) {
+
+    my $got = $env->{got} //= {};
 
     match $msg, +{
         on_next => sub ($msg) {
@@ -48,7 +52,7 @@ actor Observer => sub ($env, $msg) {
         },
         on_completed => sub ($msg) {
             err::log("Observer completed");
-            err::log("Observed values: [" . (join ', ' => sort { $a <=> $b } keys $got->%*) . "]");
+            err::log("Observed values: [" . (join ', ' => map { "$_/".$got->{$_} }sort { $a <=> $b } keys $got->%*) . "]");
             send_to( SYS, kill => [PID] );
         }
     };
@@ -69,12 +73,12 @@ actor SimpleObservable => sub ($env, $msg) {
     };
 };
 
-actor Observable => sub ($env, $msg) {
+actor ComplexObservable => sub ($env, $msg) {
 
     match $msg, +{
         subscribe => sub ($msg) {
             my ($observer) = @$msg;
-            err::log("Observeable started, calling ($observer)");
+            err::log("ComplexObserveable started, calling ($observer)");
 
             my @pids = map {
                 scalar timeout( int(rand(9)), [ $observer, on_next => [ $_ ] ])
@@ -93,10 +97,17 @@ actor Observable => sub ($env, $msg) {
 actor main => sub ($env, $msg) {
     out::print("-> main starting ...");
 
-    my $observable = spawn('Observable');
-    my $observer   = spawn('Observer');
+    my $complex = spawn('ComplexObservable');
+    my $simple  = spawn('SimpleObservable');
+    my $debug   = spawn('DebugObserver');
+    my $map     = spawn('MapObserver',
+        observer => spawn('DebugObserver'),
+        f        => sub ($x) { $x + 100 },
+    );
 
-    send_to($observable, 'subscribe' => [ $observer ]);
+    #send_to($complex, 'subscribe' => [ $debug ]);
+    send_to($simple,  'subscribe' => [ $map ]);
+    send_to($simple,  'subscribe' => [ $debug ]);
 };
 
 # loop ...
