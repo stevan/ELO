@@ -42,14 +42,10 @@ actor Printer => sub ($env, $msg) {
                 $env->{in_string}++;
             }
             else {
-                send_to(PID, string => [ join '' => $env->{str_buffer}->@* ]);
+                out::print("got string('".(join '' => $env->{str_buffer}->@*)."')");
                 $env->{str_buffer}->@* = ();
                 $env->{in_string}--;
             }
-        },
-
-        string => sub ($body) {
-            out::print("got string('".$body->[0]."')");
         },
 
         char => sub ($body) {
@@ -156,7 +152,7 @@ actor main => sub ($env, $msg) {
 
     send_to( $splitter, split => [
         [ $tokenizer, tokenize => [ $printer ]],
-        '{ "foo 20bar" : 10 }',
+        '{ "foo" : "25 bottles of baz" }',
     ]);
 };
 
