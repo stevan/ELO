@@ -326,7 +326,7 @@ actor main => sub ($env, $msg) {
 
     send_to(spawn('Tokenizer'), tokenize => [
         spawn('Printer'),
-        '{ "bling" : { "bang" : { "f" : 1 }, "balls" : 10, "boo" : { "wha" : 3000 } } }'
+        '{ "bling" : {} }'
     ]);
 
 };
