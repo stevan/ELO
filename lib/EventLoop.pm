@@ -302,7 +302,8 @@ sub loop ( $MAX_TICKS, $start_pid ) {
                         map {
                             my $pid    = $_->[0];
                             my $action = $_->[1]->[0];
-                            $action;
+                            my $msgs   = join ', ' => $_->[1]->[1]->@*;
+                            "${action}![${msgs}]";
                         } @inbox).
                     RESET ")\n";
             }
