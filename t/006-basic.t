@@ -12,8 +12,8 @@ use EventLoop;
 use EventLoop::Actors;
 use EventLoop::IO;
 
-use constant DEBUG_TOKENIZER => ($ENV{DEBUG} // 0) >= 2 ? 1 : 0;
-use constant DEBUG_DECODER   => ($ENV{DEBUG} // 0) >= 2 ? 1 : 0;
+use constant DEBUG_TOKENIZER => DEBUG >= 2 ? DEBUG - 1 : 0;
+use constant DEBUG_DECODER   => DEBUG >= 2 ? DEBUG - 1 : 0;
 
 actor Splitter => sub ($env, $msg) {
 
@@ -95,37 +95,42 @@ actor Tokenizer => sub ($env, $msg) {
         return $char, @$chars;
     }
 
+    my $stack = $env->{stack} //= [];
+
+    err::log(Dumper { stack => $stack }) if DEBUG_TOKENIZER >= 2;
+
     match $msg, +{
         tokenize => sub ($body) {
             my ($observer, $JSON) = @$body;
+            push @$stack => 'process_tokens';
             send_to(
                 spawn('Splitter'),
                 split => [
-                    [ PID, process_tokens => [ ['process_tokens'] => $observer ]],
+                    [ PID, process_tokens => [ $observer ]],
                     $JSON
                 ]
             );
         },
         process_tokens => sub ($body) {
             my $char;
-            my ($callstack, $observer, @chars) = @$body;
+            my ($observer, @chars) = @$body;
 
-            err::log("Enter process_tokens (@$callstack) : (@chars)") if DEBUG_TOKENIZER;
+            err::log("Enter process_tokens (@$stack) : (@chars)") if DEBUG_TOKENIZER;
 
             ($char, @chars) = stip_whitespace \@chars;
 
             if (defined $char) {
 
                 if ( $char eq '{' ) {
-                    send_to(PID, start_object => [ $callstack, $observer, @chars ]);
+                    send_to(PID, start_object => [ $observer, @chars ]);
                 }
                 elsif ( $char eq '"' ) {
                     # drop the quote ...
-                    send_to(PID, collect_string => [ $callstack, $observer, @chars ]);
+                    send_to(PID, collect_string => [ $observer, @chars ]);
                 }
                 elsif ( $char =~ /^\d$/ ) {
                     # but keep the number ...
-                    send_to(PID, collect_number => [ $callstack, $observer, ($char, @chars) ]);
+                    send_to(PID, collect_number => [ $observer, ($char, @chars) ]);
                 }
 
             }
@@ -138,9 +143,9 @@ actor Tokenizer => sub ($env, $msg) {
         ## ... complex ...
         start_object => sub ($body) {
             my $char;
-            my ($callstack, $observer, @chars) = @$body;
+            my ($observer, @chars) = @$body;
 
-            err::log("Enter start_object (@$callstack) : (@chars)") if DEBUG_TOKENIZER;
+            err::log("Enter start_object (@$stack) : (@chars)") if DEBUG_TOKENIZER;
 
             ($char, @chars) = stip_whitespace \@chars;
 
@@ -148,11 +153,11 @@ actor Tokenizer => sub ($env, $msg) {
                 send_to($observer, start_object => []);
 
                 if ( $char eq '}' ) {
-                    send_to(PID, end_object => [ $callstack, $observer, @chars ]);
+                    send_to(PID, end_object => [ $observer, @chars ]);
                 }
                 else {
-                    push @$callstack => 'process_object';
-                    send_to(PID, start_property => [ $callstack, $observer, $char, @chars ]);
+                    push @$stack => 'process_object';
+                    send_to(PID, start_property => [ $observer, $char, @chars ]);
                 }
             }
             else {
@@ -162,20 +167,20 @@ actor Tokenizer => sub ($env, $msg) {
         },
         process_object => sub ($body) {
             my $char;
-            my ($callstack, $observer, @chars) = @$body;
+            my ($observer, @chars) = @$body;
 
-            err::log("Enter process_object (@$callstack) : (@chars)") if DEBUG_TOKENIZER;
+            err::log("Enter process_object (@$stack) : (@chars)") if DEBUG_TOKENIZER;
 
             ($char, @chars) = stip_whitespace \@chars;
 
             if (defined $char) {
                 # process tokens
                 if ( $char eq '}' ) {
-                    send_to(PID, end_object => [ $callstack, $observer, @chars ]);
+                    send_to(PID, end_object => [ $observer, @chars ]);
                 }
                 elsif ( $char eq ',' ) {
-                    push @$callstack => 'process_object';
-                    send_to(PID, start_property => [ $callstack, $observer, @chars ]);
+                    push @$stack => 'process_object';
+                    send_to(PID, start_property => [ $observer, @chars ]);
                 }
             }
             else {
@@ -184,30 +189,30 @@ actor Tokenizer => sub ($env, $msg) {
             }
         },
         end_object => sub ($body) {
-            my ($callstack, $observer, @chars) = @$body;
+            my ($observer, @chars) = @$body;
 
-            err::log("Enter end_object (@$callstack) : (@chars)") if DEBUG_TOKENIZER;
+            err::log("Enter end_object (@$stack) : (@chars)") if DEBUG_TOKENIZER;
 
-            my $return_call = pop @$callstack;
+            my $return_call = pop @$stack;
 
             send_to($observer, end_object   => []);
-            send_to(PID, $return_call, [ $callstack, $observer, @chars ]);
+            send_to(PID, $return_call, [ $observer, @chars ]);
         },
 
         # ...
         start_property => sub ($body) {
             my $char;
-            my ($callstack, $observer, @chars) = @$body;
+            my ($observer, @chars) = @$body;
 
-            err::log("Enter start_property (@$callstack) : (@chars)") if DEBUG_TOKENIZER;
+            err::log("Enter start_property (@$stack) : (@chars)") if DEBUG_TOKENIZER;
 
             ($char, @chars) = stip_whitespace \@chars;
 
             if (defined $char) {
                 if ( $char eq '"' ) {
                     send_to($observer, start_property => []);
-                    push @$callstack => 'process_property';
-                    send_to(PID, collect_string => [ $callstack, $observer, @chars ]);
+                    push @$stack => 'process_property';
+                    send_to(PID, collect_string => [ $observer, @chars ]);
                 }
                 else {
                     die "Property must start with a quoted string";
@@ -219,15 +224,15 @@ actor Tokenizer => sub ($env, $msg) {
         },
         process_property => sub ($body) {
             my $char;
-            my ($callstack, $observer, @chars) = @$body;
+            my ($observer, @chars) = @$body;
 
-            err::log("Enter process_property (@$callstack) : (@chars)") if DEBUG_TOKENIZER;
+            err::log("Enter process_property (@$stack) : (@chars)") if DEBUG_TOKENIZER;
 
             ($char, @chars) = stip_whitespace \@chars;
 
             if (defined $char) {
                 if ( $char eq ':' ) {
-                    send_to(PID, start_item => [ $callstack, $observer, @chars ]);
+                    send_to(PID, start_item => [ $observer, @chars ]);
                 }
                 else {
                     die "Expected : got $char";
@@ -238,41 +243,41 @@ actor Tokenizer => sub ($env, $msg) {
             }
         },
         end_property => sub ($body) {
-            my ($callstack, $observer, @chars) = @$body;
+            my ($observer, @chars) = @$body;
 
-            err::log("Enter end_property (@$callstack) : (@chars)") if DEBUG_TOKENIZER;
+            err::log("Enter end_property (@$stack) : (@chars)") if DEBUG_TOKENIZER;
 
-            my $return_call = pop @$callstack;
+            my $return_call = pop @$stack;
 
             send_to($observer, end_property => []);
-            send_to(PID, process_object => [ $callstack, $observer, @chars ]);
+            send_to(PID, process_object => [ $observer, @chars ]);
         },
 
 
         start_item => sub ($body) {
-            my ($callstack, $observer, @chars) = @$body;
+            my ($observer, @chars) = @$body;
 
-            err::log("Enter start_item (@$callstack) : (@chars)") if DEBUG_TOKENIZER;
+            err::log("Enter start_item (@$stack) : (@chars)") if DEBUG_TOKENIZER;
 
             send_to($observer, start_item => []);
-            push @$callstack => 'end_item';
-            send_to(PID, process_tokens => [ $callstack, $observer, @chars ]);
+            push @$stack => 'end_item';
+            send_to(PID, process_tokens => [ $observer, @chars ]);
         },
         end_item => sub ($body) {
-            my ($callstack, $observer, @chars) = @$body;
+            my ($observer, @chars) = @$body;
 
-            err::log("Enter end_item (@$callstack) : (@chars)") if DEBUG_TOKENIZER;
+            err::log("Enter end_item (@$stack) : (@chars)") if DEBUG_TOKENIZER;
 
             send_to($observer, end_item => []);
-            send_to(PID, end_property => [ $callstack, $observer, @chars ]);
+            send_to(PID, end_property => [ $observer, @chars ]);
         },
 
 
         ## ... literals ...
         collect_string => sub ($body) {
-            my ($callstack, $observer, @chars) = @$body;
+            my ($observer, @chars) = @$body;
 
-            err::log("Enter collect_string (@$callstack) : (@chars)") if DEBUG_TOKENIZER;
+            err::log("Enter collect_string (@$stack) : (@chars)") if DEBUG_TOKENIZER;
 
             my $char = shift @chars;
 
@@ -285,14 +290,14 @@ actor Tokenizer => sub ($env, $msg) {
 
             send_to($observer, add_string => [ join '' => @buffer ]);
 
-            my $return_call = pop @$callstack;
+            my $return_call = pop @$stack;
 
-            send_to( PID, $return_call, [ $callstack, $observer, @chars ]);
+            send_to( PID, $return_call, [ $observer, @chars ]);
         },
         collect_number => sub ($body) {
-            my ($callstack, $observer, @chars) = @$body;
+            my ($observer, @chars) = @$body;
 
-            err::log("Enter collect_number (@$callstack) : (@chars)") if DEBUG_TOKENIZER;
+            err::log("Enter collect_number (@$stack) : (@chars)") if DEBUG_TOKENIZER;
 
             my $char = shift @chars;
 
@@ -305,9 +310,9 @@ actor Tokenizer => sub ($env, $msg) {
 
             send_to($observer, add_number => [ (join '' => @buffer) + 0 ]);
 
-            my $return_call = pop @$callstack;
+            my $return_call = pop @$stack;
 
-            send_to( PID, $return_call, [ $callstack, $observer, ($char, @chars) ]);
+            send_to( PID, $return_call, [ $observer, ($char, @chars) ]);
         },
 
         # ...
