@@ -319,14 +319,14 @@ actor main => sub ($env, $msg) {
     out::print("-> main starting ...");
 
 
-    send_to(spawn('Tokenizer'), tokenize => [
-        spawn('Printer'),
-        '{ "foo" : { "bar" : 10, "baz" : { "gorch" : 100 } } }'
-    ]);
+    #send_to(spawn('Tokenizer'), tokenize => [
+    #    spawn('Printer'),
+    #    '{ "foo" : { "bar" : 10, "baz" : { "gorch" : 100 } } }'
+    #]);
 
     send_to(spawn('Tokenizer'), tokenize => [
         spawn('Printer'),
-        '{ "bling" : { "bang" : {}, "balls" : 10, "boo" : { "wha" : 3000 } } }'
+        '{ "bling" : { "bang" : { "f" : 1 }, "balls" : 10, "boo" : { "wha" : 3000 } } }'
     ]);
 
 };
