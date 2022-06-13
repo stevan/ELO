@@ -35,7 +35,7 @@ actor Decoder => sub ($env, $msg) {
 
     my $stack = $env->{stack} //= [[]];
 
-    err::log(Dumper $env) if DEBUG;
+    err::log(Dumper $env) if DEBUG_DECODER >= 2;
 
     match $msg, +{
         start_parens => sub ($body) {
