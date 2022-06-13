@@ -201,6 +201,7 @@ sub cond ($cond, $then) {
 
 sub loop ( $MAX_TICKS, $start_pid ) {
 
+    # initialise the system pid singleton
     $processes{ $INIT_PID } = [ [], [], {}, sub ($env, $msg) {
         my $prefix = DEBUG
             ? ON_MAGENTA "SYS ($CURRENT_CALLER) ::". RESET " "
@@ -387,8 +388,20 @@ sub _loop_log_line ( $fmt, $tick ) {
 
 ## controls ...
 
-actor '!timeout' => sub ($env, $msg) {
+# will just return the input given ...
+actor '!ident' => sub ($env, $msg) {
+    match $msg, +{
+        id => sub ($body) {
+            my ($val) = @$body;
+            err::log("*/ !ident /* returning val($val)") if DEBUG;
+            return_to $val;
+            despawn( $CURRENT_PID );
+        },
+    };
+};
 
+# wait, then call statement
+actor '!timeout' => sub ($env, $msg) {
     match $msg, +{
         countdown => sub ($body) {
             my ($timer, $event) = @$body;
@@ -406,7 +419,8 @@ actor '!timeout' => sub ($env, $msg) {
     };
 };
 
-# THIS DOES: send a message, and loop on recv ...
+# send a message, and loop on recv ...
+# then call statement with recv values appended to statement args
 actor '!sync' => sub ($env, $msg) {
 
     match $msg, +{
@@ -436,46 +450,7 @@ actor '!sync' => sub ($env, $msg) {
     };
 };
 
-actor '!ident' => sub ($env, $msg) {
-    match $msg, +{
-        id => sub ($body) {
-            my ($val) = @$body;
-            err::log("*/ !ident /* returning val($val)") if DEBUG;
-            return_to $val;
-            despawn( $CURRENT_PID );
-        },
-    };
-};
-
-actor '!cond' => sub ($env, $msg) {
-    match $msg, +{
-        if => sub ($body) {
-            my ($if, $then) = @$body;
-            err::log("*/ !cond /* entering if condition") if DEBUG;
-            sync( $if, [ $CURRENT_PID, cond => [ $then, $CURRENT_CALLER ]] );
-        },
-        cond => sub ($body) {
-            my ($then, $caller, $result) = @$body;
-            if ( $result ) {
-                err::log("*/ !cond /* condition successful", $caller ) if DEBUG;
-                send_to( $CURRENT_PID, then => [ $then, $caller ] );
-            }
-            else {
-                err::log("*/ !cond /* condition failed", $caller ) if DEBUG;
-                despawn( $CURRENT_PID );
-            }
-        },
-        then => sub ($body) {
-            my ($then, $caller) = @$body;
-            err::log("*/ !cond /* entering then", $caller ) if DEBUG;
-            send_from( $caller, @$then );
-            despawn( $CURRENT_PID );
-        }
-    };
-};
-
-
-# ... runnnig muliples
+# ... runnnig muliple statements
 
 actor '!sequence' => sub ($env, $msg) {
     match $msg, +{
