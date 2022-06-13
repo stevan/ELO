@@ -99,14 +99,14 @@ actor main => sub ($env, $msg) {
 
     my $complex = spawn('ComplexObservable');
     my $simple  = spawn('SimpleObservable');
+
     my $debug   = spawn('DebugObserver');
     my $map     = spawn('MapObserver',
         observer => spawn('DebugObserver'),
         f        => sub ($x) { $x + 100 },
     );
 
-    #send_to($complex, 'subscribe' => [ $debug ]);
-    send_to($simple,  'subscribe' => [ $map ]);
+    send_to($complex, 'subscribe' => [ $map ]);
     send_to($simple,  'subscribe' => [ $debug ]);
 };
 
