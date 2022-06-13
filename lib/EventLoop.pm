@@ -7,8 +7,9 @@ use experimental 'signatures', 'postderef';
 our $VERSION   = '0.01';
 our $AUTHORITY = 'cpan:STEVAN';
 
+use List::Util 'max';
 use Data::Dumper 'Dumper';
-use Term::ANSIColor ':constants';
+use Term::ANSIColor ':constants', 'color';
 use Term::ReadKey 'GetTerminalSize';
 
 use EventLoop::Actors;
@@ -47,9 +48,12 @@ our @EXPORT = qw[
 use constant INBOX  => 0;
 use constant OUTBOX => 1;
 
-use constant DEBUG => $ENV{DEBUG} // 0;
+use constant DEBUG    => $ENV{DEBUG} // 0;
+use constant DEBUGGER => $ENV{DEBUGGER} // 0;
 
 # stuff
+
+our $TERM_SIZE = (GetTerminalSize())[0];
 
 ## .. process info
 
@@ -232,24 +236,21 @@ sub loop ( $MAX_TICKS, $start_pid ) {
 
     send_from( $INIT_PID, $start => '_' => [] );
 
-    my ($term_width) = GetTerminalSize();
-    my $init_pid_prefix = '('.$INIT_PID.')';
-    $term_width -= length $init_pid_prefix;
-    $term_width -= 2 ;
-
-    say FAINT (join ' ' => $init_pid_prefix, map { (' ' x ($term_width - length $_)) . " $_" } ("start(0)")), RESET if DEBUG;
-
     my $should_exit = 0;
     my $has_exited  = 0;
 
     my $tick = 0;
+
+    _loop_log_line("start(%d)", $tick) if DEBUG;
     while ($tick < $MAX_TICKS) {
-        say FAINT (join ' ' => $init_pid_prefix, map { ('-' x ($term_width - length $_)) . " $_" } ("tick($tick)")), RESET if DEBUG && !$should_exit;
-
         $tick++;
+        _loop_log_line("tick(%d)", $tick) if DEBUG;
 
-        warn Dumper \@msg_inbox  if DEBUG >= 5;
+        warn Dumper \@msg_inbox  if DEBUG >= 4;
         warn Dumper \@msg_outbox if DEBUG >= 4;
+
+        my $has_inbox_messages  = !! scalar @msg_inbox;
+        my $has_outbox_messages = !! scalar @msg_outbox;
 
         # deliver all the messages in the queue
         while (@msg_inbox) {
@@ -277,6 +278,38 @@ sub loop ( $MAX_TICKS, $start_pid ) {
             push $processes{$to}->[OUTBOX]->@* => [ $from, $m ];
         }
 
+        #
+        if ( DEBUGGER ) {
+
+            my @pids = sort keys %processes;
+
+            my $longest_pid = max( map length, @pids );
+
+            warn FAINT '-' x $TERM_SIZE, RESET "\n";
+            warn FAINT ON_MAGENTA " << MESSAGES >> " . RESET "\n";
+            warn FAINT '-' x $TERM_SIZE, RESET "\n";
+            foreach my $pid ( @pids ) {
+                my @inbox  = $processes{$pid}->[INBOX]->@*;
+                my ($num, $name) = split ':' => $pid;
+
+                my $pid_color = 'black on_ansi'.((int($num)+3) * 8);
+
+                warn '  '.
+                    color($pid_color).
+                        sprintf("> %-${longest_pid}s ", $pid).
+                    RESET " (".
+                    CYAN (join ' / ' =>
+                        map {
+                            my $pid    = $_->[0];
+                            my $action = $_->[1]->[0];
+                            $action;
+                        } @inbox).
+                    RESET ")\n";
+            }
+            warn FAINT '-' x $TERM_SIZE, RESET "\n";
+            my $proceed = <>;
+        }
+
         my @active = map [ $_, $processes{$_}->@* ], keys %processes;
 
         while (@active) {
@@ -297,7 +330,7 @@ sub loop ( $MAX_TICKS, $start_pid ) {
 
         despawn_all;
 
-        warn Dumper \%processes if DEBUG >= 3;
+        warn Dumper \%processes if DEBUG >= 4;
 
         my @active_processes =
             grep !/^\d\d\d:\#/,     # ignore I/O pids
@@ -322,24 +355,36 @@ sub loop ( $MAX_TICKS, $start_pid ) {
                 last;
             }
             else {
-                say FAINT (join ' ' => $init_pid_prefix, map { ('-' x ($term_width - length $_)) . " $_" } ("flushing($tick)")), RESET if DEBUG;
+                _loop_log_line("flushing(%d)", $tick) if DEBUG;
                 $should_exit++;
             }
         }
     }
 
     if ( $has_exited ) {
-        say FAINT (join ' ' => $init_pid_prefix, map { ('-' x ($term_width - length $_)) . " $_" } ("exit($tick)")), RESET if DEBUG;
+        _loop_log_line("exit(%d)", $tick) if DEBUG;
     } else {
-        say FAINT (join ' ' => $init_pid_prefix, map { ('-' x ($term_width - length $_)) . " $_" } ("halt($tick)")), RESET if DEBUG;
+        _loop_log_line("halt(%d)", $tick) if DEBUG;
     }
 
-    if (DEBUG) {
+    if (DEBUG >= 3) {
         warn Dumper [ keys %processes ];
     }
 
     return 1;
 }
+
+sub _loop_log_line ( $fmt, $tick ) {
+    state $init_pid_prefix = '('.$INIT_PID.')';
+    state $term_width = $TERM_SIZE - (length $init_pid_prefix) - 2;
+
+    say FAINT
+        (join ' ' => $init_pid_prefix,
+            map { ('-' x ($term_width - length $_)) . " $_" }
+                (sprintf $fmt, $tick)),
+                    RESET;
+}
+
 
 ## controls ...
 
