@@ -70,8 +70,8 @@ actor main => sub ($env, $msg) {
 
     ## ...
 
-    await(
-        [ $e2, get => [$_]],
+    sync(
+        timeout( 10, [ $e2, get => [$_]] ),
         out::printf( $_.'(%s)' )
     ) foreach qw[ foo bar baz ];
 

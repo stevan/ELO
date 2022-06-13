@@ -28,7 +28,6 @@ our @EXPORT = qw[
     quit
 
     sync
-    await
 
     ident
     sequence
@@ -158,16 +157,6 @@ sub sync ($input, $output) {
         : send_to( @$args );
 }
 
-sub await ($input, $output) {
-    my $pid  = spawn( '!await' );
-    my $args = [ $pid, send => [ $input, $output ] ];
-    defined wantarray
-        ? (wantarray
-            ? $args
-            : do { send_to( @$args ); $pid })
-        : send_to( @$args );
-}
-
 sub ident ($val=undef) {
     my $pid  = spawn( '!ident' );
     my $args = [ $pid, id => [ $val // () ] ];
@@ -179,8 +168,18 @@ sub ident ($val=undef) {
 }
 
 sub sequence (@statements) {
-    my $pid  = spawn( '!seq' );
+    my $pid  = spawn( '!sequence' );
     my $args = [ $pid, next => [ @statements ] ];
+    defined wantarray
+        ? (wantarray
+            ? $args
+            : do { send_to( @$args ); $pid })
+        : send_to( @$args );
+}
+
+sub parallel (@statements) {
+    my $pid  = spawn( '!parallel' );
+    my $args = [ $pid, all => [ @statements ] ];
     defined wantarray
         ? (wantarray
             ? $args
@@ -407,41 +406,6 @@ actor '!timeout' => sub ($env, $msg) {
     };
 };
 
-
-# NOTE:
-# this is a bit redundant with sync ... consider
-# removing it and rethinking
-#
-# THIS DOES: send a message, if ! recv, loop resend the message ...
-actor '!await' => sub ($env, $msg) {
-
-    match $msg, +{
-        send => sub ($body) {
-            my ($command, $callback, $caller) = @$body;
-            $caller //= $CURRENT_CALLER;
-            err::log("*/ !await /* : sending message", $caller) if DEBUG;
-            send_to( @$command );
-            send_to( $CURRENT_PID => recv => [ $command, $callback, $caller ]);
-        },
-        recv => sub ($body) {
-            my ($command, $callback, $caller) = @$body;
-
-            my $message = recv_from;
-
-            if (defined $message) {
-                err::log("*/ !await /* : recieve message($message)", $caller) if DEBUG;
-                $callback = copy_msg($callback, $message);
-                send_from( $caller, @$callback );
-                despawn( $CURRENT_PID );
-            }
-            else {
-                err::log("*/ !await /* : no messages", $caller) if DEBUG;
-                send_to( $CURRENT_PID => send => $body );
-            }
-        }
-    };
-};
-
 # THIS DOES: send a message, and loop on recv ...
 actor '!sync' => sub ($env, $msg) {
 
@@ -510,19 +474,34 @@ actor '!cond' => sub ($env, $msg) {
     };
 };
 
-# not sure this is actually useful ...
-actor '!seq' => sub ($env, $msg) {
+
+# ... runnnig muliples
+
+actor '!sequence' => sub ($env, $msg) {
     match $msg, +{
         next => sub ($body) {
             if ( my $statement = shift @$body ) {
-                err::log("*/ !seq /* calling, ".(scalar @$body)." remain" ) if DEBUG;
+                err::log("*/ !sequence /* calling, ".(scalar @$body)." remain" ) if DEBUG;
                 send_from( $CURRENT_CALLER, @$statement );
                 send_from( $CURRENT_CALLER, $CURRENT_PID, next => $body );
             }
             else {
-                err::log("*/ !seq /* finished") if DEBUG;
+                err::log("*/ !sequence /* finished") if DEBUG;
                 despawn( $CURRENT_PID );
             }
+        },
+    };
+};
+
+actor '!parallel' => sub ($env, $msg) {
+    match $msg, +{
+        all => sub ($body) {
+            err::log("*/ !parallel /* sending ".(scalar @$body)." messages" ) if DEBUG;
+            foreach my $statement ( @$body ) {
+                send_from( $CURRENT_CALLER, @$statement );
+            }
+            err::log("*/ !parallel /* finished") if DEBUG;
+            despawn( $CURRENT_PID );
         },
     };
 };
