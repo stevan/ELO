@@ -20,16 +20,16 @@ actor MapObserver => sub ($env, $msg) {
     match $msg, +{
         on_next => sub ($msg) {
             my ($val) = @$msg;
-            out::print("MapObserver got val($val)");
+            out::print(PID." got val($val)");
             send_to( $observer, on_next => [ $f->($val) ]);
         },
         on_error => sub ($msg) {
             my ($e) = @$msg;
-            err::log("MapObserver got error($e)");
+            err::log("MapObserver got error($e)") if DEBUG;
             send_to( $observer, on_error => [ $e ]);
         },
         on_completed => sub ($msg) {
-            err::log("MapObserver completed");
+            err::log("MapObserver completed") if DEBUG;
             send_to( $observer, on_completed => []);
             send_to( SYS, kill => [PID] );
         }
@@ -43,16 +43,16 @@ actor DebugObserver => sub ($env, $msg) {
     match $msg, +{
         on_next => sub ($msg) {
             my ($val) = @$msg;
-            out::print("Observer got val($val)");
+            out::print(PID." got val($val)");
             $got->{$val}++;
         },
         on_error => sub ($msg) {
             my ($e) = @$msg;
-            err::log("Observer got error($e)");
+            err::log("Observer got error($e)") if DEBUG;
         },
         on_completed => sub ($msg) {
-            err::log("Observer completed");
-            err::log("Observed values: [" . (join ', ' => map { "$_/".$got->{$_} }sort { $a <=> $b } keys $got->%*) . "]");
+            err::log("Observer completed") if DEBUG;
+            err::log("Observed values: [" . (join ', ' => map { "$_/".$got->{$_} }sort { $a <=> $b } keys $got->%*) . "]") if DEBUG;
             send_to( SYS, kill => [PID] );
         }
     };
@@ -63,7 +63,7 @@ actor SimpleObservable => sub ($env, $msg) {
     match $msg, +{
         subscribe => sub ($msg) {
             my ($observer) = @$msg;
-            err::log("SimpleObserveable started, calling ($observer)");
+            err::log("SimpleObserveable started, calling ($observer)") if DEBUG;
             # A simple example
             sequence(
                 (map [ $observer, on_next => [ $_ ] ], 0 .. 10),
@@ -78,7 +78,7 @@ actor ComplexObservable => sub ($env, $msg) {
     match $msg, +{
         subscribe => sub ($msg) {
             my ($observer) = @$msg;
-            err::log("ComplexObserveable started, calling ($observer)");
+            err::log("ComplexObserveable started, calling ($observer)") if DEBUG;
 
             my @pids = map {
                 scalar timeout( int(rand(9)), [ $observer, on_next => [ $_ ] ])

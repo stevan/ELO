@@ -12,8 +12,8 @@ use EventLoop;
 use EventLoop::Actors;
 use EventLoop::IO;
 
-use constant DEBUG_TOKENIZER => 1;
-use constant DEBUG_DECODER   => 1;
+use constant DEBUG_TOKENIZER => ($ENV{DEBUG} // 0) >= 2 ? 1 : 0;
+use constant DEBUG_DECODER   => ($ENV{DEBUG} // 0) >= 2 ? 1 : 0;
 
 actor Splitter => sub ($env, $msg) {
 
@@ -79,7 +79,7 @@ actor Decoder => sub ($env, $msg) {
 
         error      => sub ($body) { err::log("ERROR!!!! (@$body)") if DEBUG_DECODER; },
         finish     => sub ($body) {
-            out::print(Dumper $stack->[0]);
+            out::print( (Dumper $stack->[0]) =~ s/^\$VAR1\s/JSON /r ); #/
             send_to( SYS, kill => [PID]);
         },
     };
