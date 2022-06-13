@@ -77,9 +77,13 @@ actor Decoder => sub ($env, $msg) {
         add_false  => sub ($body) { err::log("ADD FALSE") if DEBUG_DECODER; },
         add_null   => sub ($body) { err::log("ADD NULL") if DEBUG_DECODER; },
 
-        error      => sub ($body) { err::log("ERROR!!!! (@$body)") if DEBUG_DECODER; },
+        error => sub ($body) {
+            out::print("ERROR!!!! (@$body)");
+            @$stack = ();
+        },
         finish     => sub ($body) {
-            out::print( (Dumper $stack->[0]) =~ s/^\$VAR1\s/JSON /r ); #/
+            out::print( (Dumper $stack->[0]) =~ s/^\$VAR1\s/JSON /r ) #/
+                if @$stack == 1;
             send_to( SYS, kill => [PID]);
         },
     };
@@ -132,6 +136,9 @@ actor Tokenizer => sub ($env, $msg) {
                     # but keep the number ...
                     send_to(PID, collect_number => [ $observer, ($char, @chars) ]);
                 }
+                else {
+                    send_to(PID, error => [ $observer, "Unexpected token `$char` in process_tokens, expected `{`, `\"`, or a digit"]);
+                }
 
             }
             else {
@@ -161,8 +168,7 @@ actor Tokenizer => sub ($env, $msg) {
                 }
             }
             else {
-                # end parsing ...
-                send_to(PID, finish => [ $observer ]);
+                send_to(PID, error => [ $observer, "Ran out of tokens in start_object"]);
             }
         },
         process_object => sub ($body) {
@@ -182,10 +188,12 @@ actor Tokenizer => sub ($env, $msg) {
                     push @$stack => 'process_object';
                     send_to(PID, start_property => [ $observer, @chars ]);
                 }
+                else {
+                    send_to(PID, error => [ $observer, "Unexpected token `$char` in process_object, expected `}` or `,`"]);
+                }
             }
             else {
-                # end parsing ...
-                send_to(PID, finish => [ $observer ]);
+                send_to(PID, error => [ $observer, "Ran out of tokens in process_object"]);
             }
         },
         end_object => sub ($body) {
@@ -215,11 +223,11 @@ actor Tokenizer => sub ($env, $msg) {
                     send_to(PID, collect_string => [ $observer, @chars ]);
                 }
                 else {
-                    die "Property must start with a quoted string";
+                    send_to(PID, error => [ $observer, "Unexpected token `$char` in start_property, property must start with a quote"]);
                 }
             }
             else {
-                die "Unterminated object property";
+                send_to(PID, error => [ $observer, "Unterminated object property : ran out of tokens in start_property"]);
             }
         },
         process_property => sub ($body) {
@@ -235,11 +243,11 @@ actor Tokenizer => sub ($env, $msg) {
                     send_to(PID, start_item => [ $observer, @chars ]);
                 }
                 else {
-                    die "Expected : got $char";
+                    send_to(PID, error => [ $observer, "Unexpected token `$char` in process_property, expected `:`"]);
                 }
             }
             else {
-                die "Unterminated object property";
+                send_to(PID, error => [ $observer, "Unterminated object property : ran out of tokens in process_property"]);
             }
         },
         end_property => sub ($body) {
@@ -285,7 +293,10 @@ actor Tokenizer => sub ($env, $msg) {
             while ($char ne '"') {
                 push @buffer => $char;
                 $char = shift @chars;
-                die "unterminated string" if not defined $char;
+                if (not defined $char) {
+                    send_to(PID, error => [ $observer, "Unterminated string : ran out of tokens in collect_string"]);
+                    return; # jump outta here
+                }
             }
 
             send_to($observer, add_string => [ join '' => @buffer ]);
@@ -305,7 +316,10 @@ actor Tokenizer => sub ($env, $msg) {
             while ($char =~ /^\d$/) {
                 push @buffer => $char;
                 $char = shift @chars;
-                die "unterminated numeric" if not defined $char;
+                if (not defined $char) {
+                    send_to(PID, error => [ $observer, "Unterminated numeric : ran out of tokens in collect_string"]);
+                    return; # jump outta here
+                }
             }
 
             send_to($observer, add_number => [ (join '' => @buffer) + 0 ]);
@@ -316,11 +330,23 @@ actor Tokenizer => sub ($env, $msg) {
         },
 
         # ...
+        error => sub ($body) {
+            my ($observer, $error) = @$body;
+
+            err::log("Enter error (@$stack)") if DEBUG_TOKENIZER;
+
+            @$stack = (); # clear stack ...
+
+            send_to( $observer, error => [ $error ]);
+            send_to( PID, finish => [ $observer ]);
+        },
         finish => sub ($body) {
             my ($observer) = @$body;
 
+            err::log("Enter finish (@$stack)") if DEBUG_TOKENIZER;
+
             send_to( $observer, finish => []);
-            send_to( SYS, kill   => [PID]);
+            send_to( SYS, kill => [PID]);
         }
     };
 };
@@ -328,6 +354,10 @@ actor Tokenizer => sub ($env, $msg) {
 actor main => sub ($env, $msg) {
     out::print("-> main starting ...");
 
+    send_to(spawn('Tokenizer'), tokenize => [
+        spawn('Decoder'),
+        '{ "foo" : 10 :'
+    ]);
 
     send_to(spawn('Tokenizer'), tokenize => [
         spawn('Decoder'),
