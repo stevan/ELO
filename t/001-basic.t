@@ -5,13 +5,14 @@ use warnings;
 use experimental 'signatures', 'postderef';
 
 use Test::More;
+use Test::SAM;
+
 use List::Util 'first';
 use Data::Dumper;
 
 use SAM;
 use SAM::Actors;
 use SAM::IO;
-
 
 # ... userland ...
 actor env => sub ($env, $msg) {

@@ -10,8 +10,16 @@ our $AUTHORITY = 'cpan:STEVAN';
 use Data::Dumper 'Dumper';
 use Term::ANSIColor ':constants';
 
-# use SAM; ... but not, so as to avoid the circular dep
+use SAM; # circular dep
 use SAM::Actors;
+
+sub QUIET () {
+    SAM->DEBUG()
+        # if we are DEBUG-ing, do not be quiet
+        ? 0
+        # if we are testing, be quiet
+        : $Test::SAM::TESTING
+}
 
 our $IN;
 our $OUT;
@@ -74,7 +82,7 @@ actor '#err' => sub ($env, $msg) {
                 (sprintf $fmt, @$values),
                 FAINT " >> [$caller]",
                 RESET "\n"
-            );
+            ) unless QUIET();
         },
         print => sub ($msg, $caller='') {
 
@@ -93,7 +101,7 @@ actor '#err' => sub ($env, $msg) {
                 $msg,
                 FAINT " >> [$caller]",
                 RESET "\n"
-            );
+            ) unless QUIET();
         }
     };
 };
@@ -105,10 +113,10 @@ actor '#out' => sub ($env, $msg) {
 
     match $msg, +{
         printf => sub ($fmt, @values) {
-            say( $prefix, sprintf $fmt, @values );
+            say( $prefix, sprintf $fmt, @values ) unless QUIET();
         },
         print => sub ($value) {
-            say( $prefix, $value );
+            say( $prefix, $value ) unless QUIET();
         }
     };
 };

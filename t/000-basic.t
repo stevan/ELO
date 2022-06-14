@@ -5,6 +5,8 @@ use warnings;
 use experimental 'signatures', 'postderef';
 
 use Test::More;
+use Test::SAM;
+
 use List::Util 'first';
 use Data::Dumper;
 
@@ -16,7 +18,7 @@ actor bounce => sub ($env, $msg) {
     match $msg, +{
         up => sub ($cnt) {
             out::print("bounce(UP) => $cnt");
-            send_to( PID, down => [$cnt+1] )
+            send_to( PID, down => [$cnt+1] );
         },
         down => sub ($cnt) {
             out::print("bounce(DOWN) => $cnt");
