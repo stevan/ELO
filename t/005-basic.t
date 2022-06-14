@@ -5,6 +5,8 @@ use warnings;
 use experimental 'signatures', 'postderef';
 
 use Test::More;
+use Test::SAM;
+
 use List::Util 'first';
 use Data::Dumper;
 
@@ -29,7 +31,7 @@ actor MapObserver => sub ($env, $msg) {
         on_completed => sub () {
             err::log("MapObserver completed") if DEBUG;
             send_to( $observer, on_completed => []);
-            send_to( SYS, kill => [PID] );
+            sys::kill(PID);
         }
     };
 };
@@ -49,7 +51,7 @@ actor DebugObserver => sub ($env, $msg) {
         on_completed => sub () {
             err::log("Observer completed") if DEBUG;
             err::log("Observed values: [" . (join ', ' => map { "$_/".$got->{$_} }sort { $a <=> $b } keys $got->%*) . "]") if DEBUG;
-            send_to( SYS, kill => [PID] );
+            sys::kill(PID);
         }
     };
 };
@@ -78,11 +80,9 @@ actor ComplexObservable => sub ($env, $msg) {
                 scalar timeout( int(rand(9)), [ $observer, on_next => [ $_ ] ])
             } 0 .. 10;
 
-            send_to(
-                SYS, waitpids => [
-                    \@pids,
-                    [ $observer, on_completed => []]
-                ]
+            sys::waitpids(
+                \@pids,
+                [ $observer, on_completed => []]
             );
         },
     };

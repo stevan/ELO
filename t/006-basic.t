@@ -5,6 +5,8 @@ use warnings;
 use experimental 'lexical_subs', 'signatures', 'postderef';
 
 use Test::More;
+use Test::SAM;
+
 use List::Util 'first';
 use Data::Dumper;
 
@@ -20,7 +22,7 @@ actor Splitter => sub ($env, $msg) {
     match $msg, +{
         split => sub ($return_pid, $string) {
             send_to( SAM::copy_msg( $return_pid, split '' => $string)->@* );
-            send_to( SYS, kill => [PID]);
+            sys::kill(PID);
         }
     };
 };
@@ -79,11 +81,12 @@ actor Decoder => sub ($env, $msg) {
         error => sub ($error) {
             out::print("ERROR!!!! ($error)");
             @$stack = ();
+            send_to(PID, finish => []);
         },
         finish     => sub () {
             out::print( (Dumper $stack->[0]) =~ s/^\$VAR1\s/JSON /r ) #/
                 if @$stack == 1;
-            send_to( SYS, kill => [PID]);
+            sys::kill(PID);
         },
     };
 };
@@ -331,7 +334,7 @@ actor Tokenizer => sub ($env, $msg) {
             err::log("Enter finish (@$stack)") if DEBUG_TOKENIZER;
 
             send_to( $observer, finish => []);
-            send_to( SYS, kill => [PID]);
+            sys::kill(PID);
         }
     };
 };

@@ -5,6 +5,8 @@ use warnings;
 use experimental 'signatures', 'postderef';
 
 use Test::More;
+use Test::SAM;
+
 use List::Util 'first';
 use Data::Dumper;
 

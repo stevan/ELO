@@ -35,8 +35,6 @@ our @EXPORT = qw[
 
     loop
 
-    SYS
-
     PID CALLER
 
     DEBUG
@@ -79,10 +77,25 @@ my %processes;
 sub PID    () { $CURRENT_PID    }
 sub CALLER () { $CURRENT_CALLER }
 
-# TODO:
-# Make Sys into Signals
+# system interface ... see definition below inside &loop
 
-sub SYS () { $INIT_PID }
+sub sys::kill($pid) {
+    my $args = [ $INIT_PID, kill => [ $pid ] ];
+    defined wantarray
+        ? (wantarray
+            ? $args
+            : do { send_to( @$args ); $INIT_PID })
+        : send_to( @$args );
+}
+
+sub sys::waitpids($pids, $callback) {
+    my $args = [ $INIT_PID, waitpids => [ $pids, $callback ] ];
+    defined wantarray
+        ? (wantarray
+            ? $args
+            : do { send_to( @$args ); $INIT_PID })
+        : send_to( @$args );
+}
 
 ## ... message delivery
 

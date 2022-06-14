@@ -5,6 +5,8 @@ use warnings;
 use experimental 'signatures', 'postderef';
 
 use Test::More;
+use Test::SAM;
+
 use List::Util 'first';
 use Data::Dumper;
 
@@ -34,7 +36,7 @@ actor main => sub ($env, $msg) {
     send_to( $builder, ok => [ 1, '... it works!' ] );
     send_to( $builder, ok => [ 0, '... it still works!' ] );
 
-    timeout( 4, [ SYS, kill => [$builder]] );
+    timeout( 4, sys::kill($builder) );
 };
 
 # loop ...

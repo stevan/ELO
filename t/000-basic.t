@@ -35,7 +35,7 @@ actor main => sub ($env, $msg) {
 
     timeout( 10,
         sequence(
-            [ SYS, kill => [$bounce]],
+            sys::kill($bounce),
             out::print("JELLO!"),
         ));
 };

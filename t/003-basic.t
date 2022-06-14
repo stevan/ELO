@@ -5,6 +5,8 @@ use warnings;
 use experimental 'lexical_subs', 'signatures', 'postderef';
 
 use Test::More;
+use Test::SAM;
+
 use List::Util 'first';
 use Data::Dumper;
 
@@ -26,7 +28,7 @@ actor CharacterStream => sub ($env, $msg) {
             return_to shift @$chars // EMPTY;
         },
         finish => sub () {
-            send_to( SYS, kill => [PID]);
+            sys::kill(PID);
         },
     };
 };
@@ -55,7 +57,7 @@ actor Decoder => sub ($env, $msg) {
         finish     => sub () {
             out::print( (Dumper $stack->[0]) =~ s/^\$VAR1\s/PARENS /r ) #/
                 if @$stack == 1;
-            send_to( SYS, kill => [PID]);
+            sys::kill(PID);
         },
     };
 };
@@ -76,7 +78,7 @@ actor Tokenizer => sub ($env, $msg) {
             err::log("Finishing") if DEBUG_TOKENIZER;
             send_to( $producer, finish => []);
             send_to( $observer, finish => []);
-            send_to( SYS, kill => [PID]);
+            sys::kill(PID);
         },
         error => sub ($producer, $observer, $error) {
             @$stack = ();
