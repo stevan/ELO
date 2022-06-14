@@ -90,7 +90,7 @@ actor Decoder => sub ($env, $msg) {
 
 actor Tokenizer => sub ($env, $msg) {
 
-    my sub stip_whitespace ($chars) {
+    state sub stip_whitespace ($chars) {
         my $char = shift @$chars;
         while (defined $char && $char =~ /^\s$/) {
             $char = shift @$chars;
