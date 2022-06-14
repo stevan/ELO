@@ -8,9 +8,9 @@ use Test::More;
 use List::Util 'first';
 use Data::Dumper;
 
-use EventLoop;
-use EventLoop::Actors;
-use EventLoop::IO;
+use SAM;
+use SAM::Actors;
+use SAM::IO;
 
 actor counter => sub ($env, $msg) {
     state $count = 0;

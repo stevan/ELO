@@ -1,4 +1,4 @@
-package EventLoop::Actors;
+package SAM::Actors;
 
 use v5.24;
 use warnings;

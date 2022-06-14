@@ -1,4 +1,4 @@
-package EventLoop::IO;
+package SAM::IO;
 
 use v5.24;
 use warnings;
@@ -10,41 +10,41 @@ our $AUTHORITY = 'cpan:STEVAN';
 use Data::Dumper 'Dumper';
 use Term::ANSIColor ':constants';
 
-# use EventLoop; ... but not, so as to avoid the circular dep
-use EventLoop::Actors;
+# use SAM; ... but not, so as to avoid the circular dep
+use SAM::Actors;
 
 our $IN;
 our $OUT;
 our $ERR;
 
-sub err::log ($msg, $caller=$EventLoop::CURRENT_CALLER) {
-    $ERR //= EventLoop::spawn('#err');
+sub err::log ($msg, $caller=$SAM::CURRENT_CALLER) {
+    $ERR //= SAM::spawn('#err');
     my $args = [ $ERR, print => [ $msg, $caller ]];
-    defined wantarray ? $args : EventLoop::send_to( @$args );
+    defined wantarray ? $args : SAM::send_to( @$args );
 }
 
-sub err::logf ($fmt, $msg, $caller=$EventLoop::CURRENT_CALLER) {
-    $ERR //= EventLoop::spawn('#err');
+sub err::logf ($fmt, $msg, $caller=$SAM::CURRENT_CALLER) {
+    $ERR //= SAM::spawn('#err');
     my $args = [ $ERR, printf => [ $fmt, $msg, $caller ]];
-    defined wantarray ? $args : EventLoop::send_to( @$args );
+    defined wantarray ? $args : SAM::send_to( @$args );
 }
 
 sub out::print ($msg=undef) {
-    $OUT //= EventLoop::spawn('#out');
+    $OUT //= SAM::spawn('#out');
     my $args = [ $OUT, print => [ $msg // () ]];
-    defined wantarray ? $args : EventLoop::send_to( @$args );
+    defined wantarray ? $args : SAM::send_to( @$args );
 }
 
 sub out::printf ($fmt, $msg=undef) {
-    $OUT //= EventLoop::spawn('#out');
+    $OUT //= SAM::spawn('#out');
     my $args = [ $OUT, printf => [ $fmt, $msg // () ]];
-    defined wantarray ? $args : EventLoop::send_to( @$args );
+    defined wantarray ? $args : SAM::send_to( @$args );
 }
 
 sub in::read ($prompt=undef) {
-    $IN //= EventLoop::spawn('#in');
+    $IN //= SAM::spawn('#in');
     my $args = [ $IN, read => [ $prompt // () ]];
-    defined wantarray ? $args : EventLoop::send_to( @$args );
+    defined wantarray ? $args : SAM::send_to( @$args );
 }
 
 ## ... actors
@@ -52,20 +52,20 @@ sub in::read ($prompt=undef) {
 my %INDENTS;
 
 actor '#err' => sub ($env, $msg) {
-    my $prefix = EventLoop::DEBUG()
-        ? ON_RED "LOG (".$EventLoop::CURRENT_CALLER.") !!". RESET " "
+    my $prefix = SAM::DEBUG()
+        ? ON_RED "LOG (".$SAM::CURRENT_CALLER.") !!". RESET " "
         : ON_RED "LOG !!". RESET " ";
 
     match $msg, +{
         printf => sub ($fmt, $values, $caller='') {
 
             if ($caller) {
-                $INDENTS{ $EventLoop::CURRENT_CALLER } = ($INDENTS{ $caller } // 0) + 1
-                    unless exists $INDENTS{ $EventLoop::CURRENT_CALLER };
+                $INDENTS{ $SAM::CURRENT_CALLER } = ($INDENTS{ $caller } // 0) + 1
+                    unless exists $INDENTS{ $SAM::CURRENT_CALLER };
 
                 $prefix = FAINT
                     RED
-                        ('-' x $INDENTS{ $EventLoop::CURRENT_CALLER }).'> '
+                        ('-' x $INDENTS{ $SAM::CURRENT_CALLER }).'> '
                     . RESET $prefix;
             }
 
@@ -79,12 +79,12 @@ actor '#err' => sub ($env, $msg) {
         print => sub ($msg, $caller='') {
 
             if ($caller) {
-                $INDENTS{ $EventLoop::CURRENT_CALLER } = ($INDENTS{ $caller } // 0) + 1
-                    unless exists $INDENTS{ $EventLoop::CURRENT_CALLER };
+                $INDENTS{ $SAM::CURRENT_CALLER } = ($INDENTS{ $caller } // 0) + 1
+                    unless exists $INDENTS{ $SAM::CURRENT_CALLER };
 
                 $prefix = FAINT
                     RED
-                        ('-' x $INDENTS{ $EventLoop::CURRENT_CALLER }).'> '
+                        ('-' x $INDENTS{ $SAM::CURRENT_CALLER }).'> '
                     . RESET $prefix;
             }
 
@@ -99,8 +99,8 @@ actor '#err' => sub ($env, $msg) {
 };
 
 actor '#out' => sub ($env, $msg) {
-    my $prefix = EventLoop::DEBUG()
-        ? ON_GREEN "OUT (".$EventLoop::CURRENT_CALLER.") >>". RESET " "
+    my $prefix = SAM::DEBUG()
+        ? ON_GREEN "OUT (".$SAM::CURRENT_CALLER.") >>". RESET " "
         : ON_GREEN "OUT >>". RESET " ";
 
     match $msg, +{
@@ -114,8 +114,8 @@ actor '#out' => sub ($env, $msg) {
 };
 
 actor '#in' => sub ($env, $msg) {
-    my $prefix = EventLoop::DEBUG()
-        ? ON_CYAN "IN (".$EventLoop::CURRENT_CALLER.") <<". RESET " "
+    my $prefix = SAM::DEBUG()
+        ? ON_CYAN "IN (".$SAM::CURRENT_CALLER.") <<". RESET " "
         : ON_CYAN "IN <<". RESET " ";
 
     match $msg, +{
@@ -125,7 +125,7 @@ actor '#in' => sub ($env, $msg) {
             print( $prefix, $prompt );
             my $input = <>;
             chomp $input;
-            EventLoop::return_to( $input );
+            SAM::return_to( $input );
         }
     };
 };

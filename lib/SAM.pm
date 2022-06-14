@@ -1,4 +1,4 @@
-package EventLoop;
+package SAM;
 
 use v5.24;
 use warnings;
@@ -12,8 +12,8 @@ use Data::Dumper 'Dumper';
 use Term::ANSIColor ':constants', 'color';
 use Term::ReadKey 'GetTerminalSize';
 
-use EventLoop::Actors;
-use EventLoop::IO;
+use SAM::Actors;
+use SAM::IO;
 
 use Exporter 'import';
 
@@ -113,7 +113,7 @@ sub return_to ($msg) {
 
 my $PID = 0;
 sub spawn ($name, %env) {
-    my $process = [ [], [], { %env }, EventLoop::Actors::get_actor($name) ];
+    my $process = [ [], [], { %env }, SAM::Actors::get_actor($name) ];
     my $pid = sprintf '%03d:%s' => ++$PID, $name;
     $processes{ $pid } = $process;
     $pid;

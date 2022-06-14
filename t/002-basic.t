@@ -8,9 +8,9 @@ use Test::More;
 use List::Util 'first';
 use Data::Dumper;
 
-use EventLoop;
-use EventLoop::Actors;
-use EventLoop::IO;
+use SAM;
+use SAM::Actors;
+use SAM::IO;
 
 actor TestBuilder => sub ($env, $msg) {
     state $counter = 0;

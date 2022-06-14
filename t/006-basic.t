@@ -8,9 +8,9 @@ use Test::More;
 use List::Util 'first';
 use Data::Dumper;
 
-use EventLoop;
-use EventLoop::Actors;
-use EventLoop::IO;
+use SAM;
+use SAM::Actors;
+use SAM::IO;
 
 use constant DEBUG_TOKENIZER => DEBUG >= 2 ? DEBUG - 1 : 0;
 use constant DEBUG_DECODER   => DEBUG >= 2 ? DEBUG - 1 : 0;
@@ -19,7 +19,7 @@ actor Splitter => sub ($env, $msg) {
 
     match $msg, +{
         split => sub ($return_pid, $string) {
-            send_to( EventLoop::copy_msg( $return_pid, split '' => $string)->@* );
+            send_to( SAM::copy_msg( $return_pid, split '' => $string)->@* );
             send_to( SYS, kill => [PID]);
         }
     };
