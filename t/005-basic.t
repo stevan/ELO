@@ -63,8 +63,8 @@ actor SimpleObservable => sub ($env, $msg) {
             err::log("SimpleObserveable started, calling ($observer)") if DEBUG;
             # A simple example
             sequence(
-                (map [ $observer, on_next => [ $_ ] ], 0 .. 10),
-                [ $observer, on_completed => [] ]
+                (map msg[ $observer, on_next => [ $_ ] ], 0 .. 10),
+                msg[ $observer, on_completed => [] ]
             );
         },
     };
@@ -77,12 +77,12 @@ actor ComplexObservable => sub ($env, $msg) {
             err::log("ComplexObserveable started, calling ($observer)") if DEBUG;
 
             my @pids = map {
-                scalar timeout( int(rand(9)), [ $observer, on_next => [ $_ ] ])
+                scalar timeout( int(rand(9)), msg[ $observer, on_next => [ $_ ] ])
             } 0 .. 10;
 
             sys::waitpids(
                 \@pids,
-                [ $observer, on_completed => []]
+                msg[ $observer, on_completed => []]
             );
         },
     };

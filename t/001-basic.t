@@ -55,22 +55,22 @@ actor main => sub ($env, $msg) {
     sync(
         # in:read( "$_ : " ),
         ident($val += 10),
-        [ $e1, set => [$_]]
+        msg::curry[ $e1, set => [$_]]
     ) foreach qw[ foo bar baz ];
 
     # ...
 
     my $timout_length = 2;
     sync(
-        timeout( $timout_length++ => [ $e1, get => [$_]] ),
-        [ $e2, set => [$_]]
+        timeout( $timout_length++ => msg[ $e1, get => [$_]] ),
+        msg::curry[ $e2, set => [$_]]
     ) foreach qw[ baz bar foo ];
 
     ## ...
 
     sync(
-        timeout( 10, [ $e2, get => [$_]] ),
-        out::printf( $_.'(%s)' )
+        timeout( 10, msg[ $e2, get => [$_]] ),
+        msg::curry( out::printf("$_(%s)") )
     ) foreach qw[ foo bar baz ];
 
     # ...

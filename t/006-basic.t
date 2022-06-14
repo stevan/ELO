@@ -21,7 +21,7 @@ actor Splitter => sub ($env, $msg) {
 
     match $msg, +{
         split => sub ($return_pid, $string) {
-            send_to( SAM::copy_msg( $return_pid, split '' => $string)->@* );
+            send_to( $return_pid->curry( split '' => $string )->@* );
             sys::kill(PID);
         }
     };
@@ -111,7 +111,7 @@ actor Tokenizer => sub ($env, $msg) {
             send_to(
                 spawn('Splitter'),
                 split => [
-                    [ PID, process_tokens => [ $observer ]],
+                    msg[ PID, process_tokens => [ $observer ]],
                     $JSON
                 ]
             );

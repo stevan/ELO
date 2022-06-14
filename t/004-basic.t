@@ -28,7 +28,7 @@ actor take_10_and_sync => sub ($env, $msg) {
 
     match $msg, +{
         each => sub ($producer, $consumer) {
-            sync( timeout( 10 - $i, [$producer, next => []] ), $consumer );
+            sync( timeout( 10 - $i, msg[$producer, next => []] ), $consumer );
             $i++;
             send_to( PID, each => [ $producer, $consumer ] ) if $i < 10;
         },

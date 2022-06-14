@@ -31,7 +31,7 @@ actor main => sub ($env, $msg) {
 
     my $builder = spawn( 'TestBuilder' );
 
-    timeout( 3, [ $builder, ok => [ 1, '... it works!' ]] );
+    timeout( 3, msg[ $builder, ok => [ 1, '... it works!' ]] );
 
     send_to( $builder, ok => [ 1, '... it works!' ] );
     send_to( $builder, ok => [ 0, '... it still works!' ] );

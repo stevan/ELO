@@ -68,8 +68,8 @@ actor Tokenizer => sub ($env, $msg) {
 
     my sub sync_next ($producer, $observer, $action) {
         sync(
-            [ $producer, next => []],
-            [ PID, $action => [$producer, $observer]],
+            msg[ $producer, next => []],
+            msg[ PID, $action => [$producer, $observer]],
         );
     }
 

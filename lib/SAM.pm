@@ -18,6 +18,8 @@ use SAM::IO;
 use Exporter 'import';
 
 our @EXPORT = qw[
+    msg
+
     timeout
 
     send_to
@@ -70,6 +72,22 @@ our $ERR;
 my @msg_inbox;
 my @msg_outbox;
 
+package SAM::msg::curried {
+    sub curry ($self, @args) {
+        my ($pid, $action, $body) = @$self;
+        bless [ $pid, $action, [ @$body, @args ] ] => 'SAM::msg::curried';
+    }
+}
+
+package SAM::msg {
+    sub curry ($self, @args) {
+        SAM::msg::curried::curry($self, @args);
+    }
+}
+
+sub msg        ($msg) :prototype($) { bless $msg => 'SAM::msg' }
+sub msg::curry ($msg) :prototype($) { bless $msg => 'SAM::msg::curried' }
+
 my %processes;
 
 ## ... sugar
@@ -98,11 +116,6 @@ sub sys::waitpids($pids, $callback) {
 }
 
 ## ... message delivery
-
-sub copy_msg ($msg, @additional_args) {
-    my ($pid, $action, $body) = @$msg;
-    [ $pid, $action, [ @$body, @additional_args ] ]
-}
 
 sub send_to ($pid, $action, $msg) {
     push @msg_inbox => [ $CURRENT_PID, $pid, [ $action, $msg ] ];
@@ -446,7 +459,7 @@ actor '!sync' => sub ($env, $msg) {
             if (defined $message) {
                 err::log("*/ !sync /* : recieve message($message)") if DEBUG;
                 #warn Dumper $output;
-                $output = copy_msg($output, $message);
+                $output = $output->curry( $message );
                 send_from( $CURRENT_CALLER, @$output );
                 despawn( $CURRENT_PID );
             }
