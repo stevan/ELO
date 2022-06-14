@@ -72,21 +72,7 @@ our $ERR;
 my @msg_inbox;
 my @msg_outbox;
 
-package SAM::msg::curried {
-    sub curry ($self, @args) {
-        my ($pid, $action, $body) = @$self;
-        bless [ $pid, $action, [ @$body, @args ] ] => 'SAM::msg::curried';
-    }
-}
-
-package SAM::msg {
-    sub curry ($self, @args) {
-        SAM::msg::curried::curry($self, @args);
-    }
-}
-
-sub msg        ($msg) :prototype($) { bless $msg => 'SAM::msg' }
-sub msg::curry ($msg) :prototype($) { bless $msg => 'SAM::msg::curried' }
+## ...
 
 my %processes;
 
@@ -94,26 +80,6 @@ my %processes;
 
 sub PID    () { $CURRENT_PID    }
 sub CALLER () { $CURRENT_CALLER }
-
-# system interface ... see definition below inside &loop
-
-sub sys::kill($pid) {
-    my $args = [ $INIT_PID, kill => [ $pid ] ];
-    defined wantarray
-        ? (wantarray
-            ? $args
-            : do { send_to( @$args ); $INIT_PID })
-        : send_to( @$args );
-}
-
-sub sys::waitpids($pids, $callback) {
-    my $args = [ $INIT_PID, waitpids => [ $pids, $callback ] ];
-    defined wantarray
-        ? (wantarray
-            ? $args
-            : do { send_to( @$args ); $INIT_PID })
-        : send_to( @$args );
-}
 
 ## ... message delivery
 
@@ -133,6 +99,58 @@ sub recv_from () {
 
 sub return_to ($msg) {
     push @msg_outbox => [ $CURRENT_PID, $CURRENT_CALLER, $msg ];
+}
+
+## messages ..
+
+sub msg        ($msg) :prototype($) { bless $msg => 'SAM::msg' }
+sub msg::curry ($msg) :prototype($) { bless $msg => 'SAM::msg::curryable' }
+
+package SAM::msg {
+    use v5.24;
+    use warnings;
+    use experimental 'signatures', 'postderef';
+
+    sub pid    ($self) { $self->[0] }
+    sub action ($self) { $self->[1] }
+    sub body   ($self) { $self->[2] }
+
+    sub curry ($self, @args) {
+        msg::curry($self)->curry( @args )
+    }
+
+    sub return_or_send ($self, $wantarray) {
+        defined $wantarray
+            ? ($wantarray
+                ? $self
+                : do { SAM::send_to( @$self ); $self->pid })
+            : SAM::send_to( @$self );
+    }
+}
+
+package SAM::msg::curryable {
+    use v5.24;
+    use warnings;
+    use experimental 'signatures', 'postderef';
+
+    our @ISA; BEGIN { @ISA = ('SAM::msg') };
+
+    sub curry ($self, @args) {
+        my ($pid, $action, $body) = @$self;
+        bless [ $pid, $action, [ @$body, @args ] ] => 'SAM::msg::curryable';
+    }
+}
+
+## system interface ... see Actor definitions inside &loop
+
+sub sys::kill($pid) {
+    msg([ $INIT_PID, kill => [ $pid ] ])
+        ->return_or_send( wantarray );
+}
+
+sub sys::waitpids($pids, $callback) {
+    msg([ $INIT_PID, waitpids => [ $pids, $callback ] ])
+        ->return_or_send( wantarray );
 }
 
 ## ... process creation
@@ -164,63 +182,28 @@ sub despawn_all () {
 ## ... currency control
 
 sub timeout ($ticks, $callback) {
-    my $pid  = spawn( '!timeout' );
-    my $args = [ $pid, countdown => [ $ticks, $callback ] ];
-    defined wantarray
-        ? (wantarray
-            ? $args
-            : do { send_to( @$args ); $pid })
-        : send_to( @$args );
+    msg([ spawn( '!timeout' ), countdown => [ $ticks, $callback ] ])
+        ->return_or_send( wantarray );
 }
 
 sub sync ($input, $output) {
-    my $pid  = spawn( '!sync' );
-    my $args = [ $pid, send => [ $input, $output ] ];
-    defined wantarray
-        ? (wantarray
-            ? $args
-            : do { send_to( @$args ); $pid })
-        : send_to( @$args );
+    msg([ spawn( '!sync' ), send => [ $input, $output ] ])
+        ->return_or_send( wantarray );
 }
 
 sub ident ($val=undef) {
-    my $pid  = spawn( '!ident' );
-    my $args = [ $pid, id => [ $val // () ] ];
-    defined wantarray
-        ? (wantarray
-            ? $args
-            : do { send_to( @$args ); $pid })
-        : send_to( @$args );
+    msg([ spawn( '!ident' ), id => [ $val // () ] ])
+        ->return_or_send( wantarray );
 }
 
 sub sequence (@statements) {
-    my $pid  = spawn( '!sequence' );
-    my $args = [ $pid, next => [ @statements ] ];
-    defined wantarray
-        ? (wantarray
-            ? $args
-            : do { send_to( @$args ); $pid })
-        : send_to( @$args );
+    msg([ spawn( '!sequence' ), next => [ @statements ] ])
+        ->return_or_send( wantarray );
 }
 
 sub parallel (@statements) {
-    my $pid  = spawn( '!parallel' );
-    my $args = [ $pid, all => [ @statements ] ];
-    defined wantarray
-        ? (wantarray
-            ? $args
-            : do { send_to( @$args ); $pid })
-        : send_to( @$args );
-}
-
-sub cond ($cond, $then) {
-    my $pid  = spawn( '!cond' );
-    my $args = [ $pid, if => [ $cond, $then ] ];
-    defined wantarray
-        ? (wantarray
-            ? $args
-            : do { send_to( @$args ); $pid })
-        : send_to( @$args );
+    msg([ spawn( '!parallel' ), all => [ @statements ] ])
+        ->return_or_send( wantarray );
 }
 
 ## ...
@@ -459,7 +442,7 @@ actor '!sync' => sub ($env, $msg) {
             if (defined $message) {
                 err::log("*/ !sync /* : recieve message($message)") if DEBUG;
                 #warn Dumper $output;
-                $output = $output->curry( $message );
+                $output = msg($output)->curry( $message );
                 send_from( $CURRENT_CALLER, @$output );
                 despawn( $CURRENT_PID );
             }
