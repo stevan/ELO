@@ -30,7 +30,7 @@ sub match ($msg, $table) {
     my ($action, $body) = @$msg;
     #warn Dumper [$msg, $table];
     my $cb = $table->{$action} // die "No match for $action";
-    $cb->($body);
+    $cb->(@$body);
 }
 
 

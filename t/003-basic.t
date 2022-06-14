@@ -22,10 +22,10 @@ actor CharacterStream => sub ($env, $msg) {
     my $chars = $env->{chars} //= [ split '' => $env->{string} ];
 
     match $msg, +{
-        next => sub ($body) {
+        next => sub () {
             return_to shift @$chars // EMPTY;
         },
-        finish => sub ($body) {
+        finish => sub () {
             send_to( SYS, kill => [PID]);
         },
     };
@@ -38,21 +38,21 @@ actor Decoder => sub ($env, $msg) {
     err::log(Dumper $env) if DEBUG_DECODER >= 2;
 
     match $msg, +{
-        start_parens => sub ($body) {
+        start_parens => sub () {
             err::log("START PARENS") if DEBUG_DECODER;
             push @$stack => [];
         },
-        end_parens => sub ($body) {
+        end_parens => sub () {
             err::log("END PARENS") if DEBUG_DECODER;
             my $top = pop @$stack;
             push $stack->[-1]->@* => $top;
         },
 
-        error => sub ($body) {
-            out::print("ERROR!!!! (@$body)");
+        error => sub ($error) {
+            out::print("ERROR!!!! ($error)");
             @$stack = ();
         },
-        finish     => sub ($body) {
+        finish     => sub () {
             out::print( (Dumper $stack->[0]) =~ s/^\$VAR1\s/PARENS /r ) #/
                 if @$stack == 1;
             send_to( SYS, kill => [PID]);
@@ -72,27 +72,23 @@ actor Tokenizer => sub ($env, $msg) {
     }
 
     match $msg, +{
-        finish => sub ($body) {
-            my ($producer, $observer) = @$body;
+        finish => sub ($producer, $observer) {
             err::log("Finishing") if DEBUG_TOKENIZER;
             send_to( $producer, finish => []);
             send_to( $observer, finish => []);
             send_to( SYS, kill => [PID]);
         },
-        error => sub ($body) {
-            my ($producer, $observer, $error) = @$body;
+        error => sub ($producer, $observer, $error) {
             @$stack = ();
             err::log("Got Error ($error)");
             send_to(PID, finish => [$producer, $observer]);
         },
-        process_tokens => sub ($body) {
-            my ($producer, $observer) = @$body;
+        process_tokens => sub ($producer, $observer) {
             err::log("process tokens (@$stack)") if DEBUG_TOKENIZER;
 
             sync_next($producer, $observer, 'process_token');
         },
-        process_token => sub ($body) {
-            my ($producer, $observer, $token) = @$body;
+        process_token => sub ($producer, $observer, $token) {
             err::log("process token (@$stack)") if DEBUG_TOKENIZER;
 
             if ($token eq '(') {
@@ -107,15 +103,13 @@ actor Tokenizer => sub ($env, $msg) {
         },
 
         # ..
-        open_parens => sub ($body) {
-            my ($producer, $observer) = @$body;
+        open_parens => sub ($producer, $observer) {
             err::log("// open parens (@$stack)") if DEBUG_TOKENIZER;
             push @$stack => 'process_parens';
             send_to($observer, 'start_parens' => []);
             sync_next($producer, $observer, 'process_parens');
         },
-        process_parens => sub ($body) {
-            my ($producer, $observer, $token) = @$body;
+        process_parens => sub ($producer, $observer, $token) {
             err::log("process parens (@$stack) with `$token`") if DEBUG_TOKENIZER;
             if ($token eq '(') {
                 send_to( PID, open_parens => [ $producer, $observer ] );
@@ -141,8 +135,7 @@ actor Tokenizer => sub ($env, $msg) {
                 sync_next($producer, $observer, 'process_parens');
             }
         },
-        close_parens => sub ($body) {
-            my ($producer, $observer) = @$body;
+        close_parens => sub ($producer, $observer) {
             err::log("\\\\ close parens (@$stack)") if DEBUG_TOKENIZER;
             send_to($observer, 'end_parens' => []);
             my $frame = pop @$stack;

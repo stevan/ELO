@@ -18,17 +18,15 @@ actor MapObserver => sub ($env, $msg) {
     my $f        = $env->{f};
 
     match $msg, +{
-        on_next => sub ($msg) {
-            my ($val) = @$msg;
+        on_next => sub ($val) {
             out::print(PID." got val($val)");
             send_to( $observer, on_next => [ $f->($val) ]);
         },
-        on_error => sub ($msg) {
-            my ($e) = @$msg;
+        on_error => sub ($e) {
             err::log("MapObserver got error($e)") if DEBUG;
             send_to( $observer, on_error => [ $e ]);
         },
-        on_completed => sub ($msg) {
+        on_completed => sub () {
             err::log("MapObserver completed") if DEBUG;
             send_to( $observer, on_completed => []);
             send_to( SYS, kill => [PID] );
@@ -41,16 +39,14 @@ actor DebugObserver => sub ($env, $msg) {
     my $got = $env->{got} //= {};
 
     match $msg, +{
-        on_next => sub ($msg) {
-            my ($val) = @$msg;
+        on_next => sub ($val) {
             out::print(PID." got val($val)");
             $got->{$val}++;
         },
-        on_error => sub ($msg) {
-            my ($e) = @$msg;
+        on_error => sub ($e) {
             err::log("Observer got error($e)") if DEBUG;
         },
-        on_completed => sub ($msg) {
+        on_completed => sub () {
             err::log("Observer completed") if DEBUG;
             err::log("Observed values: [" . (join ', ' => map { "$_/".$got->{$_} }sort { $a <=> $b } keys $got->%*) . "]") if DEBUG;
             send_to( SYS, kill => [PID] );
@@ -61,8 +57,7 @@ actor DebugObserver => sub ($env, $msg) {
 actor SimpleObservable => sub ($env, $msg) {
 
     match $msg, +{
-        subscribe => sub ($msg) {
-            my ($observer) = @$msg;
+        subscribe => sub ($observer) {
             err::log("SimpleObserveable started, calling ($observer)") if DEBUG;
             # A simple example
             sequence(
@@ -76,8 +71,7 @@ actor SimpleObservable => sub ($env, $msg) {
 actor ComplexObservable => sub ($env, $msg) {
 
     match $msg, +{
-        subscribe => sub ($msg) {
-            my ($observer) = @$msg;
+        subscribe => sub ($observer) {
             err::log("ComplexObserveable started, calling ($observer)") if DEBUG;
 
             my @pids = map {

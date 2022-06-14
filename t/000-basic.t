@@ -14,13 +14,11 @@ use EventLoop::IO;
 
 actor bounce => sub ($env, $msg) {
     match $msg, +{
-        up => sub ($body) {
-            my ($cnt) = @$body;
+        up => sub ($cnt) {
             out::print("bounce(UP) => $cnt");
             send_to( PID, down => [$cnt+1] )
         },
-        down => sub ($body) {
-            my ($cnt) = @$body;
+        down => sub ($cnt) {
             out::print("bounce(DOWN) => $cnt");
             send_to( PID, up => [$cnt+1] );
         }

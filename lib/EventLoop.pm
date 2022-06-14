@@ -208,13 +208,11 @@ sub loop ( $MAX_TICKS, $start_pid ) {
             : ON_MAGENTA "SYS ::". RESET " ";
 
         match $msg, +{
-            kill => sub ($body) {
-                my ($pid) = @$body;
+            kill => sub ($pid) {
                 warn( $prefix, "killing ... {$pid}\n" ) if DEBUG;
                 despawn($pid);
             },
-            waitpids => sub ($body) {
-                my ($pids, $callback) = @$body;
+            waitpids => sub ($pids, $callback) {
 
                 my @active = grep { exists $processes{$_} } @$pids;
 
@@ -392,8 +390,7 @@ sub _loop_log_line ( $fmt, $tick ) {
 # will just return the input given ...
 actor '!ident' => sub ($env, $msg) {
     match $msg, +{
-        id => sub ($body) {
-            my ($val) = @$body;
+        id => sub ($val) {
             err::log("*/ !ident /* returning val($val)") if DEBUG;
             return_to $val;
             despawn( $CURRENT_PID );
@@ -404,8 +401,7 @@ actor '!ident' => sub ($env, $msg) {
 # wait, then call statement
 actor '!timeout' => sub ($env, $msg) {
     match $msg, +{
-        countdown => sub ($body) {
-            my ($timer, $event) = @$body;
+        countdown => sub ($timer, $event) {
 
             if ( $timer == 0 ) {
                 err::log( "*/ !timeout! /* : timer DONE") if DEBUG;
@@ -425,14 +421,12 @@ actor '!timeout' => sub ($env, $msg) {
 actor '!sync' => sub ($env, $msg) {
 
     match $msg, +{
-        send => sub ($body) {
-            my ($input, $output) = @$body;
+        send => sub ($input, $output) {
             err::log("*/ !sync /* : sending message") if DEBUG;
             send_to( @$input );
             send_from( $CURRENT_CALLER, $CURRENT_PID => recv => [ $output ] );
         },
-        recv => sub ($body) {
-            my ($output) = @$body;
+        recv => sub ($output) {
 
             my $message = recv_from;
 
@@ -445,7 +439,7 @@ actor '!sync' => sub ($env, $msg) {
             }
             else {
                 err::log("*/ !sync /* : no messages") if DEBUG;
-                send_from( $CURRENT_CALLER, $CURRENT_PID => recv => $body );
+                send_from( $CURRENT_CALLER, $CURRENT_PID => recv => [ $output ] );
             }
         }
     };
@@ -455,11 +449,11 @@ actor '!sync' => sub ($env, $msg) {
 
 actor '!sequence' => sub ($env, $msg) {
     match $msg, +{
-        next => sub ($body) {
-            if ( my $statement = shift @$body ) {
-                err::log("*/ !sequence /* calling, ".(scalar @$body)." remain" ) if DEBUG;
+        next => sub (@statements) {
+            if ( my $statement = shift @statements ) {
+                err::log("*/ !sequence /* calling, ".(scalar @statements)." remain" ) if DEBUG;
                 send_from( $CURRENT_CALLER, @$statement );
-                send_from( $CURRENT_CALLER, $CURRENT_PID, next => $body );
+                send_from( $CURRENT_CALLER, $CURRENT_PID, next => \@statements );
             }
             else {
                 err::log("*/ !sequence /* finished") if DEBUG;
@@ -471,9 +465,9 @@ actor '!sequence' => sub ($env, $msg) {
 
 actor '!parallel' => sub ($env, $msg) {
     match $msg, +{
-        all => sub ($body) {
-            err::log("*/ !parallel /* sending ".(scalar @$body)." messages" ) if DEBUG;
-            foreach my $statement ( @$body ) {
+        all => sub (@statements) {
+            err::log("*/ !parallel /* sending ".(scalar @statements)." messages" ) if DEBUG;
+            foreach my $statement ( @statements ) {
                 send_from( $CURRENT_CALLER, @$statement );
             }
             err::log("*/ !parallel /* finished") if DEBUG;

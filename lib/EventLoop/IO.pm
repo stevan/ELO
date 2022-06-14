@@ -57,8 +57,7 @@ actor '#err' => sub ($env, $msg) {
         : ON_RED "LOG !!". RESET " ";
 
     match $msg, +{
-        printf => sub ($body) {
-            my ($fmt, $values, $caller) = @$body;
+        printf => sub ($fmt, $values, $caller='') {
 
             if ($caller) {
                 $INDENTS{ $EventLoop::CURRENT_CALLER } = ($INDENTS{ $caller } // 0) + 1
@@ -77,8 +76,7 @@ actor '#err' => sub ($env, $msg) {
                 RESET "\n"
             );
         },
-        print => sub ($body) {
-            my ($msg, $caller) = @$body;
+        print => sub ($msg, $caller='') {
 
             if ($caller) {
                 $INDENTS{ $EventLoop::CURRENT_CALLER } = ($INDENTS{ $caller } // 0) + 1
@@ -106,12 +104,11 @@ actor '#out' => sub ($env, $msg) {
         : ON_GREEN "OUT >>". RESET " ";
 
     match $msg, +{
-        printf => sub ($body) {
-            my ($fmt, @values) = @$body;
+        printf => sub ($fmt, @values) {
             say( $prefix, sprintf $fmt, @values );
         },
-        print => sub ($body) {
-            say( $prefix, @$body );
+        print => sub ($value) {
+            say( $prefix, $value );
         }
     };
 };
@@ -122,8 +119,7 @@ actor '#in' => sub ($env, $msg) {
         : ON_CYAN "IN <<". RESET " ";
 
     match $msg, +{
-        read => sub ($body) {
-            my ($prompt) = @$body;
+        read => sub ($prompt) {
             $prompt //= '';
 
             print( $prefix, $prompt );

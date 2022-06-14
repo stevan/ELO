@@ -18,8 +18,7 @@ use constant DEBUG_DECODER   => DEBUG >= 2 ? DEBUG - 1 : 0;
 actor Splitter => sub ($env, $msg) {
 
     match $msg, +{
-        split => sub ($body) {
-            my ($return_pid, $string) = @$body;
+        split => sub ($return_pid, $string) {
             send_to( EventLoop::copy_msg( $return_pid, split '' => $string)->@* );
             send_to( SYS, kill => [PID]);
         }
@@ -33,20 +32,20 @@ actor Decoder => sub ($env, $msg) {
     err::log(Dumper { stack => $stack }) if DEBUG_DECODER >= 2;
 
     match $msg, +{
-        start_object => sub ($body) {
+        start_object => sub () {
             err::log("START OBJECT") if DEBUG_DECODER;
             push @$stack => {};
         },
 
-        end_object => sub ($body) {
+        end_object => sub () {
             err::log("END OBJECT") if DEBUG_DECODER;
         },
 
-        start_property => sub ($body) {
+        start_property => sub () {
             err::log("START PROPERTY") if DEBUG_DECODER;
         },
 
-        end_property   => sub ($body) {
+        end_property   => sub () {
             my $value = pop @$stack;
             my $key   = pop @$stack;
             err::log("ADD PROPERTY $key => $value") if DEBUG_DECODER;
@@ -54,34 +53,34 @@ actor Decoder => sub ($env, $msg) {
             err::log("END PROPERTY") if DEBUG_DECODER;
         },
 
-        start_array => sub ($body) { err::log("START ARRAY") if DEBUG_DECODER; },
-        end_array   => sub ($body) { err::log("END ARRAY") if DEBUG_DECODER; },
+        start_array => sub () { err::log("START ARRAY") if DEBUG_DECODER; },
+        end_array   => sub () { err::log("END ARRAY") if DEBUG_DECODER; },
 
-        start_item => sub ($body) {
+        start_item => sub () {
             err::log("START ITEM") if DEBUG_DECODER;
         },
-        end_item   => sub ($body) {
+        end_item   => sub () {
             err::log("END ITEM") if DEBUG_DECODER;
         },
 
-        add_string => sub ($body) {
-            err::log("ADD STRING (@$body)") if DEBUG_DECODER;
-            push @$stack => $body->[0];
+        add_string => sub ($string) {
+            err::log("ADD STRING ($string)") if DEBUG_DECODER;
+            push @$stack => $string;
         },
-        add_number => sub ($body) {
-            err::log("ADD NUMBER (@$body)") if DEBUG_DECODER;
-            push @$stack => $body->[0];
+        add_number => sub ($number) {
+            err::log("ADD NUMBER ($number)") if DEBUG_DECODER;
+            push @$stack => $number;
         },
 
-        add_true   => sub ($body) { err::log("ADD TRUE") if DEBUG_DECODER; },
-        add_false  => sub ($body) { err::log("ADD FALSE") if DEBUG_DECODER; },
-        add_null   => sub ($body) { err::log("ADD NULL") if DEBUG_DECODER; },
+        add_true   => sub () { err::log("ADD TRUE") if DEBUG_DECODER; },
+        add_false  => sub () { err::log("ADD FALSE") if DEBUG_DECODER; },
+        add_null   => sub () { err::log("ADD NULL") if DEBUG_DECODER; },
 
-        error => sub ($body) {
-            out::print("ERROR!!!! (@$body)");
+        error => sub ($error) {
+            out::print("ERROR!!!! ($error)");
             @$stack = ();
         },
-        finish     => sub ($body) {
+        finish     => sub () {
             out::print( (Dumper $stack->[0]) =~ s/^\$VAR1\s/JSON /r ) #/
                 if @$stack == 1;
             send_to( SYS, kill => [PID]);
@@ -104,8 +103,7 @@ actor Tokenizer => sub ($env, $msg) {
     err::log(Dumper { stack => $stack }) if DEBUG_TOKENIZER >= 2;
 
     match $msg, +{
-        tokenize => sub ($body) {
-            my ($observer, $JSON) = @$body;
+        tokenize => sub ($observer, $JSON) {
             push @$stack => 'process_tokens';
             send_to(
                 spawn('Splitter'),
@@ -115,9 +113,8 @@ actor Tokenizer => sub ($env, $msg) {
                 ]
             );
         },
-        process_tokens => sub ($body) {
+        process_tokens => sub ($observer, @chars) {
             my $char;
-            my ($observer, @chars) = @$body;
 
             err::log("Enter process_tokens (@$stack) : (@chars)") if DEBUG_TOKENIZER;
 
@@ -148,9 +145,8 @@ actor Tokenizer => sub ($env, $msg) {
         },
 
         ## ... complex ...
-        start_object => sub ($body) {
+        start_object => sub ($observer, @chars) {
             my $char;
-            my ($observer, @chars) = @$body;
 
             err::log("Enter start_object (@$stack) : (@chars)") if DEBUG_TOKENIZER;
 
@@ -171,9 +167,8 @@ actor Tokenizer => sub ($env, $msg) {
                 send_to(PID, error => [ $observer, "Ran out of tokens in start_object"]);
             }
         },
-        process_object => sub ($body) {
+        process_object => sub ($observer, @chars) {
             my $char;
-            my ($observer, @chars) = @$body;
 
             err::log("Enter process_object (@$stack) : (@chars)") if DEBUG_TOKENIZER;
 
@@ -196,8 +191,7 @@ actor Tokenizer => sub ($env, $msg) {
                 send_to(PID, error => [ $observer, "Ran out of tokens in process_object"]);
             }
         },
-        end_object => sub ($body) {
-            my ($observer, @chars) = @$body;
+        end_object => sub ($observer, @chars) {
 
             err::log("Enter end_object (@$stack) : (@chars)") if DEBUG_TOKENIZER;
 
@@ -208,9 +202,8 @@ actor Tokenizer => sub ($env, $msg) {
         },
 
         # ...
-        start_property => sub ($body) {
+        start_property => sub ($observer, @chars) {
             my $char;
-            my ($observer, @chars) = @$body;
 
             err::log("Enter start_property (@$stack) : (@chars)") if DEBUG_TOKENIZER;
 
@@ -230,9 +223,8 @@ actor Tokenizer => sub ($env, $msg) {
                 send_to(PID, error => [ $observer, "Unterminated object property : ran out of tokens in start_property"]);
             }
         },
-        process_property => sub ($body) {
+        process_property => sub ($observer, @chars) {
             my $char;
-            my ($observer, @chars) = @$body;
 
             err::log("Enter process_property (@$stack) : (@chars)") if DEBUG_TOKENIZER;
 
@@ -250,8 +242,7 @@ actor Tokenizer => sub ($env, $msg) {
                 send_to(PID, error => [ $observer, "Unterminated object property : ran out of tokens in process_property"]);
             }
         },
-        end_property => sub ($body) {
-            my ($observer, @chars) = @$body;
+        end_property => sub ($observer, @chars) {
 
             err::log("Enter end_property (@$stack) : (@chars)") if DEBUG_TOKENIZER;
 
@@ -262,8 +253,7 @@ actor Tokenizer => sub ($env, $msg) {
         },
 
 
-        start_item => sub ($body) {
-            my ($observer, @chars) = @$body;
+        start_item => sub ($observer, @chars) {
 
             err::log("Enter start_item (@$stack) : (@chars)") if DEBUG_TOKENIZER;
 
@@ -271,8 +261,7 @@ actor Tokenizer => sub ($env, $msg) {
             push @$stack => 'end_item';
             send_to(PID, process_tokens => [ $observer, @chars ]);
         },
-        end_item => sub ($body) {
-            my ($observer, @chars) = @$body;
+        end_item => sub ($observer, @chars) {
 
             err::log("Enter end_item (@$stack) : (@chars)") if DEBUG_TOKENIZER;
 
@@ -282,8 +271,7 @@ actor Tokenizer => sub ($env, $msg) {
 
 
         ## ... literals ...
-        collect_string => sub ($body) {
-            my ($observer, @chars) = @$body;
+        collect_string => sub ($observer, @chars) {
 
             err::log("Enter collect_string (@$stack) : (@chars)") if DEBUG_TOKENIZER;
 
@@ -305,8 +293,7 @@ actor Tokenizer => sub ($env, $msg) {
 
             send_to( PID, $return_call, [ $observer, @chars ]);
         },
-        collect_number => sub ($body) {
-            my ($observer, @chars) = @$body;
+        collect_number => sub ($observer, @chars) {
 
             err::log("Enter collect_number (@$stack) : (@chars)") if DEBUG_TOKENIZER;
 
@@ -330,8 +317,7 @@ actor Tokenizer => sub ($env, $msg) {
         },
 
         # ...
-        error => sub ($body) {
-            my ($observer, $error) = @$body;
+        error => sub ($observer, $error) {
 
             err::log("Enter error (@$stack)") if DEBUG_TOKENIZER;
 
@@ -340,8 +326,7 @@ actor Tokenizer => sub ($env, $msg) {
             send_to( $observer, error => [ $error ]);
             send_to( PID, finish => [ $observer ]);
         },
-        finish => sub ($body) {
-            my ($observer) = @$body;
+        finish => sub ($observer) {
 
             err::log("Enter finish (@$stack)") if DEBUG_TOKENIZER;
 

@@ -16,8 +16,7 @@ actor TestBuilder => sub ($env, $msg) {
     state $counter = 0;
 
     match $msg, +{
-        ok => sub ($body) {
-            my ($value, $msg) = @$body;
+        ok => sub ($value, $msg) {
             $counter++;
             my $ok = $value ? 'ok' : 'not ok';
             out::print("$ok $counter $msg");

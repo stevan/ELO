@@ -15,7 +15,7 @@ use EventLoop::IO;
 actor counter => sub ($env, $msg) {
     state $count = 0;
     match $msg, +{
-        next => sub ($) {
+        next => sub () {
             return_to( ++$count );
         }
     };
@@ -25,11 +25,10 @@ actor take_10_and_sync => sub ($env, $msg) {
     state $i = 0;
 
     match $msg, +{
-        each => sub ($body) {
-            my ($producer, $consumer) = @$body;
+        each => sub ($producer, $consumer) {
             sync( timeout( 10 - $i, [$producer, next => []] ), $consumer );
             $i++;
-            send_to( PID, each => $body ) if $i < 10;
+            send_to( PID, each => [ $producer, $consumer ] ) if $i < 10;
         },
     };
 };

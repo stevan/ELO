@@ -16,14 +16,12 @@ use EventLoop::IO;
 # ... userland ...
 actor env => sub ($env, $msg) {
     match $msg, +{
-        init => sub ($body) {
-            my ($new_env) = @$body;
+        init => sub ($new_env) {
             $env->{$_} = $new_env->{$_} foreach keys %$new_env;
             err::log("env initialized to => ENV{ ".(join ', ' => map { join ' => ' => $_, $env->{$_} } keys %$env)." }")
                 if DEBUG;
         },
-        get => sub ($body) {
-            my ($key) = @$body;
+        get => sub ($key) {
             if ( exists $env->{$key} ) {
                 err::log("fetching {$key}") if DEBUG;
                 return_to( $env->{$key} );
@@ -32,8 +30,7 @@ actor env => sub ($env, $msg) {
                 err::log("not found {$key}") if DEBUG;
             }
         },
-        set => sub ($body) {
-            my ($key, $value) = @$body;
+        set => sub ($key, $value) {
             err::log("storing $key => $value") if DEBUG;
             $env->{$key} = $value;
 
