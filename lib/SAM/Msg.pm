@@ -15,12 +15,51 @@ use Exporter 'import';
 
 our @EXPORT = qw[
     msg
-];
 
+    recv_from
+    return_to
+];
 
 ## ----------------------------------------------------------------------------
 ## Message Queue
 ## ----------------------------------------------------------------------------
+
+my @msg_outbox;
+
+sub _message_outbox () { @msg_outbox }
+
+sub recv_from () {
+    my $process = SAM::_lookup_process( $SAM::CURRENT_PID );
+    my $msg = shift $process->[1]->@*;
+    return unless $msg;
+    return $msg->[1];
+}
+
+sub return_to ($msg) {
+    push @msg_outbox => [ $SAM::CURRENT_PID, $SAM::CURRENT_CALLER, $msg ];
+}
+
+sub _accept_all_messages () {
+    warn Dumper \@msg_outbox if DEBUG >= 4;
+
+    # accept all the messages in the queue
+    while (@msg_outbox) {
+        my $next = shift @msg_outbox;
+
+        my $from = shift $next->@*;
+        my ($to, $m) = $next->@*;
+        my $process = SAM::_lookup_process( $to );
+        if ( !$process ) {
+            warn "Got message for unknown pid($to)";
+            next;
+        }
+        push $process->[1]->@* => [ $from, $m ];
+    }
+}
+
+sub _remove_all_outbox_messages_for_pid ($pid) {
+    @msg_outbox = grep { $_->[1] ne $pid } @msg_outbox;
+}
 
 my @msg_inbox;
 

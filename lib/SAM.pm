@@ -19,9 +19,6 @@ use SAM::Msg;
 use Exporter 'import';
 
 our @EXPORT = qw[
-    recv_from
-    return_to
-
     sync
     timeout
     ident
@@ -68,49 +65,6 @@ sub PROCESS_TABLE () { \%PROCESS_TABLE }
 
 sub _lookup_process ($pid) { $PROCESS_TABLE{$pid} }
 
-# NOTE : this needs to be here because of recv_from,
-# if we remove that, or move that, we can move this
-# down lower with the spawn/despawn code (where it belongs)
-
-## ----------------------------------------------------------------------------
-## Messages and delivery
-## ----------------------------------------------------------------------------
-
-my @msg_outbox;
-
-sub _message_outbox () { @msg_outbox }
-
-sub recv_from () {
-    my $msg = shift $PROCESS_TABLE{$CURRENT_PID}->[1]->@*;
-    return unless $msg;
-    return $msg->[1];
-}
-
-sub return_to ($msg) {
-    push @msg_outbox => [ $CURRENT_PID, $CURRENT_CALLER, $msg ];
-}
-
-sub _accept_all_messages () {
-    warn Dumper \@msg_outbox if DEBUG >= 4;
-
-    # accept all the messages in the queue
-    while (@msg_outbox) {
-        my $next = shift @msg_outbox;
-
-        my $from = shift $next->@*;
-        my ($to, $m) = $next->@*;
-        unless (exists $PROCESS_TABLE{$to}) {
-            warn "Got message for unknown pid($to)";
-            next;
-        }
-        push $PROCESS_TABLE{$to}->[1]->@* => [ $from, $m ];
-    }
-}
-
-sub _remove_all_outbox_messages_for_pid ($pid) {
-    @msg_outbox = grep { $_->[1] ne $pid } @msg_outbox;
-}
-
 ## ----------------------------------------------------------------------------
 ## system interface ... see Actor definitions inside &loop
 ## ----------------------------------------------------------------------------
@@ -143,7 +97,7 @@ sub sys::despawn ($pid) {
 sub sys::despawn_waiting_pids () {
     foreach my $pid (keys %to_be_despawned) {
         SAM::Msg::_remove_all_inbox_messages_for_pid($pid);
-        _remove_all_outbox_messages_for_pid($pid);
+        SAM::Msg::_remove_all_outbox_messages_for_pid($pid);
 
         delete $PROCESS_TABLE{ $pid };
     }
@@ -230,7 +184,7 @@ sub loop ( $MAX_TICKS, $start_pid ) {
         _loop_log_line("tick(%d)", $tick) if DEBUG;
 
         SAM::Msg::_deliver_all_messages();
-        _accept_all_messages();
+        SAM::Msg::_accept_all_messages();
 
         my @active = map [ $_, $PROCESS_TABLE{$_}->@* ], keys %PROCESS_TABLE;
 
