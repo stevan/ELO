@@ -27,7 +27,7 @@ our @EXPORT = qw[
 
     loop
 
-    PID CALLER DEBUG
+    TICK PID CALLER DEBUG
 ];
 
 ## ----------------------------------------------------------------------------
@@ -48,10 +48,12 @@ our $TERM_SIZE = (GetTerminalSize())[0];
 ## call context info
 ## ----------------------------------------------------------------------------
 
+our $CURRENT_TICK;
 our $CURRENT_PID;
 our $CURRENT_CALLER;
 
 # to be exported
+sub TICK   () { $CURRENT_TICK   }
 sub PID    () { $CURRENT_PID    }
 sub CALLER () { $CURRENT_CALLER }
 
@@ -186,6 +188,7 @@ sub loop ( $MAX_TICKS, $start_pid ) {
         $tick++;
         _loop_log_line("tick(%d)", $tick) if DEBUG;
 
+        local $CURRENT_TICK = $tick;
         SAM::Msg::_deliver_all_messages();
         SAM::Msg::_accept_all_messages();
 
