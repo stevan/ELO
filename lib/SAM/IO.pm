@@ -26,31 +26,31 @@ our $OUT;
 our $ERR;
 
 sub err::log ($msg, $caller=$SAM::CURRENT_CALLER) {
-    $ERR //= SAM::spawn('#err');
+    $ERR //= sys::spawn('#err');
     SAM::msg($ERR, print => [ $msg, $caller ])
         ->return_or_send( wantarray );
 }
 
 sub err::logf ($fmt, $msg, $caller=$SAM::CURRENT_CALLER) {
-    $ERR //= SAM::spawn('#err');
+    $ERR //= sys::spawn('#err');
     SAM::msg($ERR, printf => [ $fmt, $msg, $caller ])
         ->return_or_send( wantarray );
 }
 
 sub out::print ($msg=undef) {
-    $OUT //= SAM::spawn('#out');
+    $OUT //= sys::spawn('#out');
     SAM::msg($OUT, print => [ $msg // () ])
         ->return_or_send( wantarray );
 }
 
 sub out::printf ($fmt, $msg=undef) {
-    $OUT //= SAM::spawn('#out');
+    $OUT //= sys::spawn('#out');
     SAM::msg($OUT, printf => [ $fmt, $msg // () ])
         ->return_or_send( wantarray );
 }
 
 sub in::read ($prompt=undef) {
-    $IN //= SAM::spawn('#in');
+    $IN //= sys::spawn('#in');
     SAM::msg($IN, read => [ $prompt // () ])
         ->return_or_send( wantarray );
 }

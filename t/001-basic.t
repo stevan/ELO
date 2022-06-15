@@ -44,8 +44,8 @@ actor env => sub ($env, $msg) {
 actor main => sub ($env, $msg) {
     out::print("-> main starting ...");
 
-    my $e1 = spawn( 'env' );
-    my $e2 = spawn( 'env' );
+    my $e1 = sys::spawn( 'env' );
+    my $e2 = sys::spawn( 'env' );
 
     # ...
 

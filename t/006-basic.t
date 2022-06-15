@@ -109,7 +109,7 @@ actor Tokenizer => sub ($env, $msg) {
         tokenize => sub ($observer, $JSON) {
             push @$stack => 'process_tokens';
             msg(
-                spawn('Splitter'),
+                sys::spawn('Splitter'),
                 split => [
                     msg( PID, process_tokens => [ $observer ] ),
                     $JSON
@@ -342,18 +342,18 @@ actor Tokenizer => sub ($env, $msg) {
 actor main => sub ($env, $msg) {
     out::print("-> main starting ...");
 
-    msg(spawn('Tokenizer'), tokenize => [
-        spawn('Decoder'),
+    msg(sys::spawn('Tokenizer'), tokenize => [
+        sys::spawn('Decoder'),
         '{ "foo" : 10 :'
     ])->send;
 
-    msg(spawn('Tokenizer'), tokenize => [
-        spawn('Decoder'),
+    msg(sys::spawn('Tokenizer'), tokenize => [
+        sys::spawn('Decoder'),
         '{ "foo" : { "bar" : 10, "baz" : { "gorch" : 100 } } }'
     ])->send;
 
-    msg(spawn('Tokenizer'), tokenize => [
-        spawn('Decoder'),
+    msg(sys::spawn('Tokenizer'), tokenize => [
+        sys::spawn('Decoder'),
         '{ "bling" : { "baz" : {}, "boo" : 10, "foo" : { "gorch" : 100 } }, "foo" : 500 }'
     ])->send;
 

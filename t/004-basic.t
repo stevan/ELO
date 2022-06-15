@@ -38,12 +38,12 @@ actor take_10_and_sync => sub ($env, $msg) {
 actor main => sub ($env, $msg) {
     out::print("-> main starting ...");
 
-    my $s = spawn('take_10_and_sync');
+    my $s = sys::spawn('take_10_and_sync');
 
     msg(
         $s,
         each => [
-            spawn('counter'),
+            sys::spawn('counter'),
             out::print()
         ]
     )->send;

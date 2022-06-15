@@ -20,25 +20,18 @@ use Exporter 'import';
 our @EXPORT = qw[
     msg
 
-    timeout
-
     recv_from
     return_to
 
-    spawn
-    quit
-
     sync
-
+    timeout
     ident
     sequence
     cond
 
     loop
 
-    PID CALLER
-
-    DEBUG
+    PID CALLER DEBUG
 ];
 
 # flags
@@ -165,7 +158,7 @@ sub sys::waitpids($pids, $callback) {
 ## ... process creation
 
 my $PID = 0;
-sub spawn ($name, %env) {
+sub sys::spawn ($name, %env) {
     my $process = [ [], [], { %env }, SAM::Actors::get_actor($name) ];
     my $pid = sprintf '%03d:%s' => ++$PID, $name;
     $processes{ $pid } = $process;
@@ -173,11 +166,11 @@ sub spawn ($name, %env) {
 }
 
 my %to_be_despawned;
-sub despawn ($pid) {
+sub sys::despawn ($pid) {
     $to_be_despawned{$pid}++;
 }
 
-sub despawn_all () {
+sub sys::despawn_all () {
     foreach my $pid (keys %to_be_despawned) {
         @msg_inbox  = grep { $_->[1]->pid ne $pid } @msg_inbox;
         @msg_outbox = grep { $_->[1] ne $pid } @msg_outbox;
@@ -191,27 +184,27 @@ sub despawn_all () {
 ## ... currency control
 
 sub timeout ($ticks, $callback) {
-    msg( spawn( '!timeout' ), countdown => [ $ticks, $callback ] )
+    msg( sys::spawn( '!timeout' ), countdown => [ $ticks, $callback ] )
         ->return_or_send( wantarray );
 }
 
 sub sync ($input, $output) {
-    msg( spawn( '!sync' ), send => [ $input, $output ] )
+    msg( sys::spawn( '!sync' ), send => [ $input, $output ] )
         ->return_or_send( wantarray );
 }
 
 sub ident ($val=undef) {
-    msg( spawn( '!ident' ), id => [ $val // () ] )
+    msg( sys::spawn( '!ident' ), id => [ $val // () ] )
         ->return_or_send( wantarray );
 }
 
 sub sequence (@statements) {
-    msg( spawn( '!sequence' ), next => [ @statements ] )
+    msg( sys::spawn( '!sequence' ), next => [ @statements ] )
         ->return_or_send( wantarray );
 }
 
 sub parallel (@statements) {
-    msg( spawn( '!parallel' ), all => [ @statements ] )
+    msg( sys::spawn( '!parallel' ), all => [ @statements ] )
         ->return_or_send( wantarray );
 }
 
@@ -228,7 +221,7 @@ sub loop ( $MAX_TICKS, $start_pid ) {
         match $msg, +{
             kill => sub ($pid) {
                 warn( $prefix, "killing ... {$pid}\n" ) if DEBUG;
-                despawn($pid);
+                sys::despawn($pid);
             },
             waitpids => sub ($pids, $callback) {
 
@@ -248,7 +241,7 @@ sub loop ( $MAX_TICKS, $start_pid ) {
     }];
 
     # initialise ...
-    my $start = spawn( $start_pid );
+    my $start = sys::spawn( $start_pid );
 
     msg($start => '_' => [])->send_from( $INIT_PID );
 
@@ -343,7 +336,7 @@ sub loop ( $MAX_TICKS, $start_pid ) {
             }
         }
 
-        despawn_all;
+        sys::despawn_all();
 
         warn Dumper \%processes if DEBUG >= 4;
 
@@ -409,7 +402,7 @@ actor '!ident' => sub ($env, $msg) {
         id => sub ($val) {
             err::log("*/ !ident /* returning val($val)") if DEBUG;
             return_to $val;
-            despawn( $CURRENT_PID );
+            sys::despawn( $CURRENT_PID );
         },
     };
 };
@@ -422,7 +415,7 @@ actor '!timeout' => sub ($env, $msg) {
             if ( $timer == 0 ) {
                 err::log( "*/ !timeout! /* : timer DONE") if DEBUG;
                 $event->send_from( $CURRENT_CALLER );
-                despawn( $CURRENT_PID );
+                sys::despawn( $CURRENT_PID );
             }
             else {
                 err::log("*/ !timeout! /* : counting down $timer") if DEBUG;
@@ -452,7 +445,7 @@ actor '!sync' => sub ($env, $msg) {
                 msg(@$output)
                     ->curry( $message )
                     ->send_from( $CURRENT_CALLER );
-                despawn( $CURRENT_PID );
+                sys::despawn( $CURRENT_PID );
             }
             else {
                 err::log("*/ !sync /* : no messages") if DEBUG;
@@ -474,7 +467,7 @@ actor '!sequence' => sub ($env, $msg) {
             }
             else {
                 err::log("*/ !sequence /* finished") if DEBUG;
-                despawn( $CURRENT_PID );
+                sys::despawn( $CURRENT_PID );
             }
         },
     };
@@ -488,7 +481,7 @@ actor '!parallel' => sub ($env, $msg) {
                 $statement->send_from( $CURRENT_CALLER );
             }
             err::log("*/ !parallel /* finished") if DEBUG;
-            despawn( $CURRENT_PID );
+            sys::despawn( $CURRENT_PID );
         },
     };
 };

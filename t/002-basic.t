@@ -29,7 +29,7 @@ actor TestBuilder => sub ($env, $msg) {
 actor main => sub ($env, $msg) {
     out::print("-> main starting ...");
 
-    my $builder = spawn( 'TestBuilder' );
+    my $builder = sys::spawn( 'TestBuilder' );
 
     timeout( 3, msg( $builder, ok => [ 1, '... it works!' ]) );
 
