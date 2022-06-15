@@ -67,6 +67,7 @@ use constant BLOCKED => 3; # blocked on input
 
 my $PID_ID = 0;
 my %PROCESS_TABLE;
+my %TIMERS;
 
 sub proc::lookup ($pid) { $PROCESS_TABLE{$pid} }
 
@@ -87,10 +88,26 @@ sub proc::despawn_all_waiting_pids () {
         SAM::Msg::_remove_all_inbox_messages_for_pid($pid);
         SAM::Msg::_remove_all_outbox_messages_for_pid($pid);
 
+        delete $TIMERS{ $pid };
         delete $PROCESS_TABLE{ $pid };
     }
 
     %to_be_despawned = ();
+}
+
+sub proc::alarm($timeout, $callback) {
+    my $proc = proc::lookup( $CURRENT_PID );
+    $proc->set_status(WAITING);
+
+    push @{ $TIMERS{ $CURRENT_TICK + $timeout } //= [] } => [
+        $CURRENT_PID,
+        $CURRENT_CALLER,
+        sub ($pid, $caller) {
+            my $proc = proc::lookup( $pid );
+            $proc->set_status(READY);
+            $callback->send_from( $caller );
+        }
+    ];
 }
 
 package SAM::Process::Record {
@@ -198,6 +215,17 @@ sub loop ( $MAX_TICKS, $start_pid ) {
         _loop_log_line("tick(%d)", $tick) if DEBUG;
 
         local $CURRENT_TICK = $tick;
+
+        if ( exists $TIMERS{ $CURRENT_TICK } ) {
+            my $alarms = delete $TIMERS{ $CURRENT_TICK };
+            foreach my $alarm ($alarms->@*) {
+                my ($pid, $caller, $f) = @$alarm;
+                # XXX - check $pid is still alive??
+                #       or that the pid being called
+                $f->($pid, $caller);
+            }
+        }
+
         SAM::Msg::_deliver_all_messages();
         SAM::Msg::_accept_all_messages();
 
@@ -240,7 +268,7 @@ sub loop ( $MAX_TICKS, $start_pid ) {
             last;
         }
 
-        if ( scalar @active_processes == 0 ) {
+        if ( scalar @active_processes == 0 && scalar keys %TIMERS == 0 ) {
             # loop one last time to flush any I/O
             if ( SAM::Msg::_has_inbox_messages() ) {
                 $has_exited++;

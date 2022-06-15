@@ -42,11 +42,13 @@ actor main => sub ($env, $msg) {
     my $bounce = proc::spawn( 'bounce' );
     msg( $bounce, up => [1] )->send;
 
-    timeout( 10,
+    proc::alarm(
+        10,
         sequence(
             msg( $bounce, finish => [] ),
             out::print("JELLO!"),
-        ))->send;
+        )
+    );
 };
 
 # loop ...
