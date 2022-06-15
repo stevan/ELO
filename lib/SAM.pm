@@ -186,7 +186,7 @@ sub loop ( $MAX_TICKS, $start_pid ) {
         SAM::Msg::_deliver_all_messages();
         SAM::Msg::_accept_all_messages();
 
-        my @active = map [ $_, $PROCESS_TABLE{$_}->@* ], keys %PROCESS_TABLE;
+        my @active = map [ $_, $PROCESS_TABLE{$_}->@* ], sort keys %PROCESS_TABLE;
 
         while (@active) {
             my $active = shift @active;
