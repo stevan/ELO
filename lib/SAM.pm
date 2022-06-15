@@ -189,10 +189,12 @@ sub loop ( $MAX_TICKS, $start_pid ) {
         SAM::Msg::_deliver_all_messages();
         SAM::Msg::_accept_all_messages();
 
-        my @active = map $PROCESS_TABLE{$_}, sort keys %PROCESS_TABLE;
+        my @ready = grep $_->inbox->@*,
+                    map $PROCESS_TABLE{$_},
+                    sort keys %PROCESS_TABLE;
 
-        while (@active) {
-            my $active = shift @active;
+        while (@ready) {
+            my $active = shift @ready;
 
             while ( $active->inbox->@* ) {
 
