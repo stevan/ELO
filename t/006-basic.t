@@ -5,6 +5,7 @@ use warnings;
 use experimental 'lexical_subs', 'signatures', 'postderef';
 
 use Test::More;
+use Test::Differences;
 use Test::SAM;
 
 use List::Util 'first';
@@ -81,12 +82,14 @@ actor Decoder => sub ($env, $msg) {
         error => sub ($error) {
             out::print("ERROR!!!! ($error)");
             @$stack = ();
-            msg(PID, finish => [])->send;
+            sys::kill(PID);
+            is($error, $env->{error}, '... got the error we expected');
         },
         finish     => sub () {
             out::print( (Dumper $stack->[0]) =~ s/^\$VAR1\s/JSON /r ) #/
                 if @$stack == 1;
             sys::kill(PID);
+            eq_or_diff($stack->[0], $env->{expected}, '... got the expected values');
         },
     };
 };
@@ -327,7 +330,7 @@ actor Tokenizer => sub ($env, $msg) {
             @$stack = (); # clear stack ...
 
             msg( $observer, error => [ $error ])->send;
-            msg( PID, finish => [ $observer ])->send;
+            sys::kill(PID);
         },
         finish => sub ($observer) {
 
@@ -343,17 +346,21 @@ actor main => sub ($env, $msg) {
     out::print("-> main starting ...");
 
     msg(sys::spawn('Tokenizer'), tokenize => [
-        sys::spawn('Decoder'),
+        sys::spawn('Decoder', error => 'Unexpected token `:` in process_object, expected `}` or `,`'),
         '{ "foo" : 10 :'
     ])->send;
 
     msg(sys::spawn('Tokenizer'), tokenize => [
-        sys::spawn('Decoder'),
+        sys::spawn('Decoder', expected =>
+            { foo => { bar => 10, baz => { gorch => 100 } } }
+        ),
         '{ "foo" : { "bar" : 10, "baz" : { "gorch" : 100 } } }'
     ])->send;
 
     msg(sys::spawn('Tokenizer'), tokenize => [
-        sys::spawn('Decoder'),
+        sys::spawn('Decoder', expected =>
+            { bling => { boo => 10, baz => {}, foo => { gorch => 100 } }, foo => 500 }
+        ),
         '{ "bling" : { "baz" : {}, "boo" : 10, "foo" : { "gorch" : 100 } }, "foo" : 500 }'
     ])->send;
 
