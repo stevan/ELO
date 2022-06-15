@@ -14,12 +14,11 @@ use Term::ReadKey 'GetTerminalSize';
 
 use SAM::Actors;
 use SAM::IO;
+use SAM::Msg;
 
 use Exporter 'import';
 
 our @EXPORT = qw[
-    msg
-
     recv_from
     return_to
 
@@ -48,10 +47,6 @@ use constant DEBUGGER => $ENV{DEBUGGER} // 0;
 # XXX - put this into a module along with other similar stuff?
 our $TERM_SIZE = (GetTerminalSize())[0];
 
-# FIXME: remove these
-use constant INBOX  => 0;
-use constant OUTBOX => 1;
-
 ## ----------------------------------------------------------------------------
 ## call context info
 ## ----------------------------------------------------------------------------
@@ -69,6 +64,10 @@ sub CALLER () { $CURRENT_CALLER }
 
 my %PROCESS_TABLE;
 
+sub PROCESS_TABLE () { \%PROCESS_TABLE }
+
+sub _lookup_process ($pid) { $PROCESS_TABLE{$pid} }
+
 # NOTE : this needs to be here because of recv_from,
 # if we remove that, or move that, we can move this
 # down lower with the spawn/despawn code (where it belongs)
@@ -77,19 +76,12 @@ my %PROCESS_TABLE;
 ## Messages and delivery
 ## ----------------------------------------------------------------------------
 
-my @msg_inbox;
 my @msg_outbox;
 
-sub _send_to ($msg) {
-    push @msg_inbox => [ $CURRENT_PID, $msg ];
-}
-
-sub _send_from ($from, $msg) {
-    push @msg_inbox => [ $from, $msg ];
-}
+sub _message_outbox () { @msg_outbox }
 
 sub recv_from () {
-    my $msg = shift $PROCESS_TABLE{$CURRENT_PID}->[OUTBOX]->@*;
+    my $msg = shift $PROCESS_TABLE{$CURRENT_PID}->[1]->@*;
     return unless $msg;
     return $msg->[1];
 }
@@ -98,56 +90,25 @@ sub return_to ($msg) {
     push @msg_outbox => [ $CURRENT_PID, $CURRENT_CALLER, $msg ];
 }
 
-## messages ..
+sub _accept_all_messages () {
+    warn Dumper \@msg_outbox if DEBUG >= 4;
 
-sub msg        ($pid, $action, $msg) { bless [$pid, $action, $msg] => 'SAM::Msg' }
-sub msg::curry ($pid, $action, $msg) { bless [$pid, $action, $msg] => 'SAM::Msg::Curryable' }
+    # accept all the messages in the queue
+    while (@msg_outbox) {
+        my $next = shift @msg_outbox;
 
-package SAM::Msg {
-    use v5.24;
-    use warnings;
-    use experimental 'signatures', 'postderef';
-
-    sub pid    ($self) { $self->[0] }
-    sub action ($self) { $self->[1] }
-    sub body   ($self) { $self->[2] }
-
-    sub curry ($self, @args) {
-        msg::curry(@$self)->curry( @args )
-    }
-
-    sub send ($self) { SAM::_send_to( $self ); $self }
-    sub send_from ($self, $caller) { SAM::_send_from($caller, $self); $self }
-
-    sub return_or_send ($self, $wantarray) {
-        if (not defined $wantarray) {
-            # foo(); -- will send message, return nothing
-            $self->send;
-            return;
+        my $from = shift $next->@*;
+        my ($to, $m) = $next->@*;
+        unless (exists $PROCESS_TABLE{$to}) {
+            warn "Got message for unknown pid($to)";
+            next;
         }
-        elsif (not $wantarray) {
-            # my $foo_pid = foo(); -- will send message, return msg pid
-            $self->send;
-            return $self->pid
-        }
-        else {
-            # sync(foo(), bar()); -- will just return message
-            return $self;
-        }
+        push $PROCESS_TABLE{$to}->[1]->@* => [ $from, $m ];
     }
 }
 
-package SAM::Msg::Curryable {
-    use v5.24;
-    use warnings;
-    use experimental 'signatures', 'postderef';
-
-    our @ISA; BEGIN { @ISA = ('SAM::Msg') };
-
-    sub curry ($self, @args) {
-        my ($pid, $action, $body) = @$self;
-        bless [ $pid, $action, [ @$body, @args ] ] => 'SAM::Msg::Curryable';
-    }
+sub _remove_all_outbox_messages_for_pid ($pid) {
+    @msg_outbox = grep { $_->[1] ne $pid } @msg_outbox;
 }
 
 ## ----------------------------------------------------------------------------
@@ -179,10 +140,10 @@ sub sys::despawn ($pid) {
     $to_be_despawned{$pid}++;
 }
 
-sub sys::despawn_all () {
+sub sys::despawn_waiting_pids () {
     foreach my $pid (keys %to_be_despawned) {
-        @msg_inbox  = grep { $_->[1]->pid ne $pid } @msg_inbox;
-        @msg_outbox = grep { $_->[1] ne $pid } @msg_outbox;
+        SAM::Msg::_remove_all_inbox_messages_for_pid($pid);
+        _remove_all_outbox_messages_for_pid($pid);
 
         delete $PROCESS_TABLE{ $pid };
     }
@@ -268,68 +229,8 @@ sub loop ( $MAX_TICKS, $start_pid ) {
         $tick++;
         _loop_log_line("tick(%d)", $tick) if DEBUG;
 
-        warn Dumper \@msg_inbox  if DEBUG >= 4;
-        warn Dumper \@msg_outbox if DEBUG >= 4;
-
-        my $has_inbox_messages  = !! scalar @msg_inbox;
-        my $has_outbox_messages = !! scalar @msg_outbox;
-
-        # deliver all the messages in the queue
-        while (@msg_inbox) {
-            my $next = shift @msg_inbox;
-            #warn Dumper $next;
-            my ($from, $msg) = $next->@*;
-            unless (exists $PROCESS_TABLE{$msg->pid}) {
-                warn "Got message for unknown pid(".$msg->pid.")";
-                next;
-            }
-            push $PROCESS_TABLE{$msg->pid}->[INBOX]->@* => [ $from, $msg ];
-        }
-
-        # deliver all the messages in the queue
-        while (@msg_outbox) {
-            my $next = shift @msg_outbox;
-
-            my $from = shift $next->@*;
-            my ($to, $m) = $next->@*;
-            unless (exists $PROCESS_TABLE{$to}) {
-                warn "Got message for unknown pid($to)";
-                next;
-            }
-            push $PROCESS_TABLE{$to}->[OUTBOX]->@* => [ $from, $m ];
-        }
-
-        #
-        if ( DEBUGGER ) {
-
-            my @pids = sort keys %PROCESS_TABLE;
-
-            my $longest_pid = max( map length, @pids );
-
-            warn FAINT '-' x $TERM_SIZE, RESET "\n";
-            warn FAINT ON_MAGENTA " << MESSAGES >> " . RESET "\n";
-            warn FAINT '-' x $TERM_SIZE, RESET "\n";
-            foreach my $pid ( @pids ) {
-                my @inbox  = $PROCESS_TABLE{$pid}->[INBOX]->@*;
-                my ($num, $name) = split ':' => $pid;
-
-                my $pid_color = 'black on_ansi'.((int($num)+3) * 8);
-
-                warn '  '.
-                    color($pid_color).
-                        sprintf("> %-${longest_pid}s ", $pid).
-                    RESET " (".
-                    CYAN (join ' / ' =>
-                        map {
-                            my $action = $_->[1]->action;
-                            my $body   = join ', ' => $_->[1]->body->@*;
-                            "${action}![${body}]";
-                        } @inbox).
-                    RESET ")\n";
-            }
-            warn FAINT '-' x $TERM_SIZE, RESET "\n";
-            my $proceed = <>;
-        }
+        SAM::Msg::_deliver_all_messages();
+        _accept_all_messages();
 
         my @active = map [ $_, $PROCESS_TABLE{$_}->@* ], keys %PROCESS_TABLE;
 
@@ -349,7 +250,7 @@ sub loop ( $MAX_TICKS, $start_pid ) {
             }
         }
 
-        sys::despawn_all();
+        sys::despawn_waiting_pids();
 
         warn Dumper \%PROCESS_TABLE if DEBUG >= 4;
 
@@ -361,7 +262,7 @@ sub loop ( $MAX_TICKS, $start_pid ) {
 
         warn Dumper {
             active_processes => \@active_processes,
-            msg_inbox        => \@msg_inbox,
+            msg_inbox        => [ SAM::Msg::_message_inbox() ],
         } if DEBUG >= 3;
 
         if ($should_exit) {
@@ -371,7 +272,7 @@ sub loop ( $MAX_TICKS, $start_pid ) {
 
         if ( scalar @active_processes == 0 ) {
             # loop one last time to flush any I/O
-            if ( scalar @msg_inbox == 0 ) {
+            if ( SAM::Msg::_has_inbox_messages() ) {
                 $has_exited++;
                 last;
             }
@@ -515,5 +416,37 @@ actor '!parallel' => sub ($env, $msg) {
 __END__
 
 =pod
+
+# re-implement later ...
+if ( DEBUGGER ) {
+
+    my @pids = sort keys %PROCESS_TABLE;
+
+    my $longest_pid = max( map length, @pids );
+
+    warn FAINT '-' x $TERM_SIZE, RESET "\n";
+    warn FAINT ON_MAGENTA " << MESSAGES >> " . RESET "\n";
+    warn FAINT '-' x $TERM_SIZE, RESET "\n";
+    foreach my $pid ( @pids ) {
+        my @inbox  = $PROCESS_TABLE{$pid}->[0]->@*;
+        my ($num, $name) = split ':' => $pid;
+
+        my $pid_color = 'black on_ansi'.((int($num)+3) * 8);
+
+        warn '  '.
+            color($pid_color).
+                sprintf("> %-${longest_pid}s ", $pid).
+            RESET " (".
+            CYAN (join ' / ' =>
+                map {
+                    my $action = $_->[1]->action;
+                    my $body   = join ', ' => $_->[1]->body->@*;
+                    "${action}![${body}]";
+                } @inbox).
+            RESET ")\n";
+    }
+    warn FAINT '-' x $TERM_SIZE, RESET "\n";
+    my $proceed = <>;
+}
 
 =cut

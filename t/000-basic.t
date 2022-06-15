@@ -11,6 +11,7 @@ use List::Util 'first';
 use Data::Dumper;
 
 use SAM;
+use SAM::Msg;
 use SAM::Actors;
 use SAM::IO;
 

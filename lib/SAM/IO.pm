@@ -11,6 +11,7 @@ use Data::Dumper 'Dumper';
 use Term::ANSIColor ':constants';
 
 use SAM (); # circular dep
+use SAM::Msg;
 use SAM::Actors;
 
 sub QUIET () {
@@ -27,31 +28,31 @@ our $ERR;
 
 sub err::log ($msg, $caller=$SAM::CURRENT_CALLER) {
     $ERR //= sys::spawn('#err');
-    SAM::msg($ERR, print => [ $msg, $caller ])
+    msg($ERR, print => [ $msg, $caller ])
         ->return_or_send( wantarray );
 }
 
 sub err::logf ($fmt, $msg, $caller=$SAM::CURRENT_CALLER) {
     $ERR //= sys::spawn('#err');
-    SAM::msg($ERR, printf => [ $fmt, $msg, $caller ])
+    msg($ERR, printf => [ $fmt, $msg, $caller ])
         ->return_or_send( wantarray );
 }
 
 sub out::print ($msg=undef) {
     $OUT //= sys::spawn('#out');
-    SAM::msg($OUT, print => [ $msg // () ])
+    msg($OUT, print => [ $msg // () ])
         ->return_or_send( wantarray );
 }
 
 sub out::printf ($fmt, $msg=undef) {
     $OUT //= sys::spawn('#out');
-    SAM::msg($OUT, printf => [ $fmt, $msg // () ])
+    msg($OUT, printf => [ $fmt, $msg // () ])
         ->return_or_send( wantarray );
 }
 
 sub in::read ($prompt=undef) {
     $IN //= sys::spawn('#in');
-    SAM::msg($IN, read => [ $prompt // () ])
+    msg($IN, read => [ $prompt // () ])
         ->return_or_send( wantarray );
 }
 
