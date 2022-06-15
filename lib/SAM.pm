@@ -80,12 +80,12 @@ sub CALLER () { $CURRENT_CALLER }
 my @msg_inbox;
 my @msg_outbox;
 
-sub send_to ($pid, $action, $msg) {
-    push @msg_inbox => [ $CURRENT_PID, $pid, [ $action, $msg ] ];
+sub _send_to ($msg) {
+    push @msg_inbox => [ $CURRENT_PID, $msg ];
 }
 
-sub send_from ($from, $pid, $action, $msg) {
-    push @msg_inbox => [ $from, $pid, [ $action, $msg ] ];
+sub _send_from ($from, $msg) {
+    push @msg_inbox => [ $from, $msg ];
 }
 
 sub recv_from () {
@@ -116,8 +116,8 @@ package SAM::Msg {
         msg::curry(@$self)->curry( @args )
     }
 
-    sub send ($self) { SAM::send_to( @$self ); $self }
-    sub send_from ($self, $caller) { SAM::send_from($caller, @$self); $self }
+    sub send ($self) { SAM::_send_to( $self ); $self }
+    sub send_from ($self, $caller) { SAM::_send_from($caller, $self); $self }
 
     sub return_or_send ($self, $wantarray) {
         if (not defined $wantarray) {
@@ -179,7 +179,7 @@ sub despawn ($pid) {
 
 sub despawn_all () {
     foreach my $pid (keys %to_be_despawned) {
-        @msg_inbox  = grep { $_->[1] ne $pid } @msg_inbox;
+        @msg_inbox  = grep { $_->[1]->pid ne $pid } @msg_inbox;
         @msg_outbox = grep { $_->[1] ne $pid } @msg_outbox;
 
         delete $processes{ $pid };
@@ -272,13 +272,12 @@ sub loop ( $MAX_TICKS, $start_pid ) {
         while (@msg_inbox) {
             my $next = shift @msg_inbox;
             #warn Dumper $next;
-            my $from = shift $next->@*;
-            my ($to, $m) = $next->@*;
-            unless (exists $processes{$to}) {
-                warn "Got message for unknown pid($to)";
+            my ($from, $msg) = $next->@*;
+            unless (exists $processes{$msg->pid}) {
+                warn "Got message for unknown pid(".$msg->pid.")";
                 next;
             }
-            push $processes{$to}->[INBOX]->@* => [ $from, $m ];
+            push $processes{$msg->pid}->[INBOX]->@* => [ $from, $msg ];
         }
 
         # deliver all the messages in the queue
@@ -316,10 +315,9 @@ sub loop ( $MAX_TICKS, $start_pid ) {
                     RESET " (".
                     CYAN (join ' / ' =>
                         map {
-                            my $pid    = $_->[0];
-                            my $action = $_->[1]->[0];
-                            my $msgs   = join ', ' => $_->[1]->[1]->@*;
-                            "${action}![${msgs}]";
+                            my $action = $_->[1]->action;
+                            my $body   = join ', ' => $_->[1]->body->@*;
+                            "${action}![${body}]";
                         } @inbox).
                     RESET ")\n";
             }

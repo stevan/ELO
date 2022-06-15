@@ -27,10 +27,9 @@ sub actor ($name, $recieve) {
 }
 
 sub match ($msg, $table) {
-    my ($action, $body) = @$msg;
     #warn Dumper [$msg, $table];
-    my $cb = $table->{$action} // die "No match for $action";
-    $cb->(@$body);
+    my $cb = $table->{$msg->action} // die "No match for ".$msg->action;
+    $cb->($msg->body->@*);
 }
 
 
