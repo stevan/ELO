@@ -24,7 +24,7 @@ actor TestBuilder => sub ($env, $msg) {
         ok => sub ($value, $msg) {
             $counter++;
             my $ok = $value ? 'ok' : 'not ok';
-            out::print("$ok $counter $msg");
+            out::print("$ok $counter $msg")->send;
             ok($value, $msg);
             push @VALUES => $value;
         },
@@ -36,10 +36,10 @@ actor main => sub ($env, $msg) {
 
     my $builder = sys::spawn( 'TestBuilder' );
 
-    timeout( 3, msg( $builder, ok => [ 2, '... it works later' ]) );
+    timeout( 3, msg( $builder, ok => [ 2, '... it works later' ]) )->send;
     msg( $builder, ok => [ 1, '... it works now' ] )->send;
 
-    timeout( 4, sys::kill($builder) );
+    timeout( 4, sys::kill($builder) )->send;
 };
 
 # loop ...

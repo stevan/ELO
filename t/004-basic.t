@@ -23,7 +23,7 @@ actor collector => sub ($env, $msg) {
             push @$values => $value;
         },
         finish => sub () {
-            sys::kill(PID);
+            sys::kill(PID)->send;
             eq_or_diff([ sort { $a <=> $b } @$values ], $env->{expected}, '... got the expected values');
         }
     };
@@ -36,7 +36,7 @@ actor counter => sub ($env, $msg) {
             return_to( ++$count );
         },
         finish => sub () {
-            sys::kill(PID);
+            sys::kill(PID)->send;
         }
     };
 };
@@ -49,12 +49,12 @@ actor take_10_and_sync => sub ($env, $msg) {
             sync(
                 timeout( 10 - $i, msg($producer, next => []) ),
                 msg($consumer, on_next => [])
-            );
+            )->send;
             $i++;
             msg( PID, each => [ $producer, $consumer ] )->send if $i < 10;
         },
         finish => sub () {
-            sys::kill(PID);
+            sys::kill(PID)->send;
         }
     };
 };
@@ -75,7 +75,7 @@ actor main => sub ($env, $msg) {
             msg($p, finish => []),
             msg($c, finish => []),
         )
-    );
+    )->send;
 };
 
 # loop ...

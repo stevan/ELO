@@ -16,7 +16,7 @@ use SAM::Actors;
 use SAM::IO;
 
 actor main => sub ($env, $msg) {
-    out::print("-> main starting ...");
+    out::print("-> main starting ...")->send;
 
 };
 

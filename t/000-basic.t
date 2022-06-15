@@ -20,24 +20,24 @@ my $BOUNCE_COUNT = 0;
 actor bounce => sub ($env, $msg) {
     match $msg, +{
         up => sub ($cnt) {
-            out::print("bounce(UP) => $cnt");
+            out::print("bounce(UP) => $cnt")->send;
             msg( PID, down => [$cnt+1] )->send;
             $BOUNCE_COUNT++;
         },
         down => sub ($cnt) {
-            out::print("bounce(DOWN) => $cnt");
+            out::print("bounce(DOWN) => $cnt")->send;
             msg( PID, up => [$cnt+1] )->send;
             $BOUNCE_COUNT++;
         },
         finish => sub () {
             ok($BOUNCE_COUNT < 15, "... bounce count ($BOUNCE_COUNT) is less than 15");
-            sys::kill(PID);
+            sys::kill(PID)->send;
         }
     };
 };
 
 actor main => sub ($env, $msg) {
-    out::print("-> main starting ...");
+    out::print("-> main starting ...")->send;
 
     my $bounce = sys::spawn( 'bounce' );
     msg( $bounce, up => [1] )->send;
@@ -46,7 +46,7 @@ actor main => sub ($env, $msg) {
         sequence(
             msg( $bounce, finish => [] ),
             out::print("JELLO!"),
-        ));
+        ))->send;
 };
 
 # loop ...

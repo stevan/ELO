@@ -28,32 +28,27 @@ our $ERR;
 
 sub err::log ($msg, $caller=$SAM::CURRENT_CALLER) {
     $ERR //= sys::spawn('#err');
-    msg($ERR, print => [ $msg, $caller ])
-        ->return_or_send( wantarray );
+    msg($ERR, print => [ $msg, $caller ]);
 }
 
 sub err::logf ($fmt, $msg, $caller=$SAM::CURRENT_CALLER) {
     $ERR //= sys::spawn('#err');
-    msg($ERR, printf => [ $fmt, $msg, $caller ])
-        ->return_or_send( wantarray );
+    msg($ERR, printf => [ $fmt, $msg, $caller ]);
 }
 
 sub out::print ($msg=undef) {
     $OUT //= sys::spawn('#out');
-    msg($OUT, print => [ $msg // () ])
-        ->return_or_send( wantarray );
+    msg($OUT, print => [ $msg // () ]);
 }
 
 sub out::printf ($fmt, $msg=undef) {
     $OUT //= sys::spawn('#out');
-    msg($OUT, printf => [ $fmt, $msg // () ])
-        ->return_or_send( wantarray );
+    msg($OUT, printf => [ $fmt, $msg // () ]);
 }
 
 sub in::read ($prompt=undef) {
     $IN //= sys::spawn('#in');
-    msg($IN, read => [ $prompt // () ])
-        ->return_or_send( wantarray );
+    msg($IN, read => [ $prompt // () ]);
 }
 
 ## ... actors

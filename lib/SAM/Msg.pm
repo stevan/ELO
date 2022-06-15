@@ -116,23 +116,6 @@ package SAM::Msg {
 
     sub send ($self) { SAM::Msg::_send_to( $self ); $self }
     sub send_from ($self, $caller) { SAM::Msg::_send_from($caller, $self); $self }
-
-    sub return_or_send ($self, $wantarray) {
-        if (not defined $wantarray) {
-            # foo(); -- will send message, return nothing
-            $self->send;
-            return;
-        }
-        elsif (not $wantarray) {
-            # my $foo_pid = foo(); -- will send message, return msg pid
-            $self->send;
-            return $self->pid
-        }
-        else {
-            # sync(foo(), bar()); -- will just return message
-            return $self;
-        }
-    }
 }
 
 package SAM::Msg::Curryable {

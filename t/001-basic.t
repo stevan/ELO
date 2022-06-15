@@ -21,35 +21,35 @@ actor env => sub ($env, $msg) {
     match $msg, +{
         init => sub ($new_env) {
             $env->{$_} = $new_env->{$_} foreach keys %$new_env;
-            err::log("env initialized to => ENV{ ".(join ', ' => map { join ' => ' => $_, $env->{$_} } keys %$env)." }")
+            err::log("env initialized to => ENV{ ".(join ', ' => map { join ' => ' => $_, $env->{$_} } keys %$env)." }")->send
                 if DEBUG;
         },
         get => sub ($key) {
             if ( exists $env->{$key} ) {
-                err::log("fetching {$key}") if DEBUG;
+                err::log("fetching {$key}")->send if DEBUG;
                 return_to( $env->{$key} );
             }
             else {
-                err::log("not found {$key}") if DEBUG;
+                err::log("not found {$key}")->send if DEBUG;
             }
         },
         set => sub ($key, $value) {
-            err::log("storing $key => $value") if DEBUG;
+            err::log("storing $key => $value")->send if DEBUG;
             $env->{$key} = $value;
 
-            err::log("env is now => ENV{ ".(join ', ' => map { join ' => ' => $_, $env->{$_} } keys %$env)." }")
+            err::log("env is now => ENV{ ".(join ', ' => map { join ' => ' => $_, $env->{$_} } keys %$env)." }")->send
                 if DEBUG;
         },
         finish => sub ($expected_env) {
-            err::log("finishing env and testing output") if DEBUG;
-            sys::kill(PID);
+            err::log("finishing env and testing output")->send if DEBUG;
+            sys::kill(PID)->send;
             eq_or_diff($expected_env, $env, '... got the env we expected');
         }
     };
 };
 
 actor main => sub ($env, $msg) {
-    out::print("-> main starting ...");
+    out::print("-> main starting ...")->send;
 
     my $e1 = sys::spawn( 'env' );
     my $e2 = sys::spawn( 'env' );
@@ -63,7 +63,7 @@ actor main => sub ($env, $msg) {
         # in:read( "$_ : " ),
         ident($val += 10),
         msg::curry( $e1, set => [$_])
-    ) foreach qw[ foo bar baz ];
+    )->send foreach qw[ foo bar baz ];
 
     # ...
 
@@ -71,21 +71,21 @@ actor main => sub ($env, $msg) {
     sync(
         timeout( $timout_length++ => msg( $e1, get => [$_] ) ),
         msg::curry( $e2, set => [$_])
-    ) foreach qw[ baz bar foo ];
+    )->send foreach qw[ baz bar foo ];
 
     ## ...
 
     sync(
         timeout( 10, msg( $e2, get => [$_] ) ),
         out::printf("$_(%s)")
-    ) foreach qw[ foo bar baz ];
+    )->send foreach qw[ foo bar baz ];
 
     timeout( 12,
         parallel(
             msg($e1, finish => [ { foo => 10, bar => 20, baz => 30 } ]),
             msg($e2, finish => [ { foo => 10, bar => 20, baz => 30 } ])
         )
-    );
+    )->send;
     # ...
 };
 
