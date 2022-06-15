@@ -5,6 +5,7 @@ use warnings;
 use experimental 'signatures', 'postderef';
 
 use Test::More;
+use Test::Differences;
 use Test::SAM;
 
 use List::Util 'first';
@@ -52,6 +53,8 @@ actor DebugObserver => sub ($env, $msg) {
             err::log("Observer completed") if DEBUG;
             err::log("Observed values: [" . (join ', ' => map { "$_/".$got->{$_} }sort { $a <=> $b } keys $got->%*) . "]") if DEBUG;
             sys::kill(PID);
+            eq_or_diff( [ sort { $a <=> $b } keys %$got ], $env->{expected}, '... got the expected values');
+            eq_or_diff( [ values %$got ], [ map 1, $env->{expected}->@* ], '... got the expected value counts (all 1)');
         }
     };
 };
@@ -64,7 +67,8 @@ actor SimpleObservable => sub ($env, $msg) {
             # A simple example
             sequence(
                 (map msg( $observer, on_next => [ $_ ] ), 0 .. 10),
-                msg( $observer, on_completed => [] )
+                msg( $observer, on_completed => [] ),
+                sys::kill(PID)
             );
         },
     };
@@ -82,7 +86,10 @@ actor ComplexObservable => sub ($env, $msg) {
 
             sys::waitpids(
                 \@pids,
-                msg( $observer, on_completed => [])
+                parallel(
+                    msg( $observer, on_completed => []),
+                    sys::kill(PID)
+                )
             );
         },
     };
@@ -94,9 +101,9 @@ actor main => sub ($env, $msg) {
     my $complex = sys::spawn('ComplexObservable');
     my $simple  = sys::spawn('SimpleObservable');
 
-    my $debug   = sys::spawn('DebugObserver');
+    my $debug   = sys::spawn('DebugObserver', expected => [ 0 .. 10 ]);
     my $map     = sys::spawn('MapObserver',
-        observer => sys::spawn('DebugObserver'),
+        observer => sys::spawn('DebugObserver', , expected => [ map $_+100, 0 .. 10 ]),
         f        => sub ($x) { $x + 100 },
     );
 
@@ -105,7 +112,7 @@ actor main => sub ($env, $msg) {
 };
 
 # loop ...
-ok loop( 20, 'main' );
+ok loop( 20, 'main' ), '... the event loop exited successfully';
 
 done_testing;
 

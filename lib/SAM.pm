@@ -27,48 +27,55 @@ our @EXPORT = qw[
     timeout
     ident
     sequence
-    cond
+    parallel
 
     loop
 
     PID CALLER DEBUG
 ];
 
-# flags
-
-use constant INBOX  => 0;
-use constant OUTBOX => 1;
+## ----------------------------------------------------------------------------
+## ENV flags
+## ----------------------------------------------------------------------------
 
 use constant DEBUG    => $ENV{DEBUG} // 0;
 use constant DEBUGGER => $ENV{DEBUGGER} // 0;
 
-# stuff
+## ----------------------------------------------------------------------------
+## Misc. stuff
+## ----------------------------------------------------------------------------
 
+# XXX - put this into a module along with other similar stuff?
 our $TERM_SIZE = (GetTerminalSize())[0];
 
-## .. process info
+# FIXME: remove these
+use constant INBOX  => 0;
+use constant OUTBOX => 1;
 
-our $INIT_PID = '000:<init>';
+## ----------------------------------------------------------------------------
+## call context info
+## ----------------------------------------------------------------------------
 
 our $CURRENT_PID;
 our $CURRENT_CALLER;
 
-## .. i/o
-
-our $IN;
-our $OUT;
-our $ERR;
-
-## ...
-
-my %processes;
-
-## ... sugar
-
+# to be exported
 sub PID    () { $CURRENT_PID    }
 sub CALLER () { $CURRENT_CALLER }
 
-## ... message delivery
+## ----------------------------------------------------------------------------
+## process table
+## ----------------------------------------------------------------------------
+
+my %PROCESS_TABLE;
+
+# NOTE : this needs to be here because of recv_from,
+# if we remove that, or move that, we can move this
+# down lower with the spawn/despawn code (where it belongs)
+
+## ----------------------------------------------------------------------------
+## Messages and delivery
+## ----------------------------------------------------------------------------
 
 my @msg_inbox;
 my @msg_outbox;
@@ -82,7 +89,7 @@ sub _send_from ($from, $msg) {
 }
 
 sub recv_from () {
-    my $msg = shift $processes{$CURRENT_PID}->[OUTBOX]->@*;
+    my $msg = shift $PROCESS_TABLE{$CURRENT_PID}->[OUTBOX]->@*;
     return unless $msg;
     return $msg->[1];
 }
@@ -143,7 +150,11 @@ package SAM::Msg::Curryable {
     }
 }
 
+## ----------------------------------------------------------------------------
 ## system interface ... see Actor definitions inside &loop
+## ----------------------------------------------------------------------------
+
+our $INIT_PID = '000:<init>';
 
 sub sys::kill($pid) {
     msg( $INIT_PID, kill => [ $pid ] )
@@ -155,13 +166,11 @@ sub sys::waitpids($pids, $callback) {
         ->return_or_send( wantarray );
 }
 
-## ... process creation
-
 my $PID = 0;
 sub sys::spawn ($name, %env) {
     my $process = [ [], [], { %env }, SAM::Actors::get_actor($name) ];
     my $pid = sprintf '%03d:%s' => ++$PID, $name;
-    $processes{ $pid } = $process;
+    $PROCESS_TABLE{ $pid } = $process;
     $pid;
 }
 
@@ -175,13 +184,15 @@ sub sys::despawn_all () {
         @msg_inbox  = grep { $_->[1]->pid ne $pid } @msg_inbox;
         @msg_outbox = grep { $_->[1] ne $pid } @msg_outbox;
 
-        delete $processes{ $pid };
+        delete $PROCESS_TABLE{ $pid };
     }
 
     %to_be_despawned = ();
 }
 
-## ... currency control
+## ----------------------------------------------------------------------------
+## currency control
+## ----------------------------------------------------------------------------
 
 sub timeout ($ticks, $callback) {
     msg( sys::spawn( '!timeout' ), countdown => [ $ticks, $callback ] )
@@ -208,12 +219,14 @@ sub parallel (@statements) {
         ->return_or_send( wantarray );
 }
 
-## ...
+## ----------------------------------------------------------------------------
+## teh loop
+## ----------------------------------------------------------------------------
 
 sub loop ( $MAX_TICKS, $start_pid ) {
 
     # initialise the system pid singleton
-    $processes{ $INIT_PID } = [ [], [], {}, sub ($env, $msg) {
+    $PROCESS_TABLE{ $INIT_PID } = [ [], [], {}, sub ($env, $msg) {
         my $prefix = DEBUG
             ? ON_MAGENTA "SYS ($CURRENT_CALLER) ::". RESET " "
             : ON_MAGENTA "SYS ::". RESET " ";
@@ -225,7 +238,7 @@ sub loop ( $MAX_TICKS, $start_pid ) {
             },
             waitpids => sub ($pids, $callback) {
 
-                my @active = grep { exists $processes{$_} } @$pids;
+                my @active = grep { exists $PROCESS_TABLE{$_} } @$pids;
 
                 if (@active) {
                     warn( $prefix, "waiting for ".(scalar @$pids)." pids, found ".(scalar @active)." active" ) if DEBUG;
@@ -266,11 +279,11 @@ sub loop ( $MAX_TICKS, $start_pid ) {
             my $next = shift @msg_inbox;
             #warn Dumper $next;
             my ($from, $msg) = $next->@*;
-            unless (exists $processes{$msg->pid}) {
+            unless (exists $PROCESS_TABLE{$msg->pid}) {
                 warn "Got message for unknown pid(".$msg->pid.")";
                 next;
             }
-            push $processes{$msg->pid}->[INBOX]->@* => [ $from, $msg ];
+            push $PROCESS_TABLE{$msg->pid}->[INBOX]->@* => [ $from, $msg ];
         }
 
         # deliver all the messages in the queue
@@ -279,17 +292,17 @@ sub loop ( $MAX_TICKS, $start_pid ) {
 
             my $from = shift $next->@*;
             my ($to, $m) = $next->@*;
-            unless (exists $processes{$to}) {
+            unless (exists $PROCESS_TABLE{$to}) {
                 warn "Got message for unknown pid($to)";
                 next;
             }
-            push $processes{$to}->[OUTBOX]->@* => [ $from, $m ];
+            push $PROCESS_TABLE{$to}->[OUTBOX]->@* => [ $from, $m ];
         }
 
         #
         if ( DEBUGGER ) {
 
-            my @pids = sort keys %processes;
+            my @pids = sort keys %PROCESS_TABLE;
 
             my $longest_pid = max( map length, @pids );
 
@@ -297,7 +310,7 @@ sub loop ( $MAX_TICKS, $start_pid ) {
             warn FAINT ON_MAGENTA " << MESSAGES >> " . RESET "\n";
             warn FAINT '-' x $TERM_SIZE, RESET "\n";
             foreach my $pid ( @pids ) {
-                my @inbox  = $processes{$pid}->[INBOX]->@*;
+                my @inbox  = $PROCESS_TABLE{$pid}->[INBOX]->@*;
                 my ($num, $name) = split ':' => $pid;
 
                 my $pid_color = 'black on_ansi'.((int($num)+3) * 8);
@@ -318,7 +331,7 @@ sub loop ( $MAX_TICKS, $start_pid ) {
             my $proceed = <>;
         }
 
-        my @active = map [ $_, $processes{$_}->@* ], keys %processes;
+        my @active = map [ $_, $PROCESS_TABLE{$_}->@* ], keys %PROCESS_TABLE;
 
         while (@active) {
             my $active = shift @active;
@@ -338,13 +351,13 @@ sub loop ( $MAX_TICKS, $start_pid ) {
 
         sys::despawn_all();
 
-        warn Dumper \%processes if DEBUG >= 4;
+        warn Dumper \%PROCESS_TABLE if DEBUG >= 4;
 
         my @active_processes =
             grep !/^\d\d\d:\#/,     # ignore I/O pids
             grep $_ ne $start,     # ignore start pid
             grep $_ ne $INIT_PID,  # ignore init pid
-            keys %processes;
+            keys %PROCESS_TABLE;
 
         warn Dumper {
             active_processes => \@active_processes,
@@ -376,7 +389,17 @@ sub loop ( $MAX_TICKS, $start_pid ) {
     }
 
     if (DEBUG >= 3) {
-        warn Dumper [ keys %processes ];
+        warn Dumper [ keys %PROCESS_TABLE ];
+    }
+
+    my @zombies = grep !/^\d\d\d:\#/,    # ignore I/O pids
+                  grep $_ ne $start,     # ignore start pid
+                  grep $_ ne $INIT_PID,  # ignore init pid
+                  keys %PROCESS_TABLE;
+
+    if ( @zombies ) {
+        warn("GOT ZOMBIES: ", Dumper(\@zombies)) if DEBUG;
+        return;
     }
 
     return 1;
@@ -393,8 +416,9 @@ sub _loop_log_line ( $fmt, $tick ) {
                     RESET;
 }
 
-
-## controls ...
+## ----------------------------------------------------------------------------
+## Core Actors
+## ----------------------------------------------------------------------------
 
 # will just return the input given ...
 actor '!ident' => sub ($env, $msg) {

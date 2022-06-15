@@ -20,7 +20,7 @@ actor main => sub ($env, $msg) {
 };
 
 # loop ...
-ok loop( 100, 'main' );
+ok loop( 100, 'main' ), '... the event loop exited successfully';
 
 done_testing;
 

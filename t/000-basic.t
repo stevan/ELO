@@ -14,15 +14,23 @@ use SAM;
 use SAM::Actors;
 use SAM::IO;
 
+my $BOUNCE_COUNT = 0;
+
 actor bounce => sub ($env, $msg) {
     match $msg, +{
         up => sub ($cnt) {
             out::print("bounce(UP) => $cnt");
             msg( PID, down => [$cnt+1] )->send;
+            $BOUNCE_COUNT++;
         },
         down => sub ($cnt) {
             out::print("bounce(DOWN) => $cnt");
             msg( PID, up => [$cnt+1] )->send;
+            $BOUNCE_COUNT++;
+        },
+        finish => sub () {
+            ok($BOUNCE_COUNT < 15, "... bounce count ($BOUNCE_COUNT) is less than 15");
+            sys::kill(PID);
         }
     };
 };
@@ -35,13 +43,13 @@ actor main => sub ($env, $msg) {
 
     timeout( 10,
         sequence(
-            sys::kill($bounce),
+            msg( $bounce, finish => [] ),
             out::print("JELLO!"),
         ));
 };
 
 # loop ...
-ok loop( 20, 'main' );
+ok loop( 20, 'main' ), '... the event loop exited successfully';
 
 done_testing;
 

@@ -5,6 +5,7 @@ use warnings;
 use experimental 'signatures', 'postderef';
 
 use Test::More;
+use Test::Differences;
 use Test::SAM;
 
 use List::Util 'first';
@@ -37,6 +38,11 @@ actor env => sub ($env, $msg) {
 
             err::log("env is now => ENV{ ".(join ', ' => map { join ' => ' => $_, $env->{$_} } keys %$env)." }")
                 if DEBUG;
+        },
+        finish => sub ($expected_env) {
+            err::log("finishing env and testing output") if DEBUG;
+            sys::kill(PID);
+            eq_or_diff($expected_env, $env, '... got the env we expected');
         }
     };
 };
@@ -73,10 +79,16 @@ actor main => sub ($env, $msg) {
         out::printf("$_(%s)")
     ) foreach qw[ foo bar baz ];
 
+    timeout( 12,
+        parallel(
+            msg($e1, finish => [ { foo => 10, bar => 20, baz => 30 } ]),
+            msg($e2, finish => [ { foo => 10, bar => 20, baz => 30 } ])
+        )
+    );
     # ...
 };
 
 # loop ...
-ok loop( 20, 'main' );
+ok loop( 100, 'main' ), '... the event loop exited successfully';
 
 done_testing;

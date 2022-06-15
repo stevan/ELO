@@ -14,6 +14,8 @@ use SAM;
 use SAM::Actors;
 use SAM::IO;
 
+my @VALUES;
+
 actor TestBuilder => sub ($env, $msg) {
     state $counter = 0;
 
@@ -22,6 +24,8 @@ actor TestBuilder => sub ($env, $msg) {
             $counter++;
             my $ok = $value ? 'ok' : 'not ok';
             out::print("$ok $counter $msg");
+            ok($value, $msg);
+            push @VALUES => $value;
         },
     };
 };
@@ -31,16 +35,16 @@ actor main => sub ($env, $msg) {
 
     my $builder = sys::spawn( 'TestBuilder' );
 
-    timeout( 3, msg( $builder, ok => [ 1, '... it works!' ]) );
-
-    msg( $builder, ok => [ 1, '... it works!' ] )->send;
-    msg( $builder, ok => [ 0, '... it still works!' ] )->send;
+    timeout( 3, msg( $builder, ok => [ 2, '... it works later' ]) );
+    msg( $builder, ok => [ 1, '... it works now' ] )->send;
 
     timeout( 4, sys::kill($builder) );
 };
 
 # loop ...
-ok loop( 10, 'main' );
+ok loop( 10, 'main' ), '... the event loop exited successfully';
+
+is_deeply( \@VALUES, [ 1, 2 ], '... values returned in the right order');
 
 done_testing;
 
