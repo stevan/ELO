@@ -28,9 +28,9 @@ actor take_10_and_sync => sub ($env, $msg) {
 
     match $msg, +{
         each => sub ($producer, $consumer) {
-            sync( timeout( 10 - $i, msg[$producer, next => []] ), $consumer );
+            sync( timeout( 10 - $i, msg($producer, next => []) ), $consumer );
             $i++;
-            send_to( PID, each => [ $producer, $consumer ] ) if $i < 10;
+            msg( PID, each => [ $producer, $consumer ] )->send if $i < 10;
         },
     };
 };
@@ -40,13 +40,13 @@ actor main => sub ($env, $msg) {
 
     my $s = spawn('take_10_and_sync');
 
-    send_to(
+    msg(
         $s,
         each => [
             spawn('counter'),
             out::print()
         ]
-    );
+    )->send;
 
 };
 

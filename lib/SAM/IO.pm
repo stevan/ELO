@@ -10,7 +10,7 @@ our $AUTHORITY = 'cpan:STEVAN';
 use Data::Dumper 'Dumper';
 use Term::ANSIColor ':constants';
 
-use SAM; # circular dep
+use SAM (); # circular dep
 use SAM::Actors;
 
 sub QUIET () {
@@ -27,32 +27,32 @@ our $ERR;
 
 sub err::log ($msg, $caller=$SAM::CURRENT_CALLER) {
     $ERR //= SAM::spawn('#err');
-    my $args = [ $ERR, print => [ $msg, $caller ]];
-    defined wantarray ? $args : SAM::send_to( @$args );
+    SAM::msg($ERR, print => [ $msg, $caller ])
+        ->return_or_send( wantarray );
 }
 
 sub err::logf ($fmt, $msg, $caller=$SAM::CURRENT_CALLER) {
     $ERR //= SAM::spawn('#err');
-    my $args = [ $ERR, printf => [ $fmt, $msg, $caller ]];
-    defined wantarray ? $args : SAM::send_to( @$args );
+    SAM::msg($ERR, printf => [ $fmt, $msg, $caller ])
+        ->return_or_send( wantarray );
 }
 
 sub out::print ($msg=undef) {
     $OUT //= SAM::spawn('#out');
-    my $args = [ $OUT, print => [ $msg // () ]];
-    defined wantarray ? $args : SAM::send_to( @$args );
+    SAM::msg($OUT, print => [ $msg // () ])
+        ->return_or_send( wantarray );
 }
 
 sub out::printf ($fmt, $msg=undef) {
     $OUT //= SAM::spawn('#out');
-    my $args = [ $OUT, printf => [ $fmt, $msg // () ]];
-    defined wantarray ? $args : SAM::send_to( @$args );
+    SAM::msg($OUT, printf => [ $fmt, $msg // () ])
+        ->return_or_send( wantarray );
 }
 
 sub in::read ($prompt=undef) {
     $IN //= SAM::spawn('#in');
-    my $args = [ $IN, read => [ $prompt // () ]];
-    defined wantarray ? $args : SAM::send_to( @$args );
+    SAM::msg($IN, read => [ $prompt // () ])
+        ->return_or_send( wantarray );
 }
 
 ## ... actors

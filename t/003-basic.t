@@ -68,22 +68,22 @@ actor Tokenizer => sub ($env, $msg) {
 
     my sub sync_next ($producer, $observer, $action) {
         sync(
-            msg[ $producer, next => []],
-            msg[ PID, $action => [$producer, $observer]],
+            msg( $producer, next => [] ),
+            msg( PID, $action => [$producer, $observer] ),
         );
     }
 
     match $msg, +{
         finish => sub ($producer, $observer) {
             err::log("Finishing") if DEBUG_TOKENIZER;
-            send_to( $producer, finish => []);
-            send_to( $observer, finish => []);
+            msg( $producer, finish => [])->send;
+            msg( $observer, finish => [])->send;
             sys::kill(PID);
         },
         error => sub ($producer, $observer, $error) {
             @$stack = ();
             err::log("Got Error ($error)");
-            send_to(PID, finish => [$producer, $observer]);
+            msg(PID, finish => [$producer, $observer])->send;
         },
         process_tokens => sub ($producer, $observer) {
             err::log("process tokens (@$stack)") if DEBUG_TOKENIZER;
@@ -94,10 +94,10 @@ actor Tokenizer => sub ($env, $msg) {
             err::log("process token (@$stack)") if DEBUG_TOKENIZER;
 
             if ($token eq '(') {
-                send_to( PID, open_parens => [ $producer, $observer ] );
+                msg( PID, open_parens => [ $producer, $observer ] )->send;
             }
             elsif ($token eq EMPTY) {
-                send_to( PID, finish => [ $producer, $observer ] );
+                msg( PID, finish => [ $producer, $observer ] )->send;
             }
             else {
                 sync_next($producer, $observer, 'process_token');
@@ -108,28 +108,28 @@ actor Tokenizer => sub ($env, $msg) {
         open_parens => sub ($producer, $observer) {
             err::log("// open parens (@$stack)") if DEBUG_TOKENIZER;
             push @$stack => 'process_parens';
-            send_to($observer, 'start_parens' => []);
+            msg($observer, 'start_parens' => [])->send;
             sync_next($producer, $observer, 'process_parens');
         },
         process_parens => sub ($producer, $observer, $token) {
             err::log("process parens (@$stack) with `$token`") if DEBUG_TOKENIZER;
             if ($token eq '(') {
-                send_to( PID, open_parens => [ $producer, $observer ] );
+                msg( PID, open_parens => [ $producer, $observer ] )->send;
             }
             elsif ($token eq ')') {
                 if ( @$stack ) {
-                    send_to( PID, close_parens => [ $producer, $observer ] );
+                    msg( PID, close_parens => [ $producer, $observer ] )->send;
                 }
                 else {
-                    send_to( PID, error => [$producer, $observer, "Illegal close paren"] );
+                    msg( PID, error => [$producer, $observer, "Illegal close paren"] )->send;
                 }
             }
             elsif ($token eq EMPTY) {
                 if ( @$stack ) {
-                    send_to( PID, error => [$producer, $observer, "Ran out of chars, but still had stack (@$stack)"] );
+                    msg( PID, error => [$producer, $observer, "Ran out of chars, but still had stack (@$stack)"] )->send;
                 }
                 else {
-                    send_to( PID, finish => [ $producer, $observer ] );
+                    msg( PID, finish => [ $producer, $observer ] )->send;
                 }
             }
             else {
@@ -139,7 +139,7 @@ actor Tokenizer => sub ($env, $msg) {
         },
         close_parens => sub ($producer, $observer) {
             err::log("\\\\ close parens (@$stack)") if DEBUG_TOKENIZER;
-            send_to($observer, 'end_parens' => []);
+            msg($observer, 'end_parens' => [])->send;
             my $frame = pop @$stack;
             sync_next($producer, $observer, $frame);
         },
@@ -150,37 +150,37 @@ actor Tokenizer => sub ($env, $msg) {
 actor main => sub ($env, $msg) {
     out::print("-> main starting ...");
 
-    send_to(
+    msg(
         spawn('Tokenizer'),
         process_tokens => [
             spawn('CharacterStream', string => '(() (() ()) ())' ),
             spawn('Decoder'),
         ]
-    );
+    )->send;
 
-    send_to(
+    msg(
         spawn('Tokenizer'),
         process_tokens => [
             spawn('CharacterStream', string => '((((()))))' ),
             spawn('Decoder'),
         ]
-    );
+    )->send;
 
-    send_to(
+    msg(
         spawn('Tokenizer'),
         process_tokens => [
             spawn('CharacterStream', string => '(() ())' ),
             spawn('Decoder'),
         ]
-    );
+    )->send;
 
-    send_to(
+    msg(
         spawn('Tokenizer'),
         process_tokens => [
             spawn('CharacterStream', string => '(() ()' ),
             spawn('Decoder'),
         ]
-    );
+    )->send;
 
 };
 

@@ -22,7 +22,6 @@ our @EXPORT = qw[
 
     timeout
 
-    send_to
     recv_from
     return_to
 
@@ -69,11 +68,6 @@ our $ERR;
 
 ## ...
 
-my @msg_inbox;
-my @msg_outbox;
-
-## ...
-
 my %processes;
 
 ## ... sugar
@@ -82,6 +76,9 @@ sub PID    () { $CURRENT_PID    }
 sub CALLER () { $CURRENT_CALLER }
 
 ## ... message delivery
+
+my @msg_inbox;
+my @msg_outbox;
 
 sub send_to ($pid, $action, $msg) {
     push @msg_inbox => [ $CURRENT_PID, $pid, [ $action, $msg ] ];
@@ -103,10 +100,10 @@ sub return_to ($msg) {
 
 ## messages ..
 
-sub msg        ($msg) :prototype($) { bless $msg => 'SAM::msg' }
-sub msg::curry ($msg) :prototype($) { bless $msg => 'SAM::msg::curryable' }
+sub msg        ($pid, $action, $msg) { bless [$pid, $action, $msg] => 'SAM::Msg' }
+sub msg::curry ($pid, $action, $msg) { bless [$pid, $action, $msg] => 'SAM::Msg::Curryable' }
 
-package SAM::msg {
+package SAM::Msg {
     use v5.24;
     use warnings;
     use experimental 'signatures', 'postderef';
@@ -116,40 +113,52 @@ package SAM::msg {
     sub body   ($self) { $self->[2] }
 
     sub curry ($self, @args) {
-        msg::curry($self)->curry( @args )
+        msg::curry(@$self)->curry( @args )
     }
 
+    sub send ($self) { SAM::send_to( @$self ); $self }
+    sub send_from ($self, $caller) { SAM::send_from($caller, @$self); $self }
+
     sub return_or_send ($self, $wantarray) {
-        defined $wantarray
-            ? ($wantarray
-                ? $self
-                : do { SAM::send_to( @$self ); $self->pid })
-            : SAM::send_to( @$self );
+        if (not defined $wantarray) {
+            # foo(); -- will send message, return nothing
+            $self->send;
+            return;
+        }
+        elsif (not $wantarray) {
+            # my $foo_pid = foo(); -- will send message, return msg pid
+            $self->send;
+            return $self->pid
+        }
+        else {
+            # sync(foo(), bar()); -- will just return message
+            return $self;
+        }
     }
 }
 
-package SAM::msg::curryable {
+package SAM::Msg::Curryable {
     use v5.24;
     use warnings;
     use experimental 'signatures', 'postderef';
 
-    our @ISA; BEGIN { @ISA = ('SAM::msg') };
+    our @ISA; BEGIN { @ISA = ('SAM::Msg') };
 
     sub curry ($self, @args) {
         my ($pid, $action, $body) = @$self;
-        bless [ $pid, $action, [ @$body, @args ] ] => 'SAM::msg::curryable';
+        bless [ $pid, $action, [ @$body, @args ] ] => 'SAM::Msg::Curryable';
     }
 }
 
 ## system interface ... see Actor definitions inside &loop
 
 sub sys::kill($pid) {
-    msg([ $INIT_PID, kill => [ $pid ] ])
+    msg( $INIT_PID, kill => [ $pid ] )
         ->return_or_send( wantarray );
 }
 
 sub sys::waitpids($pids, $callback) {
-    msg([ $INIT_PID, waitpids => [ $pids, $callback ] ])
+    msg( $INIT_PID, waitpids => [ $pids, $callback ] )
         ->return_or_send( wantarray );
 }
 
@@ -182,27 +191,27 @@ sub despawn_all () {
 ## ... currency control
 
 sub timeout ($ticks, $callback) {
-    msg([ spawn( '!timeout' ), countdown => [ $ticks, $callback ] ])
+    msg( spawn( '!timeout' ), countdown => [ $ticks, $callback ] )
         ->return_or_send( wantarray );
 }
 
 sub sync ($input, $output) {
-    msg([ spawn( '!sync' ), send => [ $input, $output ] ])
+    msg( spawn( '!sync' ), send => [ $input, $output ] )
         ->return_or_send( wantarray );
 }
 
 sub ident ($val=undef) {
-    msg([ spawn( '!ident' ), id => [ $val // () ] ])
+    msg( spawn( '!ident' ), id => [ $val // () ] )
         ->return_or_send( wantarray );
 }
 
 sub sequence (@statements) {
-    msg([ spawn( '!sequence' ), next => [ @statements ] ])
+    msg( spawn( '!sequence' ), next => [ @statements ] )
         ->return_or_send( wantarray );
 }
 
 sub parallel (@statements) {
-    msg([ spawn( '!parallel' ), all => [ @statements ] ])
+    msg( spawn( '!parallel' ), all => [ @statements ] )
         ->return_or_send( wantarray );
 }
 
@@ -227,11 +236,11 @@ sub loop ( $MAX_TICKS, $start_pid ) {
 
                 if (@active) {
                     warn( $prefix, "waiting for ".(scalar @$pids)." pids, found ".(scalar @active)." active" ) if DEBUG;
-                    send_from( $CURRENT_CALLER, $CURRENT_PID, waitpids => [ \@active, $callback ] );
+                    msg($CURRENT_PID, waitpids => [ \@active, $callback ])->send_from( $CURRENT_CALLER );
                 }
                 else {
                     warn( $prefix, "no more active pids" ) if DEBUG;
-                    send_from( $CURRENT_CALLER, @$callback );
+                    $callback->send_from( $CURRENT_CALLER );
                 }
 
             },
@@ -241,7 +250,7 @@ sub loop ( $MAX_TICKS, $start_pid ) {
     # initialise ...
     my $start = spawn( $start_pid );
 
-    send_from( $INIT_PID, $start => '_' => [] );
+    msg($start => '_' => [])->send_from( $INIT_PID );
 
     my $should_exit = 0;
     my $has_exited  = 0;
@@ -414,12 +423,12 @@ actor '!timeout' => sub ($env, $msg) {
 
             if ( $timer == 0 ) {
                 err::log( "*/ !timeout! /* : timer DONE") if DEBUG;
-                send_from( $CURRENT_CALLER, @$event );
+                $event->send_from( $CURRENT_CALLER );
                 despawn( $CURRENT_PID );
             }
             else {
                 err::log("*/ !timeout! /* : counting down $timer") if DEBUG;
-                send_from( $CURRENT_CALLER, $CURRENT_PID => countdown => [ $timer - 1, $event ] );
+                msg($CURRENT_PID => countdown => [ $timer - 1, $event ])->send_from( $CURRENT_CALLER );
             }
         }
     };
@@ -432,8 +441,8 @@ actor '!sync' => sub ($env, $msg) {
     match $msg, +{
         send => sub ($input, $output) {
             err::log("*/ !sync /* : sending message") if DEBUG;
-            send_to( @$input );
-            send_from( $CURRENT_CALLER, $CURRENT_PID => recv => [ $output ] );
+            $input->send;
+            msg($CURRENT_PID => recv => [ $output ])->send_from( $CURRENT_CALLER );
         },
         recv => sub ($output) {
 
@@ -442,13 +451,14 @@ actor '!sync' => sub ($env, $msg) {
             if (defined $message) {
                 err::log("*/ !sync /* : recieve message($message)") if DEBUG;
                 #warn Dumper $output;
-                $output = msg($output)->curry( $message );
-                send_from( $CURRENT_CALLER, @$output );
+                msg(@$output)
+                    ->curry( $message )
+                    ->send_from( $CURRENT_CALLER );
                 despawn( $CURRENT_PID );
             }
             else {
                 err::log("*/ !sync /* : no messages") if DEBUG;
-                send_from( $CURRENT_CALLER, $CURRENT_PID => recv => [ $output ] );
+                msg($CURRENT_PID => recv => [ $output ])->send_from( $CURRENT_CALLER );
             }
         }
     };
@@ -461,8 +471,8 @@ actor '!sequence' => sub ($env, $msg) {
         next => sub (@statements) {
             if ( my $statement = shift @statements ) {
                 err::log("*/ !sequence /* calling, ".(scalar @statements)." remain" ) if DEBUG;
-                send_from( $CURRENT_CALLER, @$statement );
-                send_from( $CURRENT_CALLER, $CURRENT_PID, next => \@statements );
+                $statement->send_from( $CURRENT_CALLER );
+                msg($CURRENT_PID, next => \@statements)->send_from( $CURRENT_CALLER );
             }
             else {
                 err::log("*/ !sequence /* finished") if DEBUG;
@@ -477,7 +487,7 @@ actor '!parallel' => sub ($env, $msg) {
         all => sub (@statements) {
             err::log("*/ !parallel /* sending ".(scalar @statements)." messages" ) if DEBUG;
             foreach my $statement ( @statements ) {
-                send_from( $CURRENT_CALLER, @$statement );
+                $statement->send_from( $CURRENT_CALLER );
             }
             err::log("*/ !parallel /* finished") if DEBUG;
             despawn( $CURRENT_PID );
