@@ -61,6 +61,10 @@ sub CALLER () { $CURRENT_CALLER }
 ## process table
 ## ----------------------------------------------------------------------------
 
+use constant READY   => 1; # can accept arguments
+use constant WAITING => 2; # waiting for a time to end
+use constant BLOCKED => 3; # blocked on input
+
 my $PID_ID = 0;
 my %PROCESS_TABLE;
 
@@ -68,7 +72,7 @@ sub proc::lookup ($pid) { $PROCESS_TABLE{$pid} }
 
 sub proc::spawn ($name, %env) {
     my $pid     = sprintf '%03d:%s' => ++$PID_ID, $name;
-    my $process = bless [ $pid, [], [], { %env }, SAM::Actors::get_actor($name) ] => 'SAM::Process::Record';
+    my $process = bless [ $pid, READY, [], [], { %env }, SAM::Actors::get_actor($name) ] => 'SAM::Process::Record';
     $PROCESS_TABLE{ $pid } = $process;
     $pid;
 }
@@ -95,10 +99,15 @@ package SAM::Process::Record {
     use experimental 'signatures', 'postderef';
 
     sub pid    ($self) { $self->[0] }
-    sub inbox  ($self) { $self->[1] }
-    sub outbox ($self) { $self->[2] }
-    sub env    ($self) { $self->[3] }
-    sub actor  ($self) { $self->[4] }
+    sub status ($self) { $self->[1] }
+    sub inbox  ($self) { $self->[2] }
+    sub outbox ($self) { $self->[3] }
+    sub env    ($self) { $self->[4] }
+    sub actor  ($self) { $self->[5] }
+
+    sub set_status ($self, $status) {
+        $self->[1] = $status;
+    }
 }
 
 ## ----------------------------------------------------------------------------
@@ -146,7 +155,7 @@ sub parallel (@statements) {
 sub loop ( $MAX_TICKS, $start_pid ) {
 
     # initialise the system pid singleton
-    $PROCESS_TABLE{ $INIT_PID } = bless [ $INIT_PID, [], [], {}, sub ($env, $msg) {
+    $PROCESS_TABLE{ $INIT_PID } = bless [ $INIT_PID, READY, [], [], {}, sub ($env, $msg) {
         my $prefix = DEBUG
             ? ON_MAGENTA "SYS ($CURRENT_CALLER) ::". RESET " "
             : ON_MAGENTA "SYS ::". RESET " ";
@@ -192,7 +201,8 @@ sub loop ( $MAX_TICKS, $start_pid ) {
         SAM::Msg::_deliver_all_messages();
         SAM::Msg::_accept_all_messages();
 
-        my @ready = grep $_->inbox->@*,
+        my @ready = grep scalar $_->inbox->@*,
+                    grep $_->status == READY,
                     map $PROCESS_TABLE{$_},
                     sort keys %PROCESS_TABLE;
 
@@ -215,7 +225,7 @@ sub loop ( $MAX_TICKS, $start_pid ) {
         warn Dumper \%PROCESS_TABLE if DEBUG >= 4;
 
         my @active_processes =
-            grep !/^\d\d\d:\#/,     # ignore I/O pids
+            grep !/^\d\d\d:\#/,    # ignore I/O pids
             grep $_ ne $start,     # ignore start pid
             grep $_ ne $INIT_PID,  # ignore init pid
             keys %PROCESS_TABLE;
