@@ -34,7 +34,7 @@ actor TestBuilder => sub ($env, $msg) {
 actor main => sub ($env, $msg) {
     out::print("-> main starting ...");
 
-    my $builder = sys::spawn( 'TestBuilder' );
+    my $builder = proc::spawn( 'TestBuilder' );
 
     timeout( 3, msg( $builder, ok => [ 2, '... it works later' ]) )->send;
     msg( $builder, ok => [ 1, '... it works now' ] )->send;

@@ -113,7 +113,7 @@ actor Tokenizer => sub ($env, $msg) {
         tokenize => sub ($observer, $JSON) {
             push @$stack => 'process_tokens';
             msg(
-                sys::spawn('Splitter'),
+                proc::spawn('Splitter'),
                 split => [
                     msg( PID, process_tokens => [ $observer ] ),
                     $JSON
@@ -346,20 +346,20 @@ actor Tokenizer => sub ($env, $msg) {
 actor main => sub ($env, $msg) {
     out::print("-> main starting ...");
 
-    msg(sys::spawn('Tokenizer'), tokenize => [
-        sys::spawn('Decoder', error => 'Unexpected token `:` in process_object, expected `}` or `,`'),
+    msg(proc::spawn('Tokenizer'), tokenize => [
+        proc::spawn('Decoder', error => 'Unexpected token `:` in process_object, expected `}` or `,`'),
         '{ "foo" : 10 :'
     ])->send;
 
-    msg(sys::spawn('Tokenizer'), tokenize => [
-        sys::spawn('Decoder', expected =>
+    msg(proc::spawn('Tokenizer'), tokenize => [
+        proc::spawn('Decoder', expected =>
             { foo => { bar => 10, baz => { gorch => 100 } } }
         ),
         '{ "foo" : { "bar" : 10, "baz" : { "gorch" : 100 } } }'
     ])->send;
 
-    msg(sys::spawn('Tokenizer'), tokenize => [
-        sys::spawn('Decoder', expected =>
+    msg(proc::spawn('Tokenizer'), tokenize => [
+        proc::spawn('Decoder', expected =>
             { bling => { boo => 10, baz => {}, foo => { gorch => 100 } }, foo => 500 }
         ),
         '{ "bling" : { "baz" : {}, "boo" : 10, "foo" : { "gorch" : 100 } }, "foo" : 500 }'

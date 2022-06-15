@@ -62,9 +62,9 @@ actor take_10_and_sync => sub ($env, $msg) {
 actor main => sub ($env, $msg) {
     out::print("-> main starting ...");
 
-    my $s = sys::spawn('take_10_and_sync');
-    my $p = sys::spawn('counter');
-    my $c = sys::spawn('collector', expected =>  [ 1 .. 10 ] );
+    my $s = proc::spawn('take_10_and_sync');
+    my $p = proc::spawn('counter');
+    my $c = proc::spawn('collector', expected =>  [ 1 .. 10 ] );
 
     msg( $s, each => [ $p, $c ] )->send;
 

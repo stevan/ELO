@@ -101,12 +101,12 @@ actor ComplexObservable => sub ($env, $msg) {
 actor main => sub ($env, $msg) {
     out::print("-> main starting ...")->send;
 
-    my $complex = sys::spawn('ComplexObservable');
-    my $simple  = sys::spawn('SimpleObservable');
+    my $complex = proc::spawn('ComplexObservable');
+    my $simple  = proc::spawn('SimpleObservable');
 
-    my $debug   = sys::spawn('DebugObserver', expected => [ 0 .. 10 ]);
-    my $map     = sys::spawn('MapObserver',
-        observer => sys::spawn('DebugObserver', , expected => [ map $_+100, 0 .. 10 ]),
+    my $debug   = proc::spawn('DebugObserver', expected => [ 0 .. 10 ]);
+    my $map     = proc::spawn('MapObserver',
+        observer => proc::spawn('DebugObserver', , expected => [ map $_+100, 0 .. 10 ]),
         f        => sub ($x) { $x + 100 },
     );
 

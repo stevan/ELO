@@ -29,8 +29,8 @@ my @msg_outbox;
 sub _message_outbox () { @msg_outbox }
 
 sub recv_from () {
-    my $process = SAM::_lookup_process( $SAM::CURRENT_PID );
-    my $msg = shift $process->[1]->@*;
+    my $process = proc::lookup( $SAM::CURRENT_PID );
+    my $msg = shift $process->outbox->@*;
     return unless $msg;
     return $msg->[1];
 }
@@ -48,12 +48,12 @@ sub _accept_all_messages () {
 
         my $from = shift $next->@*;
         my ($to, $m) = $next->@*;
-        my $process = SAM::_lookup_process( $to );
+        my $process = proc::lookup( $to );
         if ( !$process ) {
             warn "Got message for unknown pid($to)";
             next;
         }
-        push $process->[1]->@* => [ $from, $m ];
+        push $process->outbox->@* => [ $from, $m ];
     }
 }
 
@@ -83,12 +83,12 @@ sub _deliver_all_messages () {
         my $next = shift @msg_inbox;
         #warn Dumper $next;
         my ($from, $msg) = $next->@*;
-        my $process = SAM::_lookup_process( $msg->pid );
+        my $process = proc::lookup( $msg->pid );
         if ( !$process ) {
             warn "Got message for unknown pid(".$msg->pid.")";
             next;
         }
-        push $process->[0]->@* => [ $from, $msg ];
+        push $process->inbox->@* => [ $from, $msg ];
     }
 }
 
@@ -98,10 +98,10 @@ sub _remove_all_inbox_messages_for_pid ($pid) {
 
 # ....
 
-sub msg        ($pid, $action, $msg) { bless [$pid, $action, $msg] => 'SAM::Msg' }
-sub msg::curry ($pid, $action, $msg) { bless [$pid, $action, $msg] => 'SAM::Msg::Curryable' }
+sub msg        ($pid, $action, $msg) { bless [$pid, $action, $msg] => 'SAM::Msg::Message' }
+sub msg::curry ($pid, $action, $msg) { bless [$pid, $action, $msg] => 'SAM::Msg::CurriedMessage' }
 
-package SAM::Msg {
+package SAM::Msg::Message {
     use v5.24;
     use warnings;
     use experimental 'signatures', 'postderef';
@@ -118,16 +118,16 @@ package SAM::Msg {
     sub send_from ($self, $caller) { SAM::Msg::_send_from($caller, $self); $self }
 }
 
-package SAM::Msg::Curryable {
+package SAM::Msg::CurriedMessage {
     use v5.24;
     use warnings;
     use experimental 'signatures', 'postderef';
 
-    our @ISA; BEGIN { @ISA = ('SAM::Msg') };
+    our @ISA; BEGIN { @ISA = ('SAM::Msg::Message') };
 
     sub curry ($self, @args) {
         my ($pid, $action, $body) = @$self;
-        bless [ $pid, $action, [ @$body, @args ] ] => 'SAM::Msg::Curryable';
+        bless [ $pid, $action, [ @$body, @args ] ] => 'SAM::Msg::CurriedMessage';
     }
 }
 

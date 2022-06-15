@@ -27,27 +27,27 @@ our $OUT;
 our $ERR;
 
 sub err::log ($msg, $caller=$SAM::CURRENT_CALLER) {
-    $ERR //= sys::spawn('#err');
+    $ERR //= proc::spawn('#err');
     msg($ERR, print => [ $msg, $caller ]);
 }
 
 sub err::logf ($fmt, $msg, $caller=$SAM::CURRENT_CALLER) {
-    $ERR //= sys::spawn('#err');
+    $ERR //= proc::spawn('#err');
     msg($ERR, printf => [ $fmt, $msg, $caller ]);
 }
 
 sub out::print ($msg=undef) {
-    $OUT //= sys::spawn('#out');
+    $OUT //= proc::spawn('#out');
     msg($OUT, print => [ $msg // () ]);
 }
 
 sub out::printf ($fmt, $msg=undef) {
-    $OUT //= sys::spawn('#out');
+    $OUT //= proc::spawn('#out');
     msg($OUT, printf => [ $fmt, $msg // () ]);
 }
 
 sub in::read ($prompt=undef) {
-    $IN //= sys::spawn('#in');
+    $IN //= proc::spawn('#in');
     msg($IN, read => [ $prompt // () ]);
 }
 

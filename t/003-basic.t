@@ -155,34 +155,34 @@ actor main => sub ($env, $msg) {
     out::print("-> main starting ...")->send;
 
     msg(
-        sys::spawn('Tokenizer'),
+        proc::spawn('Tokenizer'),
         process_tokens => [
-            sys::spawn('CharacterStream', string => '(() (() ()) ())' ),
-            sys::spawn('Decoder'),
+            proc::spawn('CharacterStream', string => '(() (() ()) ())' ),
+            proc::spawn('Decoder'),
         ]
     )->send;
 
     msg(
-        sys::spawn('Tokenizer'),
+        proc::spawn('Tokenizer'),
         process_tokens => [
-            sys::spawn('CharacterStream', string => '((((()))))' ),
-            sys::spawn('Decoder'),
+            proc::spawn('CharacterStream', string => '((((()))))' ),
+            proc::spawn('Decoder'),
         ]
     )->send;
 
     msg(
-        sys::spawn('Tokenizer'),
+        proc::spawn('Tokenizer'),
         process_tokens => [
-            sys::spawn('CharacterStream', string => '(() ())' ),
-            sys::spawn('Decoder'),
+            proc::spawn('CharacterStream', string => '(() ())' ),
+            proc::spawn('Decoder'),
         ]
     )->send;
 
     msg(
-        sys::spawn('Tokenizer'),
+        proc::spawn('Tokenizer'),
         process_tokens => [
-            sys::spawn('CharacterStream', string => '(() ()' ),
-            sys::spawn('Decoder'),
+            proc::spawn('CharacterStream', string => '(() ()' ),
+            proc::spawn('Decoder'),
         ]
     )->send;
 

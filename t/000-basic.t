@@ -39,7 +39,7 @@ actor bounce => sub ($env, $msg) {
 actor main => sub ($env, $msg) {
     out::print("-> main starting ...")->send;
 
-    my $bounce = sys::spawn( 'bounce' );
+    my $bounce = proc::spawn( 'bounce' );
     msg( $bounce, up => [1] )->send;
 
     timeout( 10,
