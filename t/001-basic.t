@@ -80,7 +80,7 @@ actor main => sub ($env, $msg) {
         out::printf("$_(%s)")
     )->send foreach qw[ foo bar baz ];
 
-    proc::alarm( 12,
+    loop::timer( 12,
         parallel(
             msg($e1, finish => [ { foo => 10, bar => 20, baz => 30 } ]),
             msg($e2, finish => [ { foo => 10, bar => 20, baz => 30 } ])

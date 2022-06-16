@@ -18,9 +18,9 @@ use SAM::IO;
 actor main => sub ($env, $msg) {
     out::print("-> main starting ...")->send;
 
-    prod::alarm( 10, out::print("hello 2") );
-    proc::alarm( 9,  out::print("hello 1") );
-    proc::alarm( 5,  out::print("hello 0") );
+    loop::timer( 10, out::print("hello 2") );
+    loop::timer( 9,  out::print("hello 1") );
+    loop::timer( 5,  out::print("hello 0") );
 };
 
 # loop ...
