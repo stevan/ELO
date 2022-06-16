@@ -71,6 +71,8 @@ my $PID_ID = 0;
 my %PROCESS_TABLE;
 my %TIMERS;
 
+sub proc::exists ($pid) { exists $PROCESS_TABLE{$pid} }
+
 sub proc::lookup ($pid) { $PROCESS_TABLE{$pid} }
 
 sub proc::spawn ($name, %env) {
@@ -83,15 +85,15 @@ sub proc::spawn ($name, %env) {
 my %to_be_despawned;
 sub proc::despawn ($pid) {
     $to_be_despawned{$pid}++;
+    $PROCESS_TABLE{ $pid }->set_status(EXITING);
 }
 
-sub proc::despawn_all_waiting_pids () {
+sub proc::despawn_all_exiting_pids () {
     foreach my $pid (keys %to_be_despawned) {
         SAM::Msg::_remove_all_inbox_messages_for_pid($pid);
         SAM::Msg::_remove_all_outbox_messages_for_pid($pid);
 
-        delete $TIMERS{ $pid };
-        delete $PROCESS_TABLE{ $pid };
+        (delete $PROCESS_TABLE{ $pid })->set_status(DONE);
     }
 
     %to_be_despawned = ();
@@ -250,7 +252,7 @@ sub loop ( $MAX_TICKS, $start_pid ) {
             }
         }
 
-        proc::despawn_all_waiting_pids();
+        proc::despawn_all_exiting_pids();
 
         warn Dumper \%PROCESS_TABLE if DEBUG >= 4;
 
