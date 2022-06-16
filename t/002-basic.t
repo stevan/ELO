@@ -36,10 +36,10 @@ actor main => sub ($env, $msg) {
 
     my $builder = proc::spawn( 'TestBuilder' );
 
-    timeout( 3, msg( $builder, ok => [ 2, '... it works later' ]) )->send;
+    sig::timer( 3, msg( $builder, ok => [ 2, '... it works later' ]) )->send;
     msg( $builder, ok => [ 1, '... it works now' ] )->send;
 
-    timeout( 4, sig::kill($builder) )->send;
+    sig::timer( 4, sig::kill($builder) )->send;
 };
 
 # loop ...

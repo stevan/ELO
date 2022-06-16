@@ -77,6 +77,33 @@ actor SimpleObservable => sub ($env, $msg) {
     };
 };
 
+actor Watcher => sub ($env, $msg) {
+
+    my $watched_pids = $env->{pids} //= {};
+
+    match $msg, +{
+        waitpids => sub ($pids, $callback) {
+            my $i = 0;
+            foreach my $pid ( @$pids ) {
+                #warn PID." WATCHING PID: $pid";
+                $watched_pids->{$pid}++;
+                sys::waitpid( $pid, msg(PID, on_pid_exit => [ $pid, CALLER(), $callback ]) )->send;
+            }
+        },
+        on_pid_exit => sub ($pid, $caller, $callback) {
+            delete $watched_pids->{$pid};
+            unless ( keys $watched_pids->%* ) {
+                #warn PID." FIRE CALLBACK AFTER FINAL PID : $pid";
+                $callback->send_from($caller);
+                sig::kill(PID)->send;
+            }
+            #else {
+                #warn PID." STILL WATCHING: ". (join ', ' => keys $watched_pids->%*);
+            #}
+        }
+    };
+};
+
 actor ComplexObservable => sub ($env, $msg) {
 
     match $msg, +{
@@ -87,12 +114,15 @@ actor ComplexObservable => sub ($env, $msg) {
                 timeout( int(rand(9)), msg( $observer, on_next => [ $_ ] ))->send->pid
             } 0 .. 10;
 
-            sys::waitpids(
-                \@pids,
-                parallel(
-                    msg( $observer, on_completed => []),
-                    sig::kill(PID)
-                )
+            msg(
+                proc::spawn('Watcher'),
+                waitpids => [
+                    \@pids,
+                    parallel(
+                        msg( $observer, on_completed => []),
+                        sig::kill(PID)
+                    )
+                ]
             )->send;
         },
     };
@@ -115,7 +145,7 @@ actor main => sub ($env, $msg) {
 };
 
 # loop ...
-ok loop( 20, 'main' ), '... the event loop exited successfully';
+ok loop( 100, 'main' ), '... the event loop exited successfully';
 
 done_testing;
 

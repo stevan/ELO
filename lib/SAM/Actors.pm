@@ -29,7 +29,13 @@ sub actor ($name, $recieve) {
 sub match ($msg, $table) {
     #warn Dumper [$msg, $table];
     my $cb = $table->{$msg->action} // die "No match for ".$msg->action;
-    $cb->($msg->body->@*);
+    eval {
+        $cb->($msg->body->@*);
+        1;
+    } or do {
+        warn "Died calling msg(".(join ', ' => map { ref $_ ? '['.(join ', ' => @$_).']' : $_ } @$msg).")";
+        die $@;
+    };
 }
 
 

@@ -46,10 +46,10 @@ actor main => sub ($env, $msg) {
 
     msg( $bounce, up => [1] )->send;
 
-    loop::timer( 5,  msg( $bounce, peek => [ 5 ] ) );
-    loop::timer( 3,  msg( $bounce, peek => [ 3 ] ) );
+    sig::timer( 5,  msg( $bounce, peek => [ 5 ] ) )->send;
+    sig::timer( 3,  msg( $bounce, peek => [ 3 ] ) )->send;
 
-    loop::timer( 10, msg( $bounce, finish => [ 10 ] ) );
+    sig::timer( 10, msg( $bounce, finish => [ 10 ] ) )->send;
 };
 
 # loop ...

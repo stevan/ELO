@@ -87,12 +87,13 @@ sub proc::despawn ($pid) {
     $PROCESS_TABLE{ $pid }->set_status(EXITING);
 }
 
-sub proc::despawn_all_exiting_pids () {
+sub proc::despawn_all_exiting_pids ( $on_exit ) {
     foreach my $pid (keys %to_be_despawned) {
         SAM::Msg::_remove_all_inbox_messages_for_pid($pid);
         SAM::Msg::_remove_all_outbox_messages_for_pid($pid);
 
         (delete $PROCESS_TABLE{ $pid })->set_status(DONE);
+        $on_exit->( $pid );
     }
 
     %to_be_despawned = ();
@@ -125,8 +126,12 @@ sub sig::kill($pid) {
     msg( $INIT_PID, kill => [ $pid ] );
 }
 
-sub sys::waitpids($pids, $callback) {
-    msg( $INIT_PID, waitpids => [ $pids, $callback ] );
+sub sig::timer($timeout, $callback) {
+    msg( $INIT_PID, timer => [ $timeout, $callback ] );
+}
+
+sub sys::waitpid($pid, $callback) {
+    msg( $INIT_PID, waitpid => [ $pid, $callback ] );
 }
 
 ## ----------------------------------------------------------------------------
@@ -157,22 +162,8 @@ sub parallel (@statements) {
 ## teh loop
 ## ----------------------------------------------------------------------------
 
-my %TIMERS;
-
-sub loop::timer($timeout, $callback) {
-    my $proc = proc::lookup( $CURRENT_PID );
-    $proc->set_status(WAITING);
-
-    push @{ $TIMERS{ $CURRENT_TICK + $timeout } //= [] } => [
-        $CURRENT_PID,
-        $CURRENT_CALLER,
-        sub ($pid, $caller) {
-            my $proc = proc::lookup( $pid );
-            $proc->set_status(READY);
-            $callback->send_from( $caller );
-        }
-    ];
-}
+my %TIMERS;       # HASH< $tick_to_fire_at > = [ $msg, ... ]
+my %PID_WATCHERS; # HASH< $pid > = [ $msg, ... ]
 
 sub loop ( $MAX_TICKS, $start_pid ) {
 
@@ -187,20 +178,28 @@ sub loop ( $MAX_TICKS, $start_pid ) {
                 warn( $prefix, "killing ... {$pid}\n" ) if DEBUG;
                 proc::despawn($pid);
             },
-            waitpids => sub ($pids, $callback) {
-
-                my @active = grep { exists $PROCESS_TABLE{$_} } @$pids;
-
-                if (@active) {
-                    warn( $prefix, "waiting for ".(scalar @$pids)." pids, found ".(scalar @active)." active" ) if DEBUG;
-                    msg($CURRENT_PID, waitpids => [ \@active, $callback ])->send_from( $CURRENT_CALLER );
+            waitpid => sub ($pid, $callback) {
+                if (proc::exists($pid)) {
+                    warn( $prefix, "setting watch for ($pid) ...\n" ) if DEBUG;
+                    push @{ $PID_WATCHERS{$pid} //=[] } => [
+                        $CURRENT_CALLER,
+                        $callback
+                    ];
                 }
                 else {
-                    warn( $prefix, "no more active pids" ) if DEBUG;
-                    $callback->send_from( $CURRENT_CALLER );
+                    $callback->send_from($CURRENT_CALLER);
                 }
-
             },
+            timer => sub ($timeout, $callback) {
+                warn( $prefix, "setting timer for($timeout) ...\n" ) if DEBUG;
+
+                $timeout--; # subtrack one for this tick ...
+
+                push @{ $TIMERS{ $CURRENT_TICK + $timeout } //= [] } => [
+                    $CURRENT_CALLER,
+                    $callback
+                ];
+            }
         };
     }] => 'SAM::Process::Record';
 
@@ -224,10 +223,8 @@ sub loop ( $MAX_TICKS, $start_pid ) {
         if ( exists $TIMERS{ $CURRENT_TICK } ) {
             my $alarms = delete $TIMERS{ $CURRENT_TICK };
             foreach my $alarm ($alarms->@*) {
-                my ($pid, $caller, $f) = @$alarm;
-                # XXX - check $pid is still alive??
-                #       or that the pid being called
-                $f->($pid, $caller);
+                my ($caller, $callback) = @$alarm;
+                $callback->send_from( $caller );
             }
         }
 
@@ -253,9 +250,20 @@ sub loop ( $MAX_TICKS, $start_pid ) {
             }
         }
 
-        proc::despawn_all_exiting_pids();
+        proc::despawn_all_exiting_pids(sub ($pid) {
+            #warn "!!!! DESPAWNED ($pid)";
+            if ( exists $PID_WATCHERS{$pid} ) {
+                my $watchers = delete $PID_WATCHERS{$pid};
+                foreach my $watcher ($watchers->@*) {
+                    my ($caller, $callback) = @$watcher;
+                    #warn "!!!! CALLING WATCHER HANDLER ($pid)";
+                    $callback->send_from( $caller );
+                }
+            }
+        });
 
         warn Dumper \%PROCESS_TABLE if DEBUG >= 4;
+        warn Dumper \%TIMERS        if DEBUG >= 4;
 
         my @active_processes =
             grep !/^\d\d\d:\#/,    # ignore I/O pids
@@ -273,7 +281,14 @@ sub loop ( $MAX_TICKS, $start_pid ) {
             last;
         }
 
-        if ( scalar @active_processes == 0 && scalar keys %TIMERS == 0 ) {
+        #warn "TIMER COUNTER: " . scalar(keys %TIMERS);
+        #warn "ACTIVE : " . scalar(@active_processes);
+        #warn "TICK : " . $tick;
+        #warn "INBOX : " . Dumper [ SAM::Msg::_message_inbox() ];
+
+        # at least do one tick before shutting things down ...
+        if ( $tick > 1 && scalar @active_processes == 0 && scalar(keys %TIMERS) == 0 ) {
+            #warn "gonna exit ...";
             # loop one last time to flush any I/O
             if ( SAM::Msg::_has_inbox_messages() ) {
                 $has_exited++;
@@ -285,6 +300,8 @@ sub loop ( $MAX_TICKS, $start_pid ) {
             }
         }
     }
+
+    warn Dumper \%PID_WATCHERS if DEBUG >= 4;
 
     if ( $has_exited ) {
         _loop_log_line("exit(%d)", $tick) if DEBUG;
