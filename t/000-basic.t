@@ -15,23 +15,26 @@ use SAM::Msg;
 use SAM::Actors;
 use SAM::IO;
 
-my $BOUNCE_COUNT = 0;
+my $CURRENT_CNT = 0;
 
 actor bounce => sub ($env, $msg) {
     match $msg, +{
         up => sub ($cnt) {
             out::print("bounce(UP) => $cnt")->send;
             msg( PID, down => [$cnt+1] )->send;
-            $BOUNCE_COUNT++;
+            $CURRENT_CNT = $cnt;
         },
         down => sub ($cnt) {
             out::print("bounce(DOWN) => $cnt")->send;
             msg( PID, up => [$cnt+1] )->send;
-            $BOUNCE_COUNT++;
+            $CURRENT_CNT = $cnt;
         },
-        finish => sub () {
-            ok($BOUNCE_COUNT < 15, "... bounce count ($BOUNCE_COUNT) is less than 15");
-            sys::kill(PID)->send;
+        peek => sub ($expected) {
+            ok($CURRENT_CNT == $expected, "... peek bounce count ($CURRENT_CNT) is $expected");
+        },
+        finish => sub ($expected) {
+            ok($CURRENT_CNT == $expected, "... bounce count ($CURRENT_CNT) is $expected");
+            sig::kill(PID)->send;
         }
     };
 };
@@ -40,15 +43,13 @@ actor main => sub ($env, $msg) {
     out::print("-> main starting ...")->send;
 
     my $bounce = proc::spawn( 'bounce' );
+
     msg( $bounce, up => [1] )->send;
 
-    proc::alarm(
-        10,
-        sequence(
-            msg( $bounce, finish => [] ),
-            out::print("JELLO!"),
-        )
-    );
+    loop::timer( 5,  msg( $bounce, peek => [ 5 ] ) );
+    loop::timer( 3,  msg( $bounce, peek => [ 3 ] ) );
+
+    loop::timer( 10, msg( $bounce, finish => [ 10 ] ) );
 };
 
 # loop ...

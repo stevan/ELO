@@ -69,7 +69,6 @@ use constant DONE    => 5; # the end
 
 my $PID_ID = 0;
 my %PROCESS_TABLE;
-my %TIMERS;
 
 sub proc::exists ($pid) { exists $PROCESS_TABLE{$pid} }
 
@@ -97,21 +96,6 @@ sub proc::despawn_all_exiting_pids () {
     }
 
     %to_be_despawned = ();
-}
-
-sub proc::alarm($timeout, $callback) {
-    my $proc = proc::lookup( $CURRENT_PID );
-    $proc->set_status(WAITING);
-
-    push @{ $TIMERS{ $CURRENT_TICK + $timeout } //= [] } => [
-        $CURRENT_PID,
-        $CURRENT_CALLER,
-        sub ($pid, $caller) {
-            my $proc = proc::lookup( $pid );
-            $proc->set_status(READY);
-            $callback->send_from( $caller );
-        }
-    ];
 }
 
 package SAM::Process::Record {
@@ -172,6 +156,23 @@ sub parallel (@statements) {
 ## ----------------------------------------------------------------------------
 ## teh loop
 ## ----------------------------------------------------------------------------
+
+my %TIMERS;
+
+sub loop::timer($timeout, $callback) {
+    my $proc = proc::lookup( $CURRENT_PID );
+    $proc->set_status(WAITING);
+
+    push @{ $TIMERS{ $CURRENT_TICK + $timeout } //= [] } => [
+        $CURRENT_PID,
+        $CURRENT_CALLER,
+        sub ($pid, $caller) {
+            my $proc = proc::lookup( $pid );
+            $proc->set_status(READY);
+            $callback->send_from( $caller );
+        }
+    ];
+}
 
 sub loop ( $MAX_TICKS, $start_pid ) {
 
