@@ -39,7 +39,7 @@ actor main => sub ($env, $msg) {
     timeout( 3, msg( $builder, ok => [ 2, '... it works later' ]) )->send;
     msg( $builder, ok => [ 1, '... it works now' ] )->send;
 
-    timeout( 4, sys::kill($builder) )->send;
+    timeout( 4, sig::kill($builder) )->send;
 };
 
 # loop ...

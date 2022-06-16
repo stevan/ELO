@@ -24,7 +24,7 @@ actor Splitter => sub ($env, $msg) {
     match $msg, +{
         split => sub ($return_pid, $string) {
             $return_pid->curry( split '' => $string )->send;
-            sys::kill(PID)->send;
+            sig::kill(PID)->send;
         }
     };
 };
@@ -83,13 +83,13 @@ actor Decoder => sub ($env, $msg) {
         error => sub ($error) {
             out::print("ERROR!!!! ($error)")->send;
             @$stack = ();
-            sys::kill(PID)->send;
+            sig::kill(PID)->send;
             is($error, $env->{error}, '... got the error we expected');
         },
         finish     => sub () {
             out::print( (Dumper $stack->[0]) =~ s/^\$VAR1\s/JSON /r )->send #/
                 if @$stack == 1;
-            sys::kill(PID)->send;
+            sig::kill(PID)->send;
             eq_or_diff($stack->[0], $env->{expected}, '... got the expected values');
         },
     };
@@ -331,14 +331,14 @@ actor Tokenizer => sub ($env, $msg) {
             @$stack = (); # clear stack ...
 
             msg( $observer, error => [ $error ])->send;
-            sys::kill(PID)->send;
+            sig::kill(PID)->send;
         },
         finish => sub ($observer) {
 
             err::log("Enter finish (@$stack)")->send if DEBUG_TOKENIZER;
 
             msg( $observer, finish => [])->send;
-            sys::kill(PID)->send;
+            sig::kill(PID)->send;
         }
     };
 };

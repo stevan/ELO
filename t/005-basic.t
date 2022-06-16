@@ -29,12 +29,12 @@ actor MapObserver => sub ($env, $msg) {
         on_error => sub ($e) {
             err::log("MapObserver got error($e)")->send if DEBUG;
             msg( $observer, on_error => [ $e ])->send;
-            sys::kill(PID)->send;
+            sig::kill(PID)->send;
         },
         on_completed => sub () {
             err::log("MapObserver completed")->send if DEBUG;
             msg( $observer, on_completed => [])->send;
-            sys::kill(PID)->send;
+            sig::kill(PID)->send;
         }
     };
 };
@@ -50,12 +50,12 @@ actor DebugObserver => sub ($env, $msg) {
         },
         on_error => sub ($e) {
             err::log("Observer got error($e)")->send if DEBUG;
-            sys::kill(PID)->send;
+            sig::kill(PID)->send;
         },
         on_completed => sub () {
             err::log("Observer completed")->send if DEBUG;
             err::log("Observed values: [" . (join ', ' => map { "$_/".$got->{$_} }sort { $a <=> $b } keys $got->%*) . "]")->send if DEBUG;
-            sys::kill(PID)->send;
+            sig::kill(PID)->send;
             eq_or_diff( [ sort { $a <=> $b } keys %$got ], $env->{expected}, '... got the expected values');
             eq_or_diff( [ values %$got ], [ map 1, $env->{expected}->@* ], '... got the expected value counts (all 1)');
         }
@@ -71,7 +71,7 @@ actor SimpleObservable => sub ($env, $msg) {
             sequence(
                 (map msg( $observer, on_next => [ $_ ] ), 0 .. 10),
                 msg( $observer, on_completed => [] ),
-                sys::kill(PID)
+                sig::kill(PID)
             )->send;
         },
     };
@@ -91,7 +91,7 @@ actor ComplexObservable => sub ($env, $msg) {
                 \@pids,
                 parallel(
                     msg( $observer, on_completed => []),
-                    sys::kill(PID)
+                    sig::kill(PID)
                 )
             )->send;
         },

@@ -47,12 +47,12 @@ actor SExpParser => sub ($env, $msg) {
         },
         on_error => sub ($e) {
             out::print( "ERROR: $e" )->send;
-            sys::kill(PID)->send;
+            sig::kill(PID)->send;
         },
         on_completed => sub () {
             out::print( (Dumper $stack->[0]) =~ s/^\$VAR1\s/SEXP /r )->send #/
                 if @$stack == 1;
-            sys::kill(PID)->send;
+            sig::kill(PID)->send;
             if (my $expected = $env->{expected}) {
                 eq_or_diff( $stack, $expected, '... got the expected values in '.PID);
             }
@@ -74,13 +74,13 @@ actor DebugObserver => sub ($env, $msg) {
         on_error => sub ($e) {
             err::log(PID." got error($e)")->send if DEBUG;
             msg($observer, error => [ $e ])->send;
-            sys::kill(PID)->send;
+            sig::kill(PID)->send;
         },
         on_completed => sub () {
             err::log( (Dumper $got) =~ s/^\$VAR1\s/VALS /r )->send #/
                 if @$got == 1;
             msg($observer, on_completed => [])->send;
-            sys::kill(PID)->send;
+            sig::kill(PID)->send;
             if (my $expected = $env->{expected}) {
                 eq_or_diff( $got, $expected, '... got the expected values in '.PID);
             }
@@ -99,7 +99,7 @@ actor SimpleObservable => sub ($env, $msg) {
             sequence(
                 (map msg( $observer, on_next => [ $_ ] ), split '' => $string),
                 msg( $observer, on_completed => [] ),
-                sys::kill(PID)
+                sig::kill(PID)
             )->send;
         },
     };

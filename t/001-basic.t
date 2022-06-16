@@ -42,7 +42,7 @@ actor env => sub ($env, $msg) {
         },
         finish => sub ($expected_env) {
             err::log("finishing env and testing output")->send if DEBUG;
-            sys::kill(PID)->send;
+            sig::kill(PID)->send;
             eq_or_diff($expected_env, $env, '... got the env we expected');
         }
     };

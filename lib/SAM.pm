@@ -137,7 +137,7 @@ package SAM::Process::Record {
 
 our $INIT_PID = '000:<init>';
 
-sub sys::kill($pid) {
+sub sig::kill($pid) {
     msg( $INIT_PID, kill => [ $pid ] );
 }
 

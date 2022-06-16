@@ -29,7 +29,7 @@ actor CharacterStream => sub ($env, $msg) {
             return_to shift @$chars // EMPTY;
         },
         finish => sub () {
-            sys::kill(PID)->send;
+            sig::kill(PID)->send;
         },
     };
 };
@@ -61,7 +61,7 @@ actor Decoder => sub ($env, $msg) {
         finish     => sub () {
             out::print( (Dumper $stack->[0]) =~ s/^\$VAR1\s/PARENS /r )->send #/
                 if @$stack == 1;
-            sys::kill(PID)->send;
+            sig::kill(PID)->send;
         },
     };
 };
@@ -82,7 +82,7 @@ actor Tokenizer => sub ($env, $msg) {
             err::log("Finishing")->send if DEBUG_TOKENIZER;
             msg( $producer, finish => [])->send;
             msg( $observer, finish => [])->send;
-            sys::kill(PID)->send;
+            sig::kill(PID)->send;
         },
         error => sub ($producer, $observer, $error) {
             @$stack = ();
