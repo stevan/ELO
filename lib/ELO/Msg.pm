@@ -24,9 +24,9 @@ our @EXPORT = qw[
 ## Message Queue
 ## ----------------------------------------------------------------------------
 
-my @msg_outbox;
+my @MSG_OUTBOX;
 
-sub _message_outbox () { @msg_outbox }
+sub _message_outbox () { @MSG_OUTBOX }
 
 sub recv_from () {
     my $process = proc::lookup( $ELO::CURRENT_PID );
@@ -36,15 +36,15 @@ sub recv_from () {
 }
 
 sub return_to ($msg) {
-    push @msg_outbox => [ $ELO::CURRENT_PID, $ELO::CURRENT_CALLER, $msg ];
+    push @MSG_OUTBOX => [ $ELO::CURRENT_PID, $ELO::CURRENT_CALLER, $msg ];
 }
 
 sub _accept_all_messages () {
-    warn Dumper \@msg_outbox if DEBUG >= 4;
+    warn Dumper \@MSG_OUTBOX if DEBUG >= 4;
 
     # accept all the messages in the queue
-    while (@msg_outbox) {
-        my $next = shift @msg_outbox;
+    while (@MSG_OUTBOX) {
+        my $next = shift @MSG_OUTBOX;
 
         my $from = shift $next->@*;
         my ($to, $m) = $next->@*;
@@ -58,29 +58,29 @@ sub _accept_all_messages () {
 }
 
 sub _remove_all_outbox_messages_for_pid ($pid) {
-    @msg_outbox = grep { $_->[1] ne $pid } @msg_outbox;
+    @MSG_OUTBOX = grep { $_->[1] ne $pid } @MSG_OUTBOX;
 }
 
-my @msg_inbox;
+my @MSG_INBOX;
 
-sub _message_inbox () { @msg_inbox }
+sub _message_inbox () { @MSG_INBOX }
 
-sub _has_inbox_messages () { scalar @msg_inbox == 0 }
+sub _has_inbox_messages () { scalar @MSG_INBOX == 0 }
 
 sub _send_to ($msg) {
-    push @msg_inbox => [ $ELO::CURRENT_PID, $msg ];
+    push @MSG_INBOX => [ $ELO::CURRENT_PID, $msg ];
 }
 
 sub _send_from ($from, $msg) {
-    push @msg_inbox => [ $from, $msg ];
+    push @MSG_INBOX => [ $from, $msg ];
 }
 
 sub _deliver_all_messages () {
-    warn Dumper \@msg_inbox  if DEBUG >= 4;
+    warn Dumper \@MSG_INBOX  if DEBUG >= 4;
 
     # deliver all the messages in the queue
-    while (@msg_inbox) {
-        my $next = shift @msg_inbox;
+    while (@MSG_INBOX) {
+        my $next = shift @MSG_INBOX;
         #warn Dumper $next;
         my ($from, $msg) = $next->@*;
         my $process = proc::lookup( $msg->pid );
@@ -93,7 +93,7 @@ sub _deliver_all_messages () {
 }
 
 sub _remove_all_inbox_messages_for_pid ($pid) {
-    @msg_inbox  = grep { $_->[1]->pid ne $pid } @msg_inbox;
+    @MSG_INBOX = grep { $_->[1]->pid ne $pid } @MSG_INBOX;
 }
 
 # ....
