@@ -156,8 +156,7 @@ sub sys::waitpid($pid, $callback) {
 ## ----------------------------------------------------------------------------
 
 sub timeout ($ticks, $callback) {
-    croak 'You must supply a ticks value'.(defined $ticks ? ' and it must be greater than 0' : '')
-        unless $ticks;
+    croak 'You must supply a ticks value' unless defined $ticks;
     croak 'You must supply a callback msg()'
         unless blessed $callback && $callback->isa('ELO::Msg::Message');
     msg( proc::spawn( '!timeout' ), countdown => [ $ticks, $callback ] );
