@@ -106,6 +106,8 @@ package SAM::Msg::Message {
     use warnings;
     use experimental 'signatures', 'postderef';
 
+    use Scalar::Util ();
+
     sub pid    ($self) { $self->[0] }
     sub action ($self) { $self->[1] }
     sub body   ($self) { $self->[2] }
@@ -116,6 +118,22 @@ package SAM::Msg::Message {
 
     sub send ($self) { SAM::Msg::_send_to( $self ); $self }
     sub send_from ($self, $caller) { SAM::Msg::_send_from($caller, $self); $self }
+
+    sub to_string ($self) {
+        join '' =>
+            $self->pid, ' -> ',
+                $self->action, ' [ ',
+                    (join ', ' => map {
+                        Scalar::Util::blessed($_)
+                            ? ('('.$_->to_string.')')
+                            : (ref $_
+                                ? (ref $_ eq 'ARRAY'
+                                    ? ('['.(join ', ' => map { Scalar::Util::blessed($_) ? $_->to_string : $_ } @$_).']')
+                                    : ('{',(join ', ' => %$_),'}'))
+                                : $_)
+                    } $self->body->@*),
+                ' ]';
+    }
 }
 
 package SAM::Msg::CurriedMessage {

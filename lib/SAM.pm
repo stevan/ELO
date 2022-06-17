@@ -9,7 +9,7 @@ our $AUTHORITY = 'cpan:STEVAN';
 
 use List::Util 'max';
 use Data::Dumper 'Dumper';
-use Term::ANSIColor ':constants', 'color';
+use Term::ANSIColor ':constants';
 use Term::ReadKey 'GetTerminalSize';
 
 use SAM::Actors;
@@ -180,7 +180,7 @@ sub loop ( $MAX_TICKS, $start_pid ) {
             },
             waitpid => sub ($pid, $callback) {
                 if (proc::exists($pid)) {
-                    warn( $prefix, "setting watch for ($pid) ...\n" ) if DEBUG;
+                    warn( $prefix, "setting watcher for ($pid) ...\n" ) if DEBUG;
                     push @{ $PID_WATCHERS{$pid} //=[] } => [
                         $CURRENT_CALLER,
                         $callback
@@ -245,6 +245,8 @@ sub loop ( $MAX_TICKS, $start_pid ) {
 
                 local $CURRENT_PID    = $active->pid;
                 local $CURRENT_CALLER = $from;
+
+                say BLUE " >>> calling : ", CYAN $msg->to_string, RESET if DEBUG >= 3;
 
                 $active->actor->($active->env, $msg);
             }
@@ -436,6 +438,8 @@ actor '!parallel' => sub ($env, $msg) {
 __END__
 
 =pod
+
+use Term::ANSIColor 'color';
 
 # re-implement later ...
 if ( DEBUGGER ) {
