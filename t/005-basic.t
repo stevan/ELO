@@ -125,7 +125,7 @@ actor ComplexObservable => sub ($env, $msg) {
             err::log("ComplexObserveable started, calling ($observer)") if DEBUG;
 
             my @pids = map {
-                timeout( int(rand(9)), msg( $observer, on_next => [ $_ ] ))->send->pid
+                timeout( int(rand(8))+1, msg( $observer, on_next => [ $_ ] ))->send->pid
             } 0 .. 10;
 
             msg(
