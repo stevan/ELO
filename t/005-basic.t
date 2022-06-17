@@ -77,30 +77,44 @@ actor SimpleObservable => sub ($env, $msg) {
     };
 };
 
-actor Watcher => sub ($env, $msg) {
+actor PidExitObserver => sub ($env, $msg) {
 
-    my $watched_pids = $env->{pids} //= {};
+    my $pids         = $env->{pids}         // die 'PidExitObserver requires `pids`';
+    my $on_completed = $env->{on_completed} // die 'PidExitObserver requires `on_completed`';
+
+    match $msg, +{
+        on_next => sub ($pid) {
+            @$pids = grep $_ ne $pid, @$pids;
+            if (!@$pids) {
+                msg(PID, on_completed => [])->send;
+            }
+        },
+        on_completed => sub () {
+            my ($caller, $callback) = @$on_completed;
+            $callback->send_from($caller);
+            sig::kill(PID)->send;
+        }
+    }
+};
+
+actor PidExitObservable => sub ($env, $msg) {
 
     match $msg, +{
         waitpids => sub ($pids, $callback) {
-            my $i = 0;
+
+            my $observer = proc::spawn('PidExitObserver',
+                pids         => $pids,
+                on_completed => [
+                    CALLER,
+                    parallel( $callback, sig::kill(PID) )
+                ]
+            );
+
             foreach my $pid ( @$pids ) {
                 #warn PID." WATCHING PID: $pid";
-                $watched_pids->{$pid}++;
-                sys::waitpid( $pid, msg(PID, on_pid_exit => [ $pid, CALLER(), $callback ]) )->send;
+                sys::waitpid( $pid, msg($observer, on_next => [ $pid ]) )->send;
             }
         },
-        on_pid_exit => sub ($pid, $caller, $callback) {
-            delete $watched_pids->{$pid};
-            unless ( keys $watched_pids->%* ) {
-                #warn PID." FIRE CALLBACK AFTER FINAL PID : $pid";
-                $callback->send_from($caller);
-                sig::kill(PID)->send;
-            }
-            #else {
-                #warn PID." STILL WATCHING: ". (join ', ' => keys $watched_pids->%*);
-            #}
-        }
     };
 };
 
@@ -115,7 +129,7 @@ actor ComplexObservable => sub ($env, $msg) {
             } 0 .. 10;
 
             msg(
-                proc::spawn('Watcher'),
+                proc::spawn('PidExitObservable'),
                 waitpids => [
                     \@pids,
                     parallel(
