@@ -90,23 +90,22 @@ sub proc::spawn ($name, %env) {
     $pid;
 }
 
-my %to_be_despawned;
 sub proc::despawn ($pid) {
     croak 'You must supply a pid to despawn' unless $pid;
-    $to_be_despawned{$pid}++;
     $PROCESS_TABLE{ $pid }->set_status(EXITING);
 }
 
 sub proc::despawn_all_exiting_pids ( $on_exit ) {
-    foreach my $pid (keys %to_be_despawned) {
-        ELO::Msg::_remove_all_inbox_messages_for_pid($pid);
-        ELO::Msg::_remove_all_outbox_messages_for_pid($pid);
+    foreach my $pid (keys %PROCESS_TABLE) {
+        my $proc = $PROCESS_TABLE{$pid};
+        if ( $proc->status == EXITING ) {
+            ELO::Msg::_remove_all_inbox_messages_for_pid($pid);
+            ELO::Msg::_remove_all_outbox_messages_for_pid($pid);
 
-        (delete $PROCESS_TABLE{ $pid })->set_status(DONE);
-        $on_exit->( $pid );
+            (delete $PROCESS_TABLE{ $pid })->set_status(DONE);
+            $on_exit->( $pid );
+        }
     }
-
-    %to_be_despawned = ();
 }
 
 package ELO::Process::Record {
