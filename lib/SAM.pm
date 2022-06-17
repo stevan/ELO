@@ -7,6 +7,8 @@ use experimental 'signatures', 'postderef';
 our $VERSION   = '0.01';
 our $AUTHORITY = 'cpan:STEVAN';
 
+use Carp 'croak';
+use Scalar::Util 'blessed';
 use List::Util 'max';
 use Data::Dumper 'Dumper';
 use Term::ANSIColor ':constants';
@@ -70,11 +72,18 @@ use constant DONE    => 5; # the end
 my $PID_ID = 0;
 my %PROCESS_TABLE;
 
-sub proc::exists ($pid) { exists $PROCESS_TABLE{$pid} }
+sub proc::exists ($pid) {
+    croak 'You must supply a pid' unless $pid;
+    exists $PROCESS_TABLE{$pid}
+}
 
-sub proc::lookup ($pid) { $PROCESS_TABLE{$pid} }
+sub proc::lookup ($pid) {
+    croak 'You must supply a pid to lookup' unless $pid;
+    $PROCESS_TABLE{$pid};
+}
 
 sub proc::spawn ($name, %env) {
+    croak 'You must supply an actor name to spawn' unless $name;
     my $pid     = sprintf '%03d:%s' => ++$PID_ID, $name;
     my $process = bless [ $pid, READY, [], [], { %env }, SAM::Actors::get_actor($name) ] => 'SAM::Process::Record';
     $PROCESS_TABLE{ $pid } = $process;
@@ -83,6 +92,7 @@ sub proc::spawn ($name, %env) {
 
 my %to_be_despawned;
 sub proc::despawn ($pid) {
+    croak 'You must supply a pid to despawn' unless $pid;
     $to_be_despawned{$pid}++;
     $PROCESS_TABLE{ $pid }->set_status(EXITING);
 }
@@ -123,14 +133,22 @@ package SAM::Process::Record {
 our $INIT_PID = '000:<init>';
 
 sub sig::kill($pid) {
+    croak 'You must supply a pid to kill' unless $pid;
     msg( $INIT_PID, kill => [ $pid ] );
 }
 
 sub sig::timer($timeout, $callback) {
+    croak 'You must supply a timeout value'.(defined $timeout ? ' and it must be greater than 0' : '')
+        unless $timeout;
+    croak 'You must supply a callback msg()'
+        unless blessed $callback && $callback->isa('SAM::Msg::Message');
     msg( $INIT_PID, timer => [ $timeout, $callback ] );
 }
 
 sub sys::waitpid($pid, $callback) {
+    croak 'You must supply a pid value' unless $pid;
+    croak 'You must supply a callback msg()'
+        unless blessed $callback && $callback->isa('SAM::Msg::Message');
     msg( $INIT_PID, waitpid => [ $pid, $callback ] );
 }
 
@@ -139,10 +157,18 @@ sub sys::waitpid($pid, $callback) {
 ## ----------------------------------------------------------------------------
 
 sub timeout ($ticks, $callback) {
+    croak 'You must supply a ticks value'.(defined $ticks ? ' and it must be greater than 0' : '')
+        unless $ticks;
+    croak 'You must supply a callback msg()'
+        unless blessed $callback && $callback->isa('SAM::Msg::Message');
     msg( proc::spawn( '!timeout' ), countdown => [ $ticks, $callback ] );
 }
 
 sub sync ($input, $output) {
+    croak 'You must supply a input msg()'
+        unless blessed $input && $input->isa('SAM::Msg::Message');
+    croak 'You must supply a output msg()'
+        unless blessed $output && $output->isa('SAM::Msg::Message');
     msg( proc::spawn( '!sync' ), send => [ $input, $output ] );
 }
 
@@ -151,10 +177,16 @@ sub ident ($val=undef) {
 }
 
 sub sequence (@statements) {
+    (blessed $_ && $_->isa('SAM::Msg::Message'))
+        || croak 'You must supply a sequence of msg()s, not '.$_
+            foreach @statements;
     msg( proc::spawn( '!sequence' ), next => [ @statements ] );
 }
 
 sub parallel (@statements) {
+    (blessed $_ && $_->isa('SAM::Msg::Message'))
+        || croak 'You must supply a sequence of msg()s, not '.$_
+            foreach @statements;
     msg( proc::spawn( '!parallel' ), all => [ @statements ] );
 }
 
