@@ -16,14 +16,14 @@ our @EXPORT = qw[
     actor
 ];
 
-my %actors;
+my %ACTORS;
 
 sub get_actor ($name) {
-    $actors{$name};
+    $ACTORS{$name};
 }
 
 sub actor ($name, $recieve) {
-    $actors{$name} = $recieve;
+    $ACTORS{$name} = $recieve;
 }
 
 sub match ($msg, $table) {
