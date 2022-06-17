@@ -137,8 +137,7 @@ sub sig::kill($pid) {
 }
 
 sub sig::timer($timeout, $callback) {
-    croak 'You must supply a timeout value'.(defined $timeout ? ' and it must be greater than 0' : '')
-        unless $timeout;
+    croak 'You must supply a timeout value' unless defined $timeout;
     croak 'You must supply a callback msg()'
         unless blessed $callback && $callback->isa('ELO::Msg::Message');
     msg( $INIT_PID, timer => [ $timeout, $callback ] );
@@ -225,10 +224,15 @@ sub loop ( $MAX_TICKS, $start_pid ) {
 
                 $timeout--; # subtrack one for this tick ...
 
-                push @{ $TIMERS{ $CURRENT_TICK + $timeout } //= [] } => [
-                    $CURRENT_CALLER,
-                    $callback
-                ];
+                if ( $timeout <= 0 ) {
+                    $callback->send_from($CURRENT_CALLER);
+                }
+                else {
+                    push @{ $TIMERS{ $CURRENT_TICK + $timeout } //= [] } => [
+                        $CURRENT_CALLER,
+                        $callback
+                    ];
+                }
             }
         };
     }] => 'ELO::Process::Record';
@@ -389,8 +393,8 @@ actor '!timeout' => sub ($env, $msg) {
     match $msg, +{
         countdown => sub ($timer, $event) {
 
-            if ( $timer == 0 ) {
-                err::log( "*/ !timeout! /* : timer DONE")->send if DEBUG;
+            if ( $timer <= 0 ) {
+                err::log( "*/ !timeout! /* : timer DONE ($timer)")->send if DEBUG;
                 $event->send_from( $CURRENT_CALLER );
                 proc::despawn( $CURRENT_PID );
             }

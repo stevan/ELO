@@ -18,9 +18,11 @@ use ELO::IO;
 actor main => sub ($env, $msg) {
     out::print("-> main starting ...")->send;
 
-    sig::timer( 10, out::print("hello 2") )->send;
-    sig::timer( 9,  out::print("hello 1") )->send;
+    sig::timer( 0,  out::print("hello -2") )->send;
+    sig::timer( 1,  out::print("hello -1") )->send;
     sig::timer( 5,  out::print("hello 0") )->send;
+    sig::timer( 9,  out::print("hello 1") )->send;
+    sig::timer( 10, out::print("hello 2") )->send;
 };
 
 # loop ...
