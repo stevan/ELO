@@ -14,14 +14,6 @@ use ELO (); # circular dep
 use ELO::Msg;
 use ELO::Actors;
 
-sub QUIET () {
-    ELO->DEBUG()
-        # if we are DEBUG-ing, do not be quiet
-        ? 0
-        # if we are testing, be quiet
-        : $Test::ELO::TESTING
-}
-
 our $IN;
 our $OUT;
 our $ERR;
@@ -52,6 +44,14 @@ sub in::read ($prompt=undef) {
 }
 
 ## ... actors
+
+sub QUIET () {
+    ELO->DEBUG()
+        # if we are DEBUG-ing, do not be quiet
+        ? 0
+        # if we are testing, be quiet
+        : $Test::ELO::TESTING
+}
 
 my %INDENTS;
 
