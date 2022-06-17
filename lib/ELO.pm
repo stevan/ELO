@@ -1,4 +1,4 @@
-package SAM;
+package ELO;
 
 use v5.24;
 use warnings;
@@ -14,9 +14,9 @@ use Data::Dumper 'Dumper';
 use Term::ANSIColor ':constants';
 use Term::ReadKey 'GetTerminalSize';
 
-use SAM::Actors;
-use SAM::IO;
-use SAM::Msg;
+use ELO::Actors;
+use ELO::IO;
+use ELO::Msg;
 
 use Exporter 'import';
 
@@ -85,7 +85,7 @@ sub proc::lookup ($pid) {
 sub proc::spawn ($name, %env) {
     croak 'You must supply an actor name to spawn' unless $name;
     my $pid     = sprintf '%03d:%s' => ++$PID_ID, $name;
-    my $process = bless [ $pid, READY, [], [], { %env }, SAM::Actors::get_actor($name) ] => 'SAM::Process::Record';
+    my $process = bless [ $pid, READY, [], [], { %env }, ELO::Actors::get_actor($name) ] => 'ELO::Process::Record';
     $PROCESS_TABLE{ $pid } = $process;
     $pid;
 }
@@ -99,8 +99,8 @@ sub proc::despawn ($pid) {
 
 sub proc::despawn_all_exiting_pids ( $on_exit ) {
     foreach my $pid (keys %to_be_despawned) {
-        SAM::Msg::_remove_all_inbox_messages_for_pid($pid);
-        SAM::Msg::_remove_all_outbox_messages_for_pid($pid);
+        ELO::Msg::_remove_all_inbox_messages_for_pid($pid);
+        ELO::Msg::_remove_all_outbox_messages_for_pid($pid);
 
         (delete $PROCESS_TABLE{ $pid })->set_status(DONE);
         $on_exit->( $pid );
@@ -109,7 +109,7 @@ sub proc::despawn_all_exiting_pids ( $on_exit ) {
     %to_be_despawned = ();
 }
 
-package SAM::Process::Record {
+package ELO::Process::Record {
     use v5.24;
     use warnings;
     use experimental 'signatures', 'postderef';
@@ -141,14 +141,14 @@ sub sig::timer($timeout, $callback) {
     croak 'You must supply a timeout value'.(defined $timeout ? ' and it must be greater than 0' : '')
         unless $timeout;
     croak 'You must supply a callback msg()'
-        unless blessed $callback && $callback->isa('SAM::Msg::Message');
+        unless blessed $callback && $callback->isa('ELO::Msg::Message');
     msg( $INIT_PID, timer => [ $timeout, $callback ] );
 }
 
 sub sys::waitpid($pid, $callback) {
     croak 'You must supply a pid value' unless $pid;
     croak 'You must supply a callback msg()'
-        unless blessed $callback && $callback->isa('SAM::Msg::Message');
+        unless blessed $callback && $callback->isa('ELO::Msg::Message');
     msg( $INIT_PID, waitpid => [ $pid, $callback ] );
 }
 
@@ -160,15 +160,15 @@ sub timeout ($ticks, $callback) {
     croak 'You must supply a ticks value'.(defined $ticks ? ' and it must be greater than 0' : '')
         unless $ticks;
     croak 'You must supply a callback msg()'
-        unless blessed $callback && $callback->isa('SAM::Msg::Message');
+        unless blessed $callback && $callback->isa('ELO::Msg::Message');
     msg( proc::spawn( '!timeout' ), countdown => [ $ticks, $callback ] );
 }
 
 sub sync ($input, $output) {
     croak 'You must supply a input msg()'
-        unless blessed $input && $input->isa('SAM::Msg::Message');
+        unless blessed $input && $input->isa('ELO::Msg::Message');
     croak 'You must supply a output msg()'
-        unless blessed $output && $output->isa('SAM::Msg::Message');
+        unless blessed $output && $output->isa('ELO::Msg::Message');
     msg( proc::spawn( '!sync' ), send => [ $input, $output ] );
 }
 
@@ -177,14 +177,14 @@ sub ident ($val=undef) {
 }
 
 sub sequence (@statements) {
-    (blessed $_ && $_->isa('SAM::Msg::Message'))
+    (blessed $_ && $_->isa('ELO::Msg::Message'))
         || croak 'You must supply a sequence of msg()s, not '.$_
             foreach @statements;
     msg( proc::spawn( '!sequence' ), next => [ @statements ] );
 }
 
 sub parallel (@statements) {
-    (blessed $_ && $_->isa('SAM::Msg::Message'))
+    (blessed $_ && $_->isa('ELO::Msg::Message'))
         || croak 'You must supply a sequence of msg()s, not '.$_
             foreach @statements;
     msg( proc::spawn( '!parallel' ), all => [ @statements ] );
@@ -233,7 +233,7 @@ sub loop ( $MAX_TICKS, $start_pid ) {
                 ];
             }
         };
-    }] => 'SAM::Process::Record';
+    }] => 'ELO::Process::Record';
 
     # initialise ...
     my $start = proc::spawn( $start_pid );
@@ -260,8 +260,8 @@ sub loop ( $MAX_TICKS, $start_pid ) {
             }
         }
 
-        SAM::Msg::_deliver_all_messages();
-        SAM::Msg::_accept_all_messages();
+        ELO::Msg::_deliver_all_messages();
+        ELO::Msg::_accept_all_messages();
 
         my @ready = grep scalar $_->inbox->@*,
                     grep $_->status == READY,
@@ -307,7 +307,7 @@ sub loop ( $MAX_TICKS, $start_pid ) {
 
         warn Dumper {
             active_processes => \@active_processes,
-            msg_inbox        => [ SAM::Msg::_message_inbox() ],
+            msg_inbox        => [ ELO::Msg::_message_inbox() ],
         } if DEBUG >= 3;
 
         if ($should_exit) {
@@ -318,13 +318,13 @@ sub loop ( $MAX_TICKS, $start_pid ) {
         #warn "TIMER COUNTER: " . scalar(keys %TIMERS);
         #warn "ACTIVE : " . scalar(@active_processes);
         #warn "TICK : " . $tick;
-        #warn "INBOX : " . Dumper [ SAM::Msg::_message_inbox() ];
+        #warn "INBOX : " . Dumper [ ELO::Msg::_message_inbox() ];
 
         # at least do one tick before shutting things down ...
         if ( $tick > 1 && scalar @active_processes == 0 && scalar(keys %TIMERS) == 0 ) {
             #warn "gonna exit ...";
             # loop one last time to flush any I/O
-            if ( SAM::Msg::_has_inbox_messages() ) {
+            if ( ELO::Msg::_has_inbox_messages() ) {
                 $has_exited++;
                 last;
             }

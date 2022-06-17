@@ -1,4 +1,4 @@
-package SAM::IO;
+package ELO::IO;
 
 use v5.24;
 use warnings;
@@ -10,28 +10,28 @@ our $AUTHORITY = 'cpan:STEVAN';
 use Data::Dumper 'Dumper';
 use Term::ANSIColor ':constants';
 
-use SAM (); # circular dep
-use SAM::Msg;
-use SAM::Actors;
+use ELO (); # circular dep
+use ELO::Msg;
+use ELO::Actors;
 
 sub QUIET () {
-    SAM->DEBUG()
+    ELO->DEBUG()
         # if we are DEBUG-ing, do not be quiet
         ? 0
         # if we are testing, be quiet
-        : $Test::SAM::TESTING
+        : $Test::ELO::TESTING
 }
 
 our $IN;
 our $OUT;
 our $ERR;
 
-sub err::log ($msg, $caller=$SAM::CURRENT_CALLER) {
+sub err::log ($msg, $caller=$ELO::CURRENT_CALLER) {
     $ERR //= proc::spawn('#err');
     msg($ERR, print => [ $msg, $caller ]);
 }
 
-sub err::logf ($fmt, $msg, $caller=$SAM::CURRENT_CALLER) {
+sub err::logf ($fmt, $msg, $caller=$ELO::CURRENT_CALLER) {
     $ERR //= proc::spawn('#err');
     msg($ERR, printf => [ $fmt, $msg, $caller ]);
 }
@@ -56,20 +56,20 @@ sub in::read ($prompt=undef) {
 my %INDENTS;
 
 actor '#err' => sub ($env, $msg) {
-    my $prefix = SAM::DEBUG()
-        ? ON_RED "LOG (".$SAM::CURRENT_CALLER.") !!". RESET " "
+    my $prefix = ELO::DEBUG()
+        ? ON_RED "LOG (".$ELO::CURRENT_CALLER.") !!". RESET " "
         : ON_RED "LOG !!". RESET " ";
 
     match $msg, +{
         printf => sub ($fmt, $values, $caller='') {
 
             if ($caller) {
-                $INDENTS{ $SAM::CURRENT_CALLER } = ($INDENTS{ $caller } // 0) + 1
-                    unless exists $INDENTS{ $SAM::CURRENT_CALLER };
+                $INDENTS{ $ELO::CURRENT_CALLER } = ($INDENTS{ $caller } // 0) + 1
+                    unless exists $INDENTS{ $ELO::CURRENT_CALLER };
 
                 $prefix = FAINT
                     RED
-                        ('-' x $INDENTS{ $SAM::CURRENT_CALLER }).'> '
+                        ('-' x $INDENTS{ $ELO::CURRENT_CALLER }).'> '
                     . RESET $prefix;
             }
 
@@ -83,12 +83,12 @@ actor '#err' => sub ($env, $msg) {
         print => sub ($msg, $caller='') {
 
             if ($caller) {
-                $INDENTS{ $SAM::CURRENT_CALLER } = ($INDENTS{ $caller } // 0) + 1
-                    unless exists $INDENTS{ $SAM::CURRENT_CALLER };
+                $INDENTS{ $ELO::CURRENT_CALLER } = ($INDENTS{ $caller } // 0) + 1
+                    unless exists $INDENTS{ $ELO::CURRENT_CALLER };
 
                 $prefix = FAINT
                     RED
-                        ('-' x $INDENTS{ $SAM::CURRENT_CALLER }).'> '
+                        ('-' x $INDENTS{ $ELO::CURRENT_CALLER }).'> '
                     . RESET $prefix;
             }
 
@@ -103,8 +103,8 @@ actor '#err' => sub ($env, $msg) {
 };
 
 actor '#out' => sub ($env, $msg) {
-    my $prefix = SAM::DEBUG()
-        ? ON_GREEN "OUT (".$SAM::CURRENT_CALLER.") >>". RESET " "
+    my $prefix = ELO::DEBUG()
+        ? ON_GREEN "OUT (".$ELO::CURRENT_CALLER.") >>". RESET " "
         : ON_GREEN "OUT >>". RESET " ";
 
     match $msg, +{
@@ -118,8 +118,8 @@ actor '#out' => sub ($env, $msg) {
 };
 
 actor '#in' => sub ($env, $msg) {
-    my $prefix = SAM::DEBUG()
-        ? ON_CYAN "IN (".$SAM::CURRENT_CALLER.") <<". RESET " "
+    my $prefix = ELO::DEBUG()
+        ? ON_CYAN "IN (".$ELO::CURRENT_CALLER.") <<". RESET " "
         : ON_CYAN "IN <<". RESET " ";
 
     match $msg, +{
@@ -129,7 +129,7 @@ actor '#in' => sub ($env, $msg) {
             print( $prefix, $prompt );
             my $input = <>;
             chomp $input;
-            SAM::return_to( $input );
+            ELO::return_to( $input );
         }
     };
 };

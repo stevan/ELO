@@ -1,4 +1,4 @@
-package Test::SAM;
+package Test::ELO;
 
 use v5.24;
 use warnings;

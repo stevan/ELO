@@ -6,15 +6,15 @@ use experimental 'signatures', 'postderef';
 
 use Test::More;
 use Test::Differences;
-use Test::SAM;
+use Test::ELO;
 
 use List::Util 'first';
 use Data::Dumper;
 
-use SAM;
-use SAM::Msg;
-use SAM::Actors;
-use SAM::IO;
+use ELO;
+use ELO::Msg;
+use ELO::Actors;
+use ELO::IO;
 
 # ... userland ...
 actor env => sub ($env, $msg) {

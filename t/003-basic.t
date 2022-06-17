@@ -5,15 +5,15 @@ use warnings;
 use experimental 'lexical_subs', 'signatures', 'postderef';
 
 use Test::More;
-use Test::SAM;
+use Test::ELO;
 
 use List::Util 'first';
 use Data::Dumper;
 
-use SAM;
-use SAM::Msg;
-use SAM::Actors;
-use SAM::IO;
+use ELO;
+use ELO::Msg;
+use ELO::Actors;
+use ELO::IO;
 
 use constant EMPTY => '!!EMPTY!!';
 

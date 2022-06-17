@@ -1,4 +1,4 @@
-package SAM::Actors;
+package ELO::Actors;
 
 use v5.24;
 use warnings;
