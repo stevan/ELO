@@ -77,58 +77,6 @@ actor SimpleObservable => sub ($env, $msg) {
     };
 };
 
-actor PidExitObserver => sub ($env, $msg) {
-
-    my $pids         = $env->{pids}         // die 'PidExitObserver requires `pids`';
-    my $on_completed = $env->{on_completed} // die 'PidExitObserver requires `on_completed`';
-
-    match $msg, +{
-        on_next => sub ($pid) {
-            @$pids = grep $_ ne $pid, @$pids;
-            if (!@$pids) {
-                msg(PID, on_completed => [])->send;
-            }
-        },
-        on_completed => sub () {
-            my ($caller, $callback) = @$on_completed;
-            $callback->send_from($caller);
-            sig::kill(PID)->send;
-        }
-    }
-};
-
-actor PidExitObservable => sub ($env, $msg) {
-
-    match $msg, +{
-        waitpids => sub ($pids, $callback) {
-
-            my $observer = proc::spawn('PidExitObserver',
-                pids         => $pids,
-                on_completed => [
-                    CALLER,
-                    parallel( $callback, sig::kill(PID) )
-                ]
-            );
-
-            foreach my $pid ( @$pids ) {
-                #warn PID." WATCHING PID: $pid";
-                sys::waitpid( $pid, msg($observer, on_next => [ $pid ]) )->send;
-            }
-        },
-    };
-};
-
-# msg(
-#     proc::spawn('PidExitObservable'),
-#     waitpids => [
-#         \@pids,
-#         parallel(
-#             msg( $observer, on_completed => []),
-#             sig::kill(PID)
-#         )
-#     ]
-# )->send;
-
 actor ComplexObservable => sub ($env, $msg) {
 
     match $msg, +{
