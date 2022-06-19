@@ -304,29 +304,6 @@ sub loop ( $MAX_TICKS, $start_pid ) {
             }
         }
 
-        my @io = grep scalar $_->inbox->@*,
-                 grep $_->status == READY,
-                 map $PROCESS_TABLE{$_},
-                 grep /^\d\d\d:\#/,
-                 sort keys %PROCESS_TABLE;
-
-        while (@io) {
-            my $active = shift @io;
-
-            while ( $active->inbox->@* ) {
-
-                my ($from, $msg) = @{ shift $active->inbox->@* };
-
-                local $CURRENT_PID    = $active->pid;
-                local $CURRENT_CALLER = $from;
-
-                say BLUE " >>> calling : ", CYAN $msg->to_string, RESET
-                    if DEBUG_CALLS;
-
-                $active->actor->($active->env, $msg);
-            }
-        }
-
         proc::despawn_all_exiting_pids(sub ($pid) {
             if ( exists $WAITPIDS{$pid} ) {
                 my $watchers = delete $WAITPIDS{$pid};
