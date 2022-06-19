@@ -38,14 +38,34 @@ our @EXPORT = qw[
 use constant DEBUG    => $ENV{DEBUG} // '';
 use constant DEBUGGER => $ENV{DEBUGGER} // '';
 
+# -------------------------------------------------
+# DEBUG FLAGS
+# -------------------------------------------------
+# These are the most useful ...
+#
+# LOOP   - this will show ticks, start, exit, etc.
+# SIGS   - any signals sent to the INIT-PID
+# ACTORS - the core actors ...
+# -------------------------------------------------
+# CALLS - prints out the message calls, which is
+#         useful, but a lot of information
+# -------------------------------------------------
+# PROCS, MSGS, TIMERS, WAITPIDS
+#       - heavy duty debugging, and a bit rough,
+#         mostly DataDumper stuff
+# -------------------------------------------------
+
 use constant DEBUG_LOOP     => DEBUG() =~ m/LOOP/     ? 1 : 0 ;
-use constant DEBUG_CALLS    => DEBUG() =~ m/CALLS/    ? 1 : 0 ;
 use constant DEBUG_SIGS     => DEBUG() =~ m/SIGS/     ? 1 : 0 ;
+use constant DEBUG_ACTORS   => DEBUG() =~ m/ACTORS/   ? 1 : 0 ;
+
+use constant DEBUG_CALLS    => DEBUG() =~ m/CALLS/    ? 1 : 0 ;
+
 use constant DEBUG_PROCS    => DEBUG() =~ m/PROCS/    ? 1 : 0 ;
 use constant DEBUG_MSGS     => DEBUG() =~ m/MSGS/     ? 1 : 0 ;
 use constant DEBUG_TIMERS   => DEBUG() =~ m/TIMERS/   ? 1 : 0 ;
 use constant DEBUG_WAITPIDS => DEBUG() =~ m/WAITPIDS/ ? 1 : 0 ;
-use constant DEBUG_ACTORS   => DEBUG() =~ m/ACTORS/   ? 1 : 0 ;
+
 
 ## ----------------------------------------------------------------------------
 ## Misc. stuff
