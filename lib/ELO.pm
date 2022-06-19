@@ -370,24 +370,6 @@ actor '!ident' => sub ($env, $msg) {
     };
 };
 
-# wait, then call statement
-actor '!timeout' => sub ($env, $msg) {
-    match $msg, +{
-        countdown => sub ($timer, $event) {
-
-            if ( $timer <= 0 ) {
-                err::log( "*/ !timeout! /* : timer DONE ($timer)")->send if DEBUG;
-                $event->send_from( $CURRENT_CALLER );
-                proc::despawn( $CURRENT_PID );
-            }
-            else {
-                err::log("*/ !timeout! /* : counting down $timer")->send if DEBUG;
-                msg($CURRENT_PID => countdown => [ $timer - 1, $event ])->send_from( $CURRENT_CALLER );
-            }
-        }
-    };
-};
-
 # ... runnnig muliple statements
 
 actor '!sequence' => sub ($env, $msg) {
