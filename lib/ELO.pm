@@ -22,7 +22,6 @@ use ELO::Msg;
 use Exporter 'import';
 
 our @EXPORT = qw[
-    timeout
     ident
     sequence
     parallel
@@ -152,13 +151,6 @@ sub sys::waitpid($pid, $callback) {
 ## ----------------------------------------------------------------------------
 ## currency control
 ## ----------------------------------------------------------------------------
-
-sub timeout ($ticks, $callback) {
-    croak 'You must supply a ticks value' unless defined $ticks;
-    croak 'You must supply a callback msg()'
-        unless blessed $callback && $callback->isa('ELO::Msg::Message');
-    msg( proc::spawn( '!timeout' ), countdown => [ $ticks, $callback ] );
-}
 
 sub ident ($val, $callback=undef) {
     msg( proc::spawn( '!ident' ), id => [ $val, $callback // () ] );

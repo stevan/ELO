@@ -118,26 +118,32 @@ actor PidExitObservable => sub ($env, $msg) {
     };
 };
 
+# msg(
+#     proc::spawn('PidExitObservable'),
+#     waitpids => [
+#         \@pids,
+#         parallel(
+#             msg( $observer, on_completed => []),
+#             sig::kill(PID)
+#         )
+#     ]
+# )->send;
+
 actor ComplexObservable => sub ($env, $msg) {
 
     match $msg, +{
         subscribe => sub ($observer) {
             err::log("ComplexObserveable started, calling ($observer)") if DEBUG;
 
-            my @pids = map {
-                timeout( int(rand(9)), msg( $observer, on_next => [ $_ ] ))->send->pid
+            map {
+                sig::timer( int(rand(9)), msg( $observer, on_next => [ $_ ] ))->send
             } 0 .. 10;
 
-            msg(
-                proc::spawn('PidExitObservable'),
-                waitpids => [
-                    \@pids,
-                    parallel(
-                        msg( $observer, on_completed => []),
-                        sig::kill(PID)
-                    )
-                ]
-            )->send;
+            sig::timer( 10, parallel(
+                out::print("WTF!"),
+                msg( $observer, on_completed => []),
+                sig::kill(PID)
+            ))->send;
         },
     };
 };

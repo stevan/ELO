@@ -65,14 +65,14 @@ actor main => sub ($env, $msg) {
     # ...
 
     my $timout_length = 2;
-    timeout(
+    sig::timer(
         $timout_length++,
         msg( $e1, get => [ $_, msg::curry( $e2, set => [$_]) ] ),
     )->send foreach qw[ baz bar foo ];
 
     ## ...
 
-    timeout(
+    sig::timer(
         10,
         msg( $e2, get => [ $_, out::printf("$_(%s)") ] ),
     )->send foreach qw[ foo bar baz ];

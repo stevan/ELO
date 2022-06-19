@@ -46,7 +46,7 @@ actor take_10_and_sync => sub ($env, $msg) {
 
     match $msg, +{
         each => sub ($producer, $consumer) {
-            timeout( 10 - $i, msg($producer, next => [ msg($consumer, on_next => []) ]) )->send;
+            sig::timer( 10 - $i, msg($producer, next => [ msg($consumer, on_next => []) ]) )->send;
             $i++;
             msg( PID, each => [ $producer, $consumer ] )->send if $i < 10;
         },
@@ -66,7 +66,7 @@ actor main => sub ($env, $msg) {
     msg( $s, each => [ $p, $c ] )->send;
 
     # cheap hack ...
-    timeout( 18,
+    sig::timer( 18,
         parallel(
             msg($s, finish => []),
             msg($p, finish => []),
