@@ -15,51 +15,11 @@ use Exporter 'import';
 
 our @EXPORT = qw[
     msg
-
-    recv_from
-    return_to
 ];
 
 ## ----------------------------------------------------------------------------
 ## Message Queue
 ## ----------------------------------------------------------------------------
-
-my @MSG_OUTBOX;
-
-sub _message_outbox () { @MSG_OUTBOX }
-
-sub recv_from () {
-    my $process = proc::lookup( $ELO::CURRENT_PID );
-    my $msg = shift $process->outbox->@*;
-    return unless $msg;
-    return $msg->[1];
-}
-
-sub return_to ($msg) {
-    push @MSG_OUTBOX => [ $ELO::CURRENT_PID, $ELO::CURRENT_CALLER, $msg ];
-}
-
-sub _accept_all_messages () {
-    warn Dumper \@MSG_OUTBOX if DEBUG >= 4;
-
-    # accept all the messages in the queue
-    while (@MSG_OUTBOX) {
-        my $next = shift @MSG_OUTBOX;
-
-        my $from = shift $next->@*;
-        my ($to, $m) = $next->@*;
-        my $process = proc::lookup( $to );
-        if ( !$process ) {
-            warn "Got message for unknown pid($to)";
-            next;
-        }
-        push $process->outbox->@* => [ $from, $m ];
-    }
-}
-
-sub _remove_all_outbox_messages_for_pid ($pid) {
-    @MSG_OUTBOX = grep { $_->[1] ne $pid } @MSG_OUTBOX;
-}
 
 my @MSG_INBOX;
 

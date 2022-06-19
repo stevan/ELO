@@ -24,10 +24,10 @@ actor env => sub ($env, $msg) {
             err::log("env initialized to => ENV{ ".(join ', ' => map { join ' => ' => $_, $env->{$_} } keys %$env)." }")->send
                 if DEBUG;
         },
-        get => sub ($key) {
+        get => sub ($key, $callback=undef) {
             if ( exists $env->{$key} ) {
                 err::log("fetching {$key}")->send if DEBUG;
-                return_to( $env->{$key} );
+                $callback->curry( $env->{$key} )->send;
             }
             else {
                 err::log("not found {$key}")->send if DEBUG;
@@ -59,25 +59,22 @@ actor main => sub ($env, $msg) {
     msg( $e1, init => [{ foo => 100, bar => 200, baz => 300 }] )->send;
 
     my $val = 0;
-    sync(
-        # in:read( "$_ : " ),
-        ident($val += 10),
-        msg::curry( $e1, set => [$_])
-    )->send foreach qw[ foo bar baz ];
+    ident($val += 10, msg::curry( $e1, set => [$_]))->send
+        foreach qw[ foo bar baz ];
 
     # ...
 
     my $timout_length = 2;
-    sync(
-        timeout( $timout_length++ => msg( $e1, get => [$_] ) ),
-        msg::curry( $e2, set => [$_])
+    timeout(
+        $timout_length++,
+        msg( $e1, get => [ $_, msg::curry( $e2, set => [$_]) ] ),
     )->send foreach qw[ baz bar foo ];
 
     ## ...
 
-    sync(
-        timeout( 10, msg( $e2, get => [$_] ) ),
-        out::printf("$_(%s)")
+    timeout(
+        10,
+        msg( $e2, get => [ $_, out::printf("$_(%s)") ] ),
     )->send foreach qw[ foo bar baz ];
 
     sig::timer( 12,

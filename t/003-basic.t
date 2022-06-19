@@ -25,8 +25,9 @@ actor CharacterStream => sub ($env, $msg) {
     my $chars = $env->{chars} //= [ split '' => $env->{string} ];
 
     match $msg, +{
-        next => sub () {
-            return_to shift @$chars // EMPTY;
+        next => sub ($callback) {
+            my $next = shift @$chars // EMPTY;
+            $callback->curry( $next )->send;
         },
         finish => sub () {
             sig::kill(PID)->send;
@@ -71,10 +72,9 @@ actor Tokenizer => sub ($env, $msg) {
     my $stack = $env->{stack} //= [];
 
     my sub sync_next ($producer, $observer, $action) {
-        sync(
-            msg( $producer, next => [] ),
-            msg( PID, $action => [$producer, $observer] ),
-        );
+        msg( $producer, next => [
+            msg::curry( PID, $action => [$producer, $observer] )
+        ])
     }
 
     match $msg, +{

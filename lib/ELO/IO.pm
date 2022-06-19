@@ -123,13 +123,13 @@ actor '#in' => sub ($env, $msg) {
         : ON_CYAN "IN <<". RESET " ";
 
     match $msg, +{
-        read => sub ($prompt) {
+        read => sub ($prompt, $callback) {
             $prompt //= '';
 
             print( $prefix, $prompt );
             my $input = <>;
             chomp $input;
-            ELO::return_to( $input );
+            $callback->curry( $input )->send;
         }
     };
 };

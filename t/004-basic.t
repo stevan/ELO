@@ -32,8 +32,8 @@ actor collector => sub ($env, $msg) {
 actor counter => sub ($env, $msg) {
     state $count = 0;
     match $msg, +{
-        next => sub () {
-            return_to( ++$count );
+        next => sub ($callback) {
+            $callback->curry( ++$count )->send;
         },
         finish => sub () {
             sig::kill(PID)->send;
@@ -46,10 +46,7 @@ actor take_10_and_sync => sub ($env, $msg) {
 
     match $msg, +{
         each => sub ($producer, $consumer) {
-            sync(
-                timeout( 10 - $i, msg($producer, next => []) ),
-                msg($consumer, on_next => [])
-            )->send;
+            timeout( 10 - $i, msg($producer, next => [ msg($consumer, on_next => []) ]) )->send;
             $i++;
             msg( PID, each => [ $producer, $consumer ] )->send if $i < 10;
         },

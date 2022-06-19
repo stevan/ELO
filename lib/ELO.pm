@@ -22,7 +22,6 @@ use ELO::Msg;
 use Exporter 'import';
 
 our @EXPORT = qw[
-    sync
     timeout
     ident
     sequence
@@ -101,7 +100,6 @@ sub proc::despawn_all_exiting_pids ( $on_exit ) {
         my $proc = $PROCESS_TABLE{$pid};
         if ( $proc->status == EXITING ) {
             ELO::Msg::_remove_all_inbox_messages_for_pid($pid);
-            ELO::Msg::_remove_all_outbox_messages_for_pid($pid);
 
             (delete $PROCESS_TABLE{ $pid })->set_status(DONE);
             $on_exit->( $pid );
@@ -162,16 +160,8 @@ sub timeout ($ticks, $callback) {
     msg( proc::spawn( '!timeout' ), countdown => [ $ticks, $callback ] );
 }
 
-sub sync ($input, $output) {
-    croak 'You must supply a input msg()'
-        unless blessed $input && $input->isa('ELO::Msg::Message');
-    croak 'You must supply a output msg()'
-        unless blessed $output && $output->isa('ELO::Msg::Message');
-    msg( proc::spawn( '!sync' ), send => [ $input, $output ] );
-}
-
-sub ident ($val=undef) {
-    msg( proc::spawn( '!ident' ), id => [ $val // () ] );
+sub ident ($val, $callback=undef) {
+    msg( proc::spawn( '!ident' ), id => [ $val, $callback // () ] );
 }
 
 sub sequence (@statements) {
@@ -264,7 +254,6 @@ sub loop ( $MAX_TICKS, $start_pid ) {
         }
 
         ELO::Msg::_deliver_all_messages();
-        ELO::Msg::_accept_all_messages();
 
         my @ready = grep scalar $_->inbox->@*,
                     grep $_->status == READY,
@@ -381,9 +370,9 @@ sub _loop_log_line ( $fmt, $tick ) {
 # will just return the input given ...
 actor '!ident' => sub ($env, $msg) {
     match $msg, +{
-        id => sub ($val) {
+        id => sub ($val, $callback=undef) {
             err::log("*/ !ident /* returning val($val)")->send if DEBUG;
-            return_to $val;
+            $callback->curry($val)->send;
             proc::despawn( $CURRENT_PID );
         },
     };
@@ -402,36 +391,6 @@ actor '!timeout' => sub ($env, $msg) {
             else {
                 err::log("*/ !timeout! /* : counting down $timer")->send if DEBUG;
                 msg($CURRENT_PID => countdown => [ $timer - 1, $event ])->send_from( $CURRENT_CALLER );
-            }
-        }
-    };
-};
-
-# send a message, and loop on recv ...
-# then call statement with recv values appended to statement args
-actor '!sync' => sub ($env, $msg) {
-
-    match $msg, +{
-        send => sub ($input, $output) {
-            err::log("*/ !sync /* : sending message")->send if DEBUG;
-            $input->send;
-            msg($CURRENT_PID => recv => [ $output ])->send_from( $CURRENT_CALLER );
-        },
-        recv => sub ($output) {
-
-            my $message = recv_from;
-
-            if (defined $message) {
-                err::log("*/ !sync /* : recieve message($message)")->send if DEBUG;
-                #warn Dumper $output;
-                msg(@$output)
-                    ->curry( $message )
-                    ->send_from( $CURRENT_CALLER );
-                proc::despawn( $CURRENT_PID );
-            }
-            else {
-                err::log("*/ !sync /* : no messages")->send if DEBUG;
-                msg($CURRENT_PID => recv => [ $output ])->send_from( $CURRENT_CALLER );
             }
         }
     };
