@@ -18,6 +18,10 @@ our $IN;
 our $OUT;
 our $ERR;
 
+our $STDIN  = \*STDIN;
+our $STDOUT = \*STDOUT;
+our $STDERR = \*STDERR;
+
 sub err::log ($msg, $caller=$ELO::CURRENT_CALLER) {
     $ERR //= proc::spawn('#err');
     msg($ERR, print => [ $msg, $caller ]);
@@ -71,7 +75,7 @@ actor '#err' => sub ($env, $msg) {
                     . RESET $prefix;
             }
 
-            warn(
+            $STDERR->print(
                 $prefix,
                 (sprintf $fmt, @$values),
                 FAINT " >> [$caller]",
@@ -90,7 +94,7 @@ actor '#err' => sub ($env, $msg) {
                     . RESET $prefix;
             }
 
-            warn(
+            $STDERR->print(
                 $prefix,
                 $msg,
                 FAINT " >> [$caller]",
@@ -105,10 +109,10 @@ actor '#out' => sub ($env, $msg) {
 
     match $msg, +{
         printf => sub ($fmt, @values) {
-            say( $prefix, sprintf $fmt, @values ) unless QUIET();
+            $STDOUT->print( $prefix, (sprintf $fmt, @values), "\n" ) unless QUIET();
         },
         print => sub ($value) {
-            say( $prefix, $value ) unless QUIET();
+            $STDOUT->print( $prefix, $value, "\n" ) unless QUIET();
         }
     };
 };
@@ -121,7 +125,7 @@ actor '#in' => sub ($env, $msg) {
             $prompt //= '';
 
             print( $prefix, $prompt );
-            my $input = <>;
+            my $input = <$STDIN>;
             chomp $input;
             $callback->curry( $input )->send;
         }

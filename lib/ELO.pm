@@ -66,7 +66,6 @@ use constant DEBUG_MSGS     => DEBUG() =~ m/MSGS/     ? 1 : 0 ;
 use constant DEBUG_TIMERS   => DEBUG() =~ m/TIMERS/   ? 1 : 0 ;
 use constant DEBUG_WAITPIDS => DEBUG() =~ m/WAITPIDS/ ? 1 : 0 ;
 
-
 ## ----------------------------------------------------------------------------
 ## Misc. stuff
 ## ----------------------------------------------------------------------------
@@ -290,6 +289,29 @@ sub loop ( $MAX_TICKS, $start_pid ) {
 
         while (@ready) {
             my $active = shift @ready;
+
+            while ( $active->inbox->@* ) {
+
+                my ($from, $msg) = @{ shift $active->inbox->@* };
+
+                local $CURRENT_PID    = $active->pid;
+                local $CURRENT_CALLER = $from;
+
+                say BLUE " >>> calling : ", CYAN $msg->to_string, RESET
+                    if DEBUG_CALLS;
+
+                $active->actor->($active->env, $msg);
+            }
+        }
+
+        my @io = grep scalar $_->inbox->@*,
+                 grep $_->status == READY,
+                 map $PROCESS_TABLE{$_},
+                 grep /^\d\d\d:\#/,
+                 sort keys %PROCESS_TABLE;
+
+        while (@io) {
+            my $active = shift @io;
 
             while ( $active->inbox->@* ) {
 

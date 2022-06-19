@@ -24,20 +24,16 @@ package Actor::Base {
     use ELO;
 
     use parent 'UNIVERSAL::Object';
-    use slots (
-        env => sub {}
-    );
+    use slots;
 
     sub new_actor ($class) {
         return sub ($env, $msg) {
             my $self = $env->{__SELF__} //= $class->new($env);
-            $self->{env} = $env;
-            $self->RECIEVE($env, $msg);
-            $self->{env} = undef;
+            $self->RECIEVE($msg);
         }
     }
 
-    sub RECIEVE ($self, $env, $msg) {
+    sub RECIEVE ($self, $msg) {
         my $cb = $self->can($msg->action) // die "No match for ".$msg->action;
         eval {
             $cb->($self, $msg->body->@*);
@@ -83,8 +79,8 @@ package TestObserver {
         err::log(PID." completed")->send if DEBUG;
         err::log(PID." observed values: [" . (join ', ' => map { "$_/".$self->{got}->{$_} } sort { $a <=> $b } keys $self->{got}->%*) . "]")->send if DEBUG;
         $self->exit();
-        eq_or_diff( [ sort { $a <=> $b } keys $self->{got}->%* ], $self->{env}->{expected}, '... got the expected values');
-        eq_or_diff( [ values $self->{got}->%* ], [ map 1, $self->{env}->{expected}->@* ], '... got the expected value counts (all 1)');
+        eq_or_diff( [ sort { $a <=> $b } keys $self->{got}->%* ], $self->{expected}, '... got the expected values for '.PID);
+        eq_or_diff( [ values $self->{got}->%* ], [ map 1, $self->{expected}->@* ], '... got the expected value counts (all 1) for '.PID);
     }
 }
 
