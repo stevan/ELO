@@ -56,9 +56,7 @@ sub QUIET () {
 my %INDENTS;
 
 actor '#err' => sub ($env, $msg) {
-    my $prefix = ELO::DEBUG()
-        ? ON_RED "LOG (".$ELO::CURRENT_CALLER.") !!". RESET " "
-        : ON_RED "LOG !!". RESET " ";
+    my $prefix = ON_RED "LOG (".$ELO::CURRENT_CALLER.") !!". RESET " ";
 
     match $msg, +{
         printf => sub ($fmt, $values, $caller='') {
@@ -103,9 +101,7 @@ actor '#err' => sub ($env, $msg) {
 };
 
 actor '#out' => sub ($env, $msg) {
-    my $prefix = ELO::DEBUG()
-        ? ON_GREEN "OUT (".$ELO::CURRENT_CALLER.") >>". RESET " "
-        : ON_GREEN "OUT >>". RESET " ";
+    my $prefix = ON_GREEN "OUT (".$ELO::CURRENT_CALLER.") >>". RESET " ";
 
     match $msg, +{
         printf => sub ($fmt, @values) {
@@ -118,9 +114,7 @@ actor '#out' => sub ($env, $msg) {
 };
 
 actor '#in' => sub ($env, $msg) {
-    my $prefix = ELO::DEBUG()
-        ? ON_CYAN "IN (".$ELO::CURRENT_CALLER.") <<". RESET " "
-        : ON_CYAN "IN <<". RESET " ";
+    my $prefix = ON_CYAN "IN (".$ELO::CURRENT_CALLER.") <<". RESET " ";
 
     match $msg, +{
         read => sub ($prompt, $callback) {

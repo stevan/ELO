@@ -35,8 +35,17 @@ our @EXPORT = qw[
 ## ENV flags
 ## ----------------------------------------------------------------------------
 
-use constant DEBUG    => $ENV{DEBUG} // 0;
-use constant DEBUGGER => $ENV{DEBUGGER} // 0;
+use constant DEBUG    => $ENV{DEBUG} // '';
+use constant DEBUGGER => $ENV{DEBUGGER} // '';
+
+use constant DEBUG_LOOP     => DEBUG() =~ m/LOOP/     ? 1 : 0 ;
+use constant DEBUG_CALLS    => DEBUG() =~ m/CALLS/    ? 1 : 0 ;
+use constant DEBUG_SIGS     => DEBUG() =~ m/SIGS/     ? 1 : 0 ;
+use constant DEBUG_PROCS    => DEBUG() =~ m/PROCS/    ? 1 : 0 ;
+use constant DEBUG_MSGS     => DEBUG() =~ m/MSGS/     ? 1 : 0 ;
+use constant DEBUG_TIMERS   => DEBUG() =~ m/TIMERS/   ? 1 : 0 ;
+use constant DEBUG_WAITPIDS => DEBUG() =~ m/WAITPIDS/ ? 1 : 0 ;
+use constant DEBUG_ACTORS   => DEBUG() =~ m/ACTORS/   ? 1 : 0 ;
 
 ## ----------------------------------------------------------------------------
 ## Misc. stuff
@@ -174,26 +183,24 @@ sub parallel (@statements) {
 ## teh loop
 ## ----------------------------------------------------------------------------
 
-my %TIMERS;       # HASH< $tick_to_fire_at > = [ $msg, ... ]
-my %PID_WATCHERS; # HASH< $pid > = [ $msg, ... ]
+my %TIMERS;   # HASH< $tick_to_fire_at > = [ $msg, ... ]
+my %WAITPIDS; # HASH< $pid > = [ $msg, ... ]
 
 sub loop ( $MAX_TICKS, $start_pid ) {
 
     # initialise the system pid singleton
     $PROCESS_TABLE{ $INIT_PID } = bless [ $INIT_PID, READY, [], [], {}, sub ($env, $msg) {
-        my $prefix = DEBUG
-            ? ON_MAGENTA "SYS ($CURRENT_CALLER) ::". RESET " "
-            : ON_MAGENTA "SYS ::". RESET " ";
+        my $prefix = ON_MAGENTA "SYS ($CURRENT_CALLER) ::". RESET " ";
 
         match $msg, +{
             kill => sub ($pid) {
-                warn( $prefix, "killing ... {$pid}\n" ) if DEBUG;
+                warn( $prefix, "killing ... {$pid}\n" ) if DEBUG_SIGS;
                 proc::despawn($pid);
             },
             waitpid => sub ($pid, $callback) {
                 if (proc::exists($pid)) {
-                    warn( $prefix, "setting watcher for ($pid) ...\n" ) if DEBUG;
-                    push @{ $PID_WATCHERS{$pid} //=[] } => [
+                    warn( $prefix, "setting watcher for ($pid) ...\n" ) if DEBUG_SIGS;
+                    push @{ $WAITPIDS{$pid} //=[] } => [
                         $CURRENT_CALLER,
                         $callback
                     ];
@@ -203,7 +210,7 @@ sub loop ( $MAX_TICKS, $start_pid ) {
                 }
             },
             timer => sub ($timeout, $callback) {
-                warn( $prefix, "setting timer for($timeout) ...\n" ) if DEBUG;
+                warn( $prefix, "setting timer for($timeout) ...\n" ) if DEBUG_SIGS;
 
                 $timeout--; # subtrack one for this tick ...
 
@@ -230,10 +237,10 @@ sub loop ( $MAX_TICKS, $start_pid ) {
 
     my $tick = 0;
 
-    _loop_log_line("start(%d)", $tick) if DEBUG;
+    _loop_log_line("start(%d)", $tick) if DEBUG_LOOP;
     while ($tick < $MAX_TICKS) {
         $tick++;
-        _loop_log_line("tick(%d)", $tick) if DEBUG;
+        _loop_log_line("tick(%d)", $tick) if DEBUG_LOOP;
 
         local $CURRENT_TICK = $tick;
 
@@ -245,12 +252,23 @@ sub loop ( $MAX_TICKS, $start_pid ) {
             }
         }
 
+        warn Dumper {
+            msg              => 'Inbox before delivery',
+            msg_inbox        => [ ELO::Msg::_message_inbox() ],
+        } if DEBUG_MSGS;
+
         ELO::Msg::_deliver_all_messages();
 
         my @ready = grep scalar $_->inbox->@*,
                     grep $_->status == READY,
                     map $PROCESS_TABLE{$_},
                     sort keys %PROCESS_TABLE;
+
+        warn Dumper {
+            msg             => 'Ready Processes and Inbox after delivery',
+            ready_processes => \@ready,
+            msg_inbox       => [ ELO::Msg::_message_inbox() ],
+        } if DEBUG_MSGS;
 
         while (@ready) {
             my $active = shift @ready;
@@ -262,26 +280,25 @@ sub loop ( $MAX_TICKS, $start_pid ) {
                 local $CURRENT_PID    = $active->pid;
                 local $CURRENT_CALLER = $from;
 
-                say BLUE " >>> calling : ", CYAN $msg->to_string, RESET if DEBUG >= 3;
+                say BLUE " >>> calling : ", CYAN $msg->to_string, RESET
+                    if DEBUG_CALLS;
 
                 $active->actor->($active->env, $msg);
             }
         }
 
         proc::despawn_all_exiting_pids(sub ($pid) {
-            #warn "!!!! DESPAWNED ($pid)";
-            if ( exists $PID_WATCHERS{$pid} ) {
-                my $watchers = delete $PID_WATCHERS{$pid};
+            if ( exists $WAITPIDS{$pid} ) {
+                my $watchers = delete $WAITPIDS{$pid};
                 foreach my $watcher ($watchers->@*) {
                     my ($caller, $callback) = @$watcher;
-                    #warn "!!!! CALLING WATCHER HANDLER ($pid)";
                     $callback->send_from( $caller );
                 }
             }
         });
 
-        warn Dumper \%PROCESS_TABLE if DEBUG >= 4;
-        warn Dumper \%TIMERS        if DEBUG >= 4;
+        warn Dumper \%PROCESS_TABLE if DEBUG_PROCS;
+        warn Dumper \%TIMERS        if DEBUG_TIMERS;
 
         my @active_processes =
             grep !/^\d\d\d:\#/,    # ignore I/O pids
@@ -290,45 +307,36 @@ sub loop ( $MAX_TICKS, $start_pid ) {
             keys %PROCESS_TABLE;
 
         warn Dumper {
+            msg              => 'Active Procsses and Inbox after tick',
             active_processes => \@active_processes,
             msg_inbox        => [ ELO::Msg::_message_inbox() ],
-        } if DEBUG >= 3;
+        } if DEBUG_MSGS;
 
         if ($should_exit) {
             $has_exited++;
             last;
         }
 
-        #warn "TIMER COUNTER: " . scalar(keys %TIMERS);
-        #warn "ACTIVE : " . scalar(@active_processes);
-        #warn "TICK : " . $tick;
-        #warn "INBOX : " . Dumper [ ELO::Msg::_message_inbox() ];
-
         # at least do one tick before shutting things down ...
         if ( $tick > 1 && scalar @active_processes == 0 && scalar(keys %TIMERS) == 0 ) {
-            #warn "gonna exit ...";
             # loop one last time to flush any I/O
             if ( ELO::Msg::_has_inbox_messages() ) {
                 $has_exited++;
                 last;
             }
             else {
-                _loop_log_line("flushing(%d)", $tick) if DEBUG;
+                _loop_log_line("flushing(%d)", $tick) if DEBUG_LOOP;
                 $should_exit++;
             }
         }
     }
 
-    warn Dumper \%PID_WATCHERS if DEBUG >= 4;
+    warn Dumper \%WAITPIDS if DEBUG_WAITPIDS;
 
     if ( $has_exited ) {
-        _loop_log_line("exit(%d)", $tick) if DEBUG;
+        _loop_log_line("exit(%d)", $tick) if DEBUG_LOOP;
     } else {
-        _loop_log_line("halt(%d)", $tick) if DEBUG;
-    }
-
-    if (DEBUG >= 3) {
-        warn Dumper [ keys %PROCESS_TABLE ];
+        _loop_log_line("halt(%d)", $tick) if DEBUG_LOOP;
     }
 
     my @zombies = grep !/^\d\d\d:\#/,    # ignore I/O pids
@@ -337,7 +345,7 @@ sub loop ( $MAX_TICKS, $start_pid ) {
                   keys %PROCESS_TABLE;
 
     if ( @zombies ) {
-        warn("GOT ZOMBIES: ", Dumper(\@zombies)) if DEBUG;
+        warn("GOT ZOMBIES: ", Dumper(\@zombies)) if DEBUG_LOOP;
         return;
     }
 
@@ -363,7 +371,7 @@ sub _loop_log_line ( $fmt, $tick ) {
 actor '!ident' => sub ($env, $msg) {
     match $msg, +{
         id => sub ($val, $callback=undef) {
-            err::log("*/ !ident /* returning val($val)")->send if DEBUG;
+            err::log("*/ !ident /* returning val($val)")->send if DEBUG_ACTORS;
             $callback->curry($val)->send;
             proc::despawn( $CURRENT_PID );
         },
@@ -376,12 +384,12 @@ actor '!sequence' => sub ($env, $msg) {
     match $msg, +{
         next => sub (@statements) {
             if ( my $statement = shift @statements ) {
-                err::log("*/ !sequence /* calling, ".(scalar @statements)." remain" )->send if DEBUG;
+                err::log("*/ !sequence /* calling, ".(scalar @statements)." remain" )->send if DEBUG_ACTORS;
                 $statement->send_from( $CURRENT_CALLER );
                 msg($CURRENT_PID, next => \@statements)->send_from( $CURRENT_CALLER );
             }
             else {
-                err::log("*/ !sequence /* finished")->send if DEBUG;
+                err::log("*/ !sequence /* finished")->send if DEBUG_ACTORS;
                 proc::despawn( $CURRENT_PID );
             }
         },
@@ -391,11 +399,11 @@ actor '!sequence' => sub ($env, $msg) {
 actor '!parallel' => sub ($env, $msg) {
     match $msg, +{
         all => sub (@statements) {
-            err::log("*/ !parallel /* sending ".(scalar @statements)." messages" )->send if DEBUG;
+            err::log("*/ !parallel /* sending ".(scalar @statements)." messages" )->send if DEBUG_ACTORS;
             foreach my $statement ( @statements ) {
                 $statement->send_from( $CURRENT_CALLER );
             }
-            err::log("*/ !parallel /* finished")->send if DEBUG;
+            err::log("*/ !parallel /* finished")->send if DEBUG_ACTORS;
             proc::despawn( $CURRENT_PID );
         },
     };

@@ -9,8 +9,6 @@ our $AUTHORITY = 'cpan:STEVAN';
 
 use Data::Dumper 'Dumper';
 
-use constant DEBUG => $ENV{DEBUG} // 0;
-
 use Exporter 'import';
 
 our @EXPORT = qw[
@@ -36,12 +34,10 @@ sub _send_from ($from, $msg) {
 }
 
 sub _deliver_all_messages () {
-    warn Dumper \@MSG_INBOX  if DEBUG >= 4;
 
     # deliver all the messages in the queue
     while (@MSG_INBOX) {
         my $next = shift @MSG_INBOX;
-        #warn Dumper $next;
         my ($from, $msg) = $next->@*;
         my $process = proc::lookup( $msg->pid );
         if ( !$process ) {
