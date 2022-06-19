@@ -92,10 +92,8 @@ sub CALLER () { $CURRENT_CALLER }
 ## ----------------------------------------------------------------------------
 
 use constant READY   => 1; # can accept arguments
-use constant WAITING => 2; # waiting for a time to end
-use constant BLOCKED => 3; # blocked on input
-use constant EXITING => 4; # waiting to exit at the end of the loop
-use constant DONE    => 5; # the end
+use constant EXITING => 2; # waiting to exit at the end of the loop
+use constant DONE    => 3; # the end
 
 my $PID_ID = 0;
 my %PROCESS_TABLE;
