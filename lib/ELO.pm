@@ -87,6 +87,20 @@ sub PID    () { $CURRENT_PID    }
 sub CALLER () { $CURRENT_CALLER }
 
 ## ----------------------------------------------------------------------------
+## Message Queue
+## ----------------------------------------------------------------------------
+
+my @MSG_INBOX;
+
+sub enqueue_msg ($msg) {
+    push @MSG_INBOX => [ $CURRENT_PID, $msg ];
+}
+
+sub enqueue_msg_from ($from, $msg) {
+    push @MSG_INBOX => [ $from, $msg ];
+}
+
+## ----------------------------------------------------------------------------
 ## process table
 ## ----------------------------------------------------------------------------
 
@@ -124,7 +138,7 @@ sub proc::despawn_all_exiting_pids ( $on_exit ) {
     foreach my $pid (keys %PROCESS_TABLE) {
         my $proc = $PROCESS_TABLE{$pid};
         if ( $proc->status == EXITING ) {
-            ELO::Msg::_remove_all_inbox_messages_for_pid($pid);
+            @MSG_INBOX = grep { $_->[1]->pid ne $pid } @MSG_INBOX;
 
             (delete $PROCESS_TABLE{ $pid })->set_status(DONE);
             $on_exit->( $pid );
@@ -271,10 +285,20 @@ sub loop ( $MAX_TICKS, $start_pid ) {
 
         warn Dumper {
             msg              => 'Inbox before delivery',
-            msg_inbox        => [ ELO::Msg::_message_inbox() ],
+            msg_inbox        => \@MSG_INBOX,
         } if DEBUG_MSGS;
 
-        ELO::Msg::_deliver_all_messages();
+        # deliver all the messages
+        while (@MSG_INBOX) {
+            my $next = shift @MSG_INBOX;
+            my ($from, $msg) = $next->@*;
+            my $process = $PROCESS_TABLE{ $msg->pid };
+            if ( !$process ) {
+                warn "Got message for unknown pid(".$msg->pid.")";
+                next;
+            }
+            push $process->inbox->@* => [ $from, $msg ];
+        }
 
         my @ready = grep scalar $_->inbox->@*,
                     grep $_->status == READY,
@@ -284,7 +308,7 @@ sub loop ( $MAX_TICKS, $start_pid ) {
         warn Dumper {
             msg             => 'Ready Processes and Inbox after delivery',
             ready_processes => \@ready,
-            msg_inbox       => [ ELO::Msg::_message_inbox() ],
+            msg_inbox       => \@MSG_INBOX,
         } if DEBUG_MSGS;
 
         while (@ready) {
@@ -326,7 +350,7 @@ sub loop ( $MAX_TICKS, $start_pid ) {
         warn Dumper {
             msg              => 'Active Procsses and Inbox after tick',
             active_processes => \@active_processes,
-            msg_inbox        => [ ELO::Msg::_message_inbox() ],
+            msg_inbox        => \@MSG_INBOX,
         } if DEBUG_MSGS;
 
         if ($should_exit) {
@@ -337,7 +361,7 @@ sub loop ( $MAX_TICKS, $start_pid ) {
         # at least do one tick before shutting things down ...
         if ( $tick > 1 && scalar @active_processes == 0 && scalar(keys %TIMERS) == 0 ) {
             # loop one last time to flush any I/O
-            if ( ELO::Msg::_has_inbox_messages() ) {
+            if ( scalar @MSG_INBOX == 0 ) {
                 $has_exited++;
                 last;
             }

@@ -15,43 +15,6 @@ our @EXPORT = qw[
     msg
 ];
 
-## ----------------------------------------------------------------------------
-## Message Queue
-## ----------------------------------------------------------------------------
-
-my @MSG_INBOX;
-
-sub _message_inbox () { @MSG_INBOX }
-
-sub _has_inbox_messages () { scalar @MSG_INBOX == 0 }
-
-sub _send_to ($msg) {
-    push @MSG_INBOX => [ $ELO::CURRENT_PID, $msg ];
-}
-
-sub _send_from ($from, $msg) {
-    push @MSG_INBOX => [ $from, $msg ];
-}
-
-sub _deliver_all_messages () {
-
-    # deliver all the messages in the queue
-    while (@MSG_INBOX) {
-        my $next = shift @MSG_INBOX;
-        my ($from, $msg) = $next->@*;
-        my $process = proc::lookup( $msg->pid );
-        if ( !$process ) {
-            warn "Got message for unknown pid(".$msg->pid.")";
-            next;
-        }
-        push $process->inbox->@* => [ $from, $msg ];
-    }
-}
-
-sub _remove_all_inbox_messages_for_pid ($pid) {
-    @MSG_INBOX = grep { $_->[1]->pid ne $pid } @MSG_INBOX;
-}
-
 # ....
 
 sub msg        ($pid, $action, $msg) { bless [$pid, $action, $msg] => 'ELO::Msg::Message' }
@@ -72,8 +35,8 @@ package ELO::Msg::Message {
         msg::curry(@$self)->curry( @args )
     }
 
-    sub send ($self) { ELO::Msg::_send_to( $self ); $self }
-    sub send_from ($self, $caller) { ELO::Msg::_send_from($caller, $self); $self }
+    sub send ($self) { ELO::enqueue_msg( $self ); $self }
+    sub send_from ($self, $caller) { ELO::enqueue_msg_from($caller, $self); $self }
 
     sub to_string ($self) {
         join '' =>
