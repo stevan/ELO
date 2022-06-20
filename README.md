@@ -19,7 +19,7 @@ actor Bounce => sub ($env, $msg) {
             out::print("bounce(DOWN) => $count")->send;
             msg( PID, up => [$count+1] )->send;
         },
-        finish => sub ($expected) {
+        finish => sub () {
             sig::kill(PID)->send;
         }
     };
@@ -31,11 +31,11 @@ actor main => sub ($env, $msg) {
     # spawn a Bounce actor
     my $bounce = proc::spawn( 'Bounce' );
 
-    # tell it to start bouncing from
+    # tell it to start bouncing
     msg( $bounce, down => [] )->send;
 
     # set a timer signal to finish after 10 ticks ...
-    sig::timer( 10, msg( $bounce, finish => [ 10 ] ) )->send;
+    sig::timer( 10, msg( $bounce, finish => [] ) )->send;
 };
 
 # loop ...
