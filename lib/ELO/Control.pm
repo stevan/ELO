@@ -37,14 +37,14 @@ sub ident ($val, $callback=undef) {
 }
 
 sub sequence (@statements) {
-    (blessed $_ && $_->isa('ELO::Msg::Message'))
+    (blessed $_ && $_->isa('ELO::Core::Message'))
         || croak 'You must supply a sequence of msg()s, not '.$_
             foreach @statements;
     msg( proc::spawn( '!sequence' ), next => [ @statements ] );
 }
 
 sub parallel (@statements) {
-    (blessed $_ && $_->isa('ELO::Msg::Message'))
+    (blessed $_ && $_->isa('ELO::Core::Message'))
         || croak 'You must supply a sequence of msg()s, not '.$_
             foreach @statements;
     msg( proc::spawn( '!parallel' ), all => [ @statements ] );

@@ -70,7 +70,7 @@ actor Tokenizer => sub ($env, $msg) {
 
     my sub sync_next ($producer, $observer, $action) {
         msg( $producer, next => [
-            msg::curry( PID, $action => [$producer, $observer] )
+            msg( PID, $action => [$producer, $observer] )
         ])
     }
 

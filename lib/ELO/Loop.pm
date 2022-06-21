@@ -16,8 +16,13 @@ use Term::ANSIColor ':constants';
 use Term::ReadKey 'GetTerminalSize';
 
 use ELO::Actors;
+
+# NOTE:
+# this has a dependency on ELO::Loop inside
+# the ELO::Core::Message object ...
 use ELO::Msg;
 
+use ELO::Core::ProcessRecord;
 use ELO::Debug;
 
 use Exporter 'import';
@@ -79,7 +84,9 @@ sub proc::lookup ($pid) {
 sub proc::spawn ($name, %env) {
     croak 'You must supply an actor name to spawn' unless $name;
     my $pid     = sprintf '%03d:%s' => ++$PID_ID, $name;
-    my $process = bless [ $pid, READY, [], [], { %env }, ELO::Actors::get_actor($name) ] => 'ELO::Process::Record';
+    my $process = ELO::Core::ProcessRecord->new(
+        $pid, READY, \%env, ELO::Actors::get_actor($name)
+    );
     $PROCESS_TABLE{ $pid } = $process;
     $pid;
 }
@@ -101,23 +108,6 @@ sub proc::despawn_all_exiting_pids ( $on_exit ) {
     }
 }
 
-package ELO::Process::Record {
-    use v5.24;
-    use warnings;
-    use experimental 'signatures', 'postderef';
-
-    sub pid    ($self) { $self->[0] }
-    sub status ($self) { $self->[1] }
-    sub inbox  ($self) { $self->[2] }
-    sub outbox ($self) { $self->[3] }
-    sub env    ($self) { $self->[4] }
-    sub actor  ($self) { $self->[5] }
-
-    sub set_status ($self, $status) {
-        $self->[1] = $status;
-    }
-}
-
 ## ----------------------------------------------------------------------------
 ## system interface ... see Actor definitions inside &loop
 ## ----------------------------------------------------------------------------
@@ -132,14 +122,14 @@ sub sig::kill($pid) {
 sub sig::timer($timeout, $callback) {
     croak 'You must supply a timeout value' unless defined $timeout;
     croak 'You must supply a callback msg()'
-        unless blessed $callback && $callback->isa('ELO::Msg::Message');
+        unless blessed $callback && $callback->isa('ELO::Core::Message');
     msg( $INIT_PID, timer => [ $timeout, $callback ] );
 }
 
 sub sys::waitpid($pid, $callback) {
     croak 'You must supply a pid value' unless $pid;
     croak 'You must supply a callback msg()'
-        unless blessed $callback && $callback->isa('ELO::Msg::Message');
+        unless blessed $callback && $callback->isa('ELO::Core::Message');
     msg( $INIT_PID, waitpid => [ $pid, $callback ] );
 }
 
@@ -153,7 +143,7 @@ my %WAITPIDS; # HASH< $pid > = [ $msg, ... ]
 sub loop ( $MAX_TICKS, $start_pid ) {
 
     # initialise the system pid singleton
-    $PROCESS_TABLE{ $INIT_PID } = bless [ $INIT_PID, READY, [], [], {}, sub ($env, $msg) {
+    $PROCESS_TABLE{ $INIT_PID } = ELO::Core::ProcessRecord->new($INIT_PID, READY, {}, sub ($env, $msg) {
         my $prefix = ON_MAGENTA "SYS ($CURRENT_CALLER) ::". RESET " ";
 
         match $msg, +{
@@ -189,7 +179,7 @@ sub loop ( $MAX_TICKS, $start_pid ) {
                 }
             }
         };
-    }] => 'ELO::Process::Record';
+    });
 
     # initialise ...
     my $start = proc::spawn( $start_pid );

@@ -56,7 +56,7 @@ actor main => sub ($env, $msg) {
     msg( $e1, init => [{ foo => 100, bar => 200, baz => 300 }] )->send;
 
     my $val = 0;
-    ident($val += 10, msg::curry( $e1, set => [$_]))->send
+    ident($val += 10, msg( $e1, set => [$_]))->send
         foreach qw[ foo bar baz ];
 
     # ...
@@ -64,7 +64,7 @@ actor main => sub ($env, $msg) {
     my $timout_length = 2;
     sig::timer(
         $timout_length++,
-        msg( $e1, get => [ $_, msg::curry( $e2, set => [$_]) ] ),
+        msg( $e1, get => [ $_, msg( $e2, set => [$_]) ] ),
     )->send foreach qw[ baz bar foo ];
 
     ## ...
