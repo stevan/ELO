@@ -1,0 +1,12 @@
+
+Things to consider:
+
+- VM abstraction, helps in organizing forks, i/o, etc.
+
+- Erlang like linked processes ... where if one of the linked processes dies, it sends a single to the other.
+    - can only have one link between procs, no more.
+
+- Erlang like monitors ... same as linked, but you can have many of them
+
+
+
