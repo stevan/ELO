@@ -1,4 +1,5 @@
 package ELO::Actors;
+# ABSTRACT: Event Loop Orchestra
 
 use v5.24;
 use warnings;
@@ -8,6 +9,8 @@ our $VERSION   = '0.01';
 our $AUTHORITY = 'cpan:STEVAN';
 
 use Data::Dumper 'Dumper';
+
+use ELO::Debug;
 
 use Exporter 'import';
 

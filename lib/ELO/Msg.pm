@@ -1,4 +1,5 @@
 package ELO::Msg;
+# ABSTRACT: Event Loop Orchestra
 
 use v5.24;
 use warnings;
@@ -8,6 +9,8 @@ our $VERSION   = '0.01';
 our $AUTHORITY = 'cpan:STEVAN';
 
 use Data::Dumper 'Dumper';
+
+use ELO::Debug;
 
 use Exporter 'import';
 
@@ -35,8 +38,8 @@ package ELO::Msg::Message {
         msg::curry(@$self)->curry( @args )
     }
 
-    sub send ($self) { ELO::enqueue_msg( $self ); $self }
-    sub send_from ($self, $caller) { ELO::enqueue_msg_from($caller, $self); $self }
+    sub send ($self) { ELO::Loop::enqueue_msg( $self ); $self }
+    sub send_from ($self, $caller) { ELO::Loop::enqueue_msg_from($caller, $self); $self }
 
     sub to_string ($self) {
         join '' =>

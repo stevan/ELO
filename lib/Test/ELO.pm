@@ -1,4 +1,5 @@
 package Test::ELO;
+# ABSTRACT: Event Loop Orchestra
 
 use v5.24;
 use warnings;

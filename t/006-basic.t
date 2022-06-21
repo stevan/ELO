@@ -12,9 +12,6 @@ use List::Util 'first';
 use Data::Dumper;
 
 use ELO;
-use ELO::Msg;
-use ELO::Actors;
-use ELO::IO;
 
 use constant DEBUG_TOKENIZER => DEBUG() =~ m/TOKENIZER/ ? 1 : 0;
 use constant DEBUG_DECODER   => DEBUG() =~ m/DECODER/   ? 1 : 0;

@@ -11,9 +11,6 @@ use List::Util 'first';
 use Data::Dumper;
 
 use ELO;
-use ELO::Msg;
-use ELO::Actors;
-use ELO::IO;
 
 actor main => sub ($env, $msg) {
     out::print("-> main starting ...")->send;

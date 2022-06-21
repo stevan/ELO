@@ -1,4 +1,5 @@
 package ELO::IO;
+# ABSTRACT: Event Loop Orchestra
 
 use v5.24;
 use warnings;
@@ -10,9 +11,11 @@ our $AUTHORITY = 'cpan:STEVAN';
 use Data::Dumper 'Dumper';
 use Term::ANSIColor ':constants';
 
-use ELO (); # circular dep
+use ELO::Loop;
 use ELO::Msg;
 use ELO::Actors;
+
+use ELO::Debug;
 
 our $IN;
 our $OUT;
@@ -22,12 +25,12 @@ our $STDIN  = \*STDIN;
 our $STDOUT = \*STDOUT;
 our $STDERR = \*STDERR;
 
-sub err::log ($msg, $caller=$ELO::CURRENT_CALLER) {
+sub err::log ($msg, $caller=CALLER()) {
     $ERR //= proc::spawn('#err');
     msg($ERR, print => [ $msg, $caller ]);
 }
 
-sub err::logf ($fmt, $msg, $caller=$ELO::CURRENT_CALLER) {
+sub err::logf ($fmt, $msg, $caller=CALLER()) {
     $ERR //= proc::spawn('#err');
     msg($ERR, printf => [ $fmt, $msg, $caller ]);
 }
@@ -60,18 +63,18 @@ sub QUIET () {
 my %INDENTS;
 
 actor '#err' => sub ($env, $msg) {
-    my $prefix = ON_RED "LOG (".$ELO::CURRENT_CALLER.") !!". RESET " ";
+    my $prefix = ON_RED "LOG (".CALLER().") !!". RESET " ";
 
     match $msg, +{
         printf => sub ($fmt, $values, $caller='') {
 
             if ($caller) {
-                $INDENTS{ $ELO::CURRENT_CALLER } = ($INDENTS{ $caller } // 0) + 1
-                    unless exists $INDENTS{ $ELO::CURRENT_CALLER };
+                $INDENTS{ CALLER() } = ($INDENTS{ $caller } // 0) + 1
+                    unless exists $INDENTS{ CALLER() };
 
                 $prefix = FAINT
                     RED
-                        ('-' x $INDENTS{ $ELO::CURRENT_CALLER }).'> '
+                        ('-' x $INDENTS{ CALLER() }).'> '
                     . RESET $prefix;
             }
 
@@ -85,12 +88,12 @@ actor '#err' => sub ($env, $msg) {
         print => sub ($msg, $caller='') {
 
             if ($caller) {
-                $INDENTS{ $ELO::CURRENT_CALLER } = ($INDENTS{ $caller } // 0) + 1
-                    unless exists $INDENTS{ $ELO::CURRENT_CALLER };
+                $INDENTS{ CALLER() } = ($INDENTS{ $caller } // 0) + 1
+                    unless exists $INDENTS{ CALLER() };
 
                 $prefix = FAINT
                     RED
-                        ('-' x $INDENTS{ $ELO::CURRENT_CALLER }).'> '
+                        ('-' x $INDENTS{ CALLER() }).'> '
                     . RESET $prefix;
             }
 
@@ -105,7 +108,7 @@ actor '#err' => sub ($env, $msg) {
 };
 
 actor '#out' => sub ($env, $msg) {
-    my $prefix = ON_GREEN "OUT (".$ELO::CURRENT_CALLER.") >>". RESET " ";
+    my $prefix = ON_GREEN "OUT (".CALLER().") >>". RESET " ";
 
     match $msg, +{
         printf => sub ($fmt, @values) {
@@ -118,7 +121,7 @@ actor '#out' => sub ($env, $msg) {
 };
 
 actor '#in' => sub ($env, $msg) {
-    my $prefix = ON_CYAN "IN (".$ELO::CURRENT_CALLER.") <<". RESET " ";
+    my $prefix = ON_CYAN "IN (".CALLER().") <<". RESET " ";
 
     match $msg, +{
         read => sub ($prompt, $callback) {

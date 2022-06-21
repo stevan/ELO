@@ -11,9 +11,6 @@ use List::Util 'first';
 use Data::Dumper;
 
 use ELO;
-use ELO::Msg;
-use ELO::Actors;
-use ELO::IO;
 
 my $CURRENT_CNT = 0;
 

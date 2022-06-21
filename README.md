@@ -5,9 +5,6 @@
 
 ```
 use ELO;
-use ELO::Msg;
-use ELO::Actors;
-use ELO::IO;
 
 actor Bounce => sub ($env, $msg) {
     match $msg, +{
