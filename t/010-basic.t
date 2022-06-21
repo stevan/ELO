@@ -54,7 +54,6 @@ package TestObserver {
     use Test::Differences;
 
     use ELO;
-    use ELO::IO;
 
     our @ISA; BEGIN{ @ISA = ('Actor::Base') }
     use slots (
@@ -112,7 +111,6 @@ package MapObservable {
     use experimental 'signatures', 'postderef';
 
     use ELO;
-    use ELO::Msg;
 
     our @ISA; BEGIN{ @ISA = ('Actor::Base') }
     use slots (
@@ -157,7 +155,6 @@ package SimpleObservable {
     use experimental 'signatures', 'postderef';
 
     use ELO;
-    use ELO::Msg;
 
     our @ISA; BEGIN{ @ISA = ('Actor::Base') }
     use slots (

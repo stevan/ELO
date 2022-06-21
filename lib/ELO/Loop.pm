@@ -15,23 +15,28 @@ use Data::Dumper 'Dumper';
 use Term::ANSIColor ':constants';
 use Term::ReadKey 'GetTerminalSize';
 
-use ELO::Actors;
+use ELO::Actors; # to get actors for process creation, and one use of `match` ...
 
-# NOTE:
-# this has a dependency on ELO::Loop inside
-# the ELO::Core::Message object ...
-use ELO::Msg;
-
+use ELO::Core::Message;
 use ELO::Core::ProcessRecord;
+
 use ELO::Debug;
 
 use Exporter 'import';
 
 our @EXPORT = qw[
+    msg
+
     loop
 
     TICK PID CALLER
 ];
+
+## ----------------------------------------------------------------------------
+## msg interface
+## ----------------------------------------------------------------------------
+
+sub msg ($pid, $action, $msg) { ELO::Core::Message->new( $pid, $action, $msg ) }
 
 ## ----------------------------------------------------------------------------
 ## call context info

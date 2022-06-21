@@ -11,9 +11,9 @@ our $AUTHORITY = 'cpan:STEVAN';
 use Data::Dumper 'Dumper';
 use Term::ANSIColor ':constants';
 
-use ELO::Loop;
-use ELO::Msg;
 use ELO::Actors;
+
+use ELO::Loop;
 
 use ELO::Debug;
 

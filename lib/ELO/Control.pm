@@ -12,11 +12,10 @@ use Carp 'croak';
 use Scalar::Util 'blessed';
 use Data::Dumper 'Dumper';
 
-use ELO::Loop;
-
 use ELO::Actors;
+
+use ELO::Loop;
 use ELO::IO;
-use ELO::Msg;
 
 use ELO::Debug;
 

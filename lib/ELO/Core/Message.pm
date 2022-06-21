@@ -6,8 +6,7 @@ use experimental 'signatures', 'postderef';
 use Scalar::Util 'blessed';
 use Data::Dumper 'Dumper';
 
-# see NOTE in ELO::Msg ...
-# use ELO::Loop;
+# use ELO::Loop; ... circular dep
 
 sub new ($class, $pid, $action, $msg) { bless [ $pid, $action, $msg ] => $class }
 

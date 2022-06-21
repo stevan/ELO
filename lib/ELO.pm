@@ -12,7 +12,6 @@ use Carp 'croak';
 use Data::Dumper 'Dumper';
 
 use ELO::Actors;
-use ELO::Msg;
 use ELO::Loop;
 
 use ELO::IO;
@@ -24,7 +23,6 @@ use Exporter 'import';
 
 our @EXPORT = (
     @ELO::Actors::EXPORT,
-    @ELO::Msg::EXPORT,
     @ELO::Loop::EXPORT,
     @ELO::Control::EXPORT,
     @ELO::Debug::EXPORT,
