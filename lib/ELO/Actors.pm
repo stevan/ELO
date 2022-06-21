@@ -9,6 +9,7 @@ our $VERSION   = '0.01';
 our $AUTHORITY = 'cpan:STEVAN';
 
 use Data::Dumper 'Dumper';
+use Sub::Util 'set_subname';
 
 use ELO::Debug;
 
@@ -26,7 +27,7 @@ sub get_actor ($name) {
 }
 
 sub actor ($name, $recieve) {
-    $ACTORS{$name} = $recieve;
+    $ACTORS{$name} = set_subname( $name, $recieve );
 }
 
 sub match ($msg, $table) {

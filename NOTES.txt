@@ -13,6 +13,4 @@ Things to consider:
 Dependeny issues
 
 - ELO::Core::Message depends on ELO::Loop for enqueueing messages
-
-- ELO::Loop depends on ELO::Msg for sig:: stuff
-    - ELO::Msg depends on ELO::Core::Message as message class
+    - ELO::Loop loads ELO::Core::Message
