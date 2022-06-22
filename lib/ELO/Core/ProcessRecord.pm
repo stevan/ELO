@@ -7,7 +7,6 @@ sub new ($class, $pid, $status, $start_env, $actor) {
     bless [
         $pid,
         $status,
-        [],
         +{ %$start_env },
         $actor
     ] => $class;
@@ -15,9 +14,8 @@ sub new ($class, $pid, $status, $start_env, $actor) {
 
 sub pid    ($self) { $self->[0] }
 sub status ($self) { $self->[1] }
-sub inbox  ($self) { $self->[2] }
-sub env    ($self) { $self->[3] }
-sub actor  ($self) { $self->[4] }
+sub env    ($self) { $self->[2] }
+sub actor  ($self) { $self->[3] }
 
 sub set_status ($self, $status) {
     $self->[1] = $status;
