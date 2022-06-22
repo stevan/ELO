@@ -161,6 +161,7 @@ sub loop ( $MAX_TICKS, $start_pid ) {
                     ];
                 }
                 else {
+                    # the proc has died, so just call it ...
                     $callback->send_from($CURRENT_CALLER);
                 }
             },
