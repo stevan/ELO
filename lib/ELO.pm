@@ -1,16 +1,13 @@
 package ELO;
 # ABSTRACT: Event Loop Orchestra
-
 use v5.24;
 use warnings;
 use experimental 'signatures', 'postderef';
 
-our $VERSION   = '0.01';
-our $AUTHORITY = 'cpan:STEVAN';
-
 use Carp 'croak';
 use Data::Dumper 'Dumper';
 
+use ELO::VM;
 use ELO::Actors;
 use ELO::Loop;
 
@@ -19,9 +16,13 @@ use ELO::Control;
 
 use ELO::Debug;
 
+our $VERSION   = '0.01';
+our $AUTHORITY = 'cpan:STEVAN';
+
 use Exporter 'import';
 
 our @EXPORT = (
+    @ELO::VM::EXPORT,
     @ELO::Actors::EXPORT,
     @ELO::Loop::EXPORT,
     @ELO::Control::EXPORT,

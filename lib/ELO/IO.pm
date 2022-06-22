@@ -1,28 +1,26 @@
 package ELO::IO;
 # ABSTRACT: Event Loop Orchestra
-
 use v5.24;
 use warnings;
 use experimental 'signatures', 'postderef';
 
-our $VERSION   = '0.01';
-our $AUTHORITY = 'cpan:STEVAN';
-
 use Data::Dumper 'Dumper';
 use Term::ANSIColor ':constants';
 
+use ELO::Debug;
+use ELO::VM qw[ PID CALLER msg ];
+
 use ELO::Actors;
 
-use ELO::Loop;
-
-use ELO::Debug;
+our $VERSION   = '0.01';
+our $AUTHORITY = 'cpan:STEVAN';
 
 our $STDIN  = \*STDIN;
 our $STDOUT = \*STDOUT;
 our $STDERR = \*STDERR;
 
 sub QUIET () {
-    ELO->DEBUG()
+    DEBUG()
         # if we are DEBUG-ing, do not be quiet
         ? 0
         # if we are testing, be quiet

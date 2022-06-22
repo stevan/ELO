@@ -1,4 +1,5 @@
 package ELO::Core::Message;
+# ABSTRACT: Event Loop Orchestra
 use v5.24;
 use warnings;
 use experimental 'signatures', 'postderef';
@@ -6,9 +7,14 @@ use experimental 'signatures', 'postderef';
 use Scalar::Util 'blessed';
 use Data::Dumper 'Dumper';
 
-# use ELO::Loop; ... circular dep
+use ELO::VM ();
 
-sub new ($class, $pid, $action, $msg) { bless [ $pid, $action, $msg ] => $class }
+our $VERSION   = '0.01';
+our $AUTHORITY = 'cpan:STEVAN';
+
+sub new ($class, $pid, $action, $msg) {
+    bless [ $pid, $action, $msg ] => $class
+}
 
 sub pid    ($self) { $self->[0] }
 sub action ($self) { $self->[1] }
@@ -19,8 +25,8 @@ sub curry ($self, @args) {
     blessed($self)->new( $pid, $action, [ @$body, @args ] );
 }
 
-sub send ($self) { ELO::Loop::enqueue_msg($self); $self }
-sub send_from ($self, $caller) { ELO::Loop::enqueue_msg($self, $caller); $self }
+sub send ($self) { ELO::VM::enqueue_msg($self); $self }
+sub send_from ($self, $caller) { ELO::VM::enqueue_msg($self, $caller); $self }
 
 sub to_string ($self) {
     join '' =>

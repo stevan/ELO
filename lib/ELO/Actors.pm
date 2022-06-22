@@ -1,17 +1,16 @@
 package ELO::Actors;
 # ABSTRACT: Event Loop Orchestra
-
 use v5.24;
 use warnings;
 use experimental 'signatures', 'postderef';
 
-our $VERSION   = '0.01';
-our $AUTHORITY = 'cpan:STEVAN';
-
 use Data::Dumper 'Dumper';
 use Sub::Util 'set_subname';
 
-use ELO::Debug;
+use ELO::VM ();
+
+our $VERSION   = '0.01';
+our $AUTHORITY = 'cpan:STEVAN';
 
 use Exporter 'import';
 
@@ -20,14 +19,12 @@ our @EXPORT = qw[
     actor
 ];
 
-my %ACTORS;
-
 sub get_actor ($name) {
-    $ACTORS{$name};
+    $ELO::VM::ACTORS{$name};
 }
 
 sub actor ($name, $recieve) {
-    $ACTORS{$name} = set_subname( $name, $recieve );
+    $ELO::VM::ACTORS{$name} = set_subname( $name, $recieve );
 }
 
 sub match ($msg, $table) {

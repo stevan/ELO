@@ -1,23 +1,21 @@
 package ELO::Control;
 # ABSTRACT: Event Loop Orchestra
-
 use v5.24;
 use warnings;
 use experimental 'signatures', 'postderef';
 
-our $VERSION   = '0.01';
-our $AUTHORITY = 'cpan:STEVAN';
-
-use Carp 'croak';
+use Carp         'croak';
 use Scalar::Util 'blessed';
 use Data::Dumper 'Dumper';
 
+use ELO::VM qw[ PID CALLER msg ];
+
 use ELO::Actors;
-
-use ELO::Loop;
 use ELO::IO;
-
 use ELO::Debug;
+
+our $VERSION   = '0.01';
+our $AUTHORITY = 'cpan:STEVAN';
 
 use Exporter 'import';
 
