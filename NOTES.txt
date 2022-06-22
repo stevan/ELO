@@ -1,3 +1,12 @@
+TODO:
+
+- move the proc:: stuff into its own module
+    - the use of PROCESS_TABLE inside loop can be replaced with function calls
+        - most of it is DEBUG stuff anyway
+
+- move process STATUS to Core::ProcessRecord
+    - add methods to query it, so we don't need to know them outside
+
 
 Things to consider:
 
