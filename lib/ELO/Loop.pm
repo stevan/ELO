@@ -131,7 +131,7 @@ sub sig::timer($timeout, $callback) {
     msg( $INIT_PID, timer => [ $timeout, $callback ] );
 }
 
-sub sys::waitpid($pid, $callback) {
+sub sig::waitpid($pid, $callback) {
     croak 'You must supply a pid value' unless $pid;
     croak 'You must supply a callback msg()'
         unless blessed $callback && $callback->isa('ELO::Core::Message');

@@ -49,7 +49,7 @@ actor PidExitObservable => sub ($env, $msg) {
 
             foreach my $pid ( @$pids ) {
                 #warn PID." WATCHING PID: $pid";
-                sys::waitpid( $pid, msg($observer, on_next => [ $pid ]) )->send;
+                sig::waitpid( $pid, msg($observer, on_next => [ $pid ]) )->send;
             }
         },
     };
