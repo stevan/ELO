@@ -34,34 +34,52 @@ __END__
 
 =pod
 
+# ----------------------------------------
 # Building Actors
+# ----------------------------------------
 
 actor match
 
-# Flow Controls
+# ----------------------------------------
+# VM
+# ----------------------------------------
 
-ident sequence parallel
+# Loop start
 
-# Loop
+loop
 
-loop msg
-TICK
-PID CALLER
+# messaging ...
 
-# PROCESSES
+msg
+
+# Loop context constants
+
+TICK PID CALLER
+
+# Loop process functions
 
 proc::exists
 proc::lookup
 proc::spawn
 proc::despawn
 
-# SIGNALS
+# ----------------------------------------
+# Build in Message builders ...
+# ----------------------------------------
+
+# Flow Control messages
+
+ident
+sequence
+parallel
+
+# SIGNAL messages
 
 sig::kill
 sig::waitpid
 sig::timer
 
-# I/O
+# Aysnc I/O messages
 
 err::log
 err::logf
@@ -70,6 +88,21 @@ out::print
 out::printf
 
 in::read
+
+# ----------------------------------------
+# System Interface
+# ----------------------------------------
+
+# Sync I/0 functions
+
+sys::err::log
+sys::err::logf
+
+sys::out::print
+sys::out::printf
+
+sys::in::read
+
 
 =cut
 
