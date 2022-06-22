@@ -216,44 +216,21 @@ sub loop ( $MAX_TICKS, $start_pid ) {
             msg_inbox        => \@MSG_INBOX,
         } if DEBUG_MSGS;
 
-        # deliver all the messages
-        while (@MSG_INBOX) {
-            my $next = shift @MSG_INBOX;
-            my ($from, $msg) = $next->@*;
-            my $process = $PROCESS_TABLE{ $msg->pid };
-            if ( !$process ) {
-                warn "Got message for unknown pid(".$msg->pid.")";
-                next;
-            }
-            push $process->inbox->@* => [ $from, $msg ];
-        }
+        my @inbox = @MSG_INBOX;
+        @MSG_INBOX = ();
 
-        my @ready = grep scalar $_->inbox->@*,
-                    grep $_->status == READY,
-                    map $PROCESS_TABLE{$_},
-                    sort keys %PROCESS_TABLE;
+        while (@inbox) {
+            my ($from, $msg) = (shift @inbox)->@*;
 
-        warn Dumper {
-            msg             => 'Ready Processes and Inbox after delivery',
-            ready_processes => \@ready,
-            msg_inbox       => \@MSG_INBOX,
-        } if DEBUG_MSGS;
+            my $active = $PROCESS_TABLE{ $msg->pid };
 
-        while (@ready) {
-            my $active = shift @ready;
+            local $CURRENT_PID    = $active->pid;
+            local $CURRENT_CALLER = $from;
 
-            while ( $active->inbox->@* ) {
+            say BLUE " >>> calling : ", CYAN $msg->to_string, RESET
+                if DEBUG_CALLS;
 
-                my ($from, $msg) = @{ shift $active->inbox->@* };
-
-                local $CURRENT_PID    = $active->pid;
-                local $CURRENT_CALLER = $from;
-
-                say BLUE " >>> calling : ", CYAN $msg->to_string, RESET
-                    if DEBUG_CALLS;
-
-                $active->actor->($active->env, $msg);
-            }
+            $active->actor->($active->env, $msg);
         }
 
         proc::despawn_all_exiting_pids(sub ($pid) {
