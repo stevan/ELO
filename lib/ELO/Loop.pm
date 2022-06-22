@@ -57,11 +57,7 @@ sub CALLER () { $CURRENT_CALLER }
 
 my @MSG_INBOX;
 
-sub enqueue_msg ($msg) {
-    push @MSG_INBOX => [ $CURRENT_PID, $msg ];
-}
-
-sub enqueue_msg_from ($from, $msg) {
+sub enqueue_msg ($msg, $from=$CURRENT_PID) {
     push @MSG_INBOX => [ $from, $msg ];
 }
 

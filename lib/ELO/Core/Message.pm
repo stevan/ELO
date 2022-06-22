@@ -20,7 +20,7 @@ sub curry ($self, @args) {
 }
 
 sub send ($self) { ELO::Loop::enqueue_msg($self); $self }
-sub send_from ($self, $caller) { ELO::Loop::enqueue_msg_from($caller, $self); $self }
+sub send_from ($self, $caller) { ELO::Loop::enqueue_msg($self, $caller); $self }
 
 sub to_string ($self) {
     join '' =>
