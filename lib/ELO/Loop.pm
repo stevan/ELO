@@ -24,12 +24,10 @@ use Exporter 'import';
 
 our @EXPORT = qw[
     loop
-
-    TICK
 ];
 
 ## ----------------------------------------------------------------------------
-## system interface ... see Actor definitions inside &loop
+## Signals ... see Actor definitions inside &loop
 ## ----------------------------------------------------------------------------
 
 sub sig::kill($pid) {
@@ -54,9 +52,10 @@ sub sig::waitpid($pid, $callback) {
 ## ----------------------------------------------------------------------------
 ## teh loop
 ## ----------------------------------------------------------------------------
-our $CURRENT_TICK;
 
-sub TICK () { $CURRENT_TICK }
+our $CURRENT_TICK; # localized context for TIMERS
+our %TIMERS;       # HASH< $tick_to_fire_at > = [ [ $from, $msg ], ... ]
+our %WAITPIDS;     # HASH< $pid > = [ [ $from, $msg ], ... ]
 
 sub loop ( $MAX_TICKS, $start_pid ) {
 
@@ -72,7 +71,7 @@ sub loop ( $MAX_TICKS, $start_pid ) {
             waitpid => sub ($pid, $callback) {
                 if (proc::exists($pid)) {
                     warn( $prefix, "setting watcher for ($pid) ...\n" ) if DEBUG_SIGS;
-                    push @{ $ELO::VM::WAITPIDS{$pid} //=[] } => [
+                    push @{ $WAITPIDS{$pid} //=[] } => [
                         CALLER,
                         $callback
                     ];
@@ -91,7 +90,7 @@ sub loop ( $MAX_TICKS, $start_pid ) {
                     $callback->send_from(CALLER);
                 }
                 else {
-                    push @{ $ELO::VM::TIMERS{ $CURRENT_TICK + $timeout } //= [] } => [
+                    push @{ $TIMERS{ $CURRENT_TICK + $timeout } //= [] } => [
                         CALLER,
                         $callback
                     ];
@@ -117,8 +116,8 @@ sub loop ( $MAX_TICKS, $start_pid ) {
 
         local $CURRENT_TICK = $tick;
 
-        if ( exists $ELO::VM::TIMERS{ $tick } ) {
-            my $alarms = delete $ELO::VM::TIMERS{ $tick };
+        if ( exists $TIMERS{ $tick } ) {
+            my $alarms = delete $TIMERS{ $tick };
             foreach my $alarm ($alarms->@*) {
                 my ($caller, $callback) = @$alarm;
                 $callback->send_from( $caller );
@@ -145,11 +144,13 @@ sub loop ( $MAX_TICKS, $start_pid ) {
                 if DEBUG_CALLS;
 
             $active->actor->($active->env, $msg);
+
+
         }
 
         proc::despawn_all_exiting_pids(sub ($pid) {
-            if ( exists $ELO::VM::WAITPIDS{$pid} ) {
-                my $watchers = delete $ELO::VM::WAITPIDS{$pid};
+            if ( exists $WAITPIDS{$pid} ) {
+                my $watchers = delete $WAITPIDS{$pid};
                 foreach my $watcher ($watchers->@*) {
                     my ($caller, $callback) = @$watcher;
                     $callback->send_from( $caller );
@@ -158,7 +159,7 @@ sub loop ( $MAX_TICKS, $start_pid ) {
         });
 
         warn Dumper \%ELO::VM::PROCESS_TABLE if DEBUG_PROCS;
-        warn Dumper \%ELO::VM::TIMERS        if DEBUG_TIMERS;
+        warn Dumper \%TIMERS        if DEBUG_TIMERS;
 
         my @active_processes =
             grep !/^\d\d\d:\#/,    # ignore I/O pids
@@ -178,7 +179,7 @@ sub loop ( $MAX_TICKS, $start_pid ) {
         }
 
         # at least do one tick before shutting things down ...
-        if ( $tick > 1 && scalar @active_processes == 0 && scalar(keys %ELO::VM::TIMERS) == 0 ) {
+        if ( $tick > 1 && scalar @active_processes == 0 && scalar(keys %TIMERS) == 0 ) {
             # loop one last time to flush any I/O
             if ( scalar @ELO::VM::MSG_INBOX == 0 ) {
                 $has_exited++;
@@ -191,7 +192,7 @@ sub loop ( $MAX_TICKS, $start_pid ) {
         }
     }
 
-    warn Dumper \%ELO::VM::WAITPIDS if DEBUG_WAITPIDS;
+    warn Dumper \%WAITPIDS if DEBUG_WAITPIDS;
 
     if ( $has_exited ) {
         _loop_log_line("exit(%d)", $tick) if DEBUG_LOOP;

@@ -30,12 +30,10 @@ our @EXPORT = qw[
 our $CURRENT_PID;
 our $CURRENT_CALLER;
 
-our $INIT_PID;
+our $INIT_PID = new_pid('<init>');
 
 our %ACTORS;        # HASH< $name > = sub ($env, $msg) {}
-
 our @MSG_INBOX;     # ARRAY [ [ $from, $msg ], ... ]
-
 our %PROCESS_TABLE; # HASH< $pid > = ELO::Core::ProcessRecord
 
 ## ----------------------------------------------------------------------------
@@ -93,6 +91,9 @@ sub proc::despawn ($pid) {
     $PROCESS_TABLE{ $pid }->set_to_exiting;
 }
 
+# FIXME
+# consider doing this differently,
+# it doesnt need to be a public function
 sub proc::despawn_all_exiting_pids ( $on_exit ) {
     foreach my $pid (keys %PROCESS_TABLE) {
         my $proc = $PROCESS_TABLE{$pid};
@@ -103,12 +104,6 @@ sub proc::despawn_all_exiting_pids ( $on_exit ) {
             $on_exit->( $pid );
         }
     }
-}
-
-## SETUP ...
-
-UNITCHECK {
-    $INIT_PID = new_pid('<init>');
 }
 
 1;
