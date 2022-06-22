@@ -61,7 +61,7 @@ actor BusySpinner => sub ($env, $msg) {
 
     match $msg, +{
         next => sub () {
-            err::log(PID." counting down until ".$env->{until})->send if DEBUG;
+            sys::err::log(PID." counting down until ".$env->{until}) if DEBUG;
             $env->{until}--;
             if ($env->{until} <= 0) {
                 msg(PID, finish => [])->send;
@@ -71,7 +71,7 @@ actor BusySpinner => sub ($env, $msg) {
             }
         },
         finish => sub () {
-            err::log(PID." finished countdown")->send if DEBUG;
+            sys::err::log(PID." finished countdown") if DEBUG;
             sig::kill(PID)->send;
         }
     }
@@ -79,7 +79,7 @@ actor BusySpinner => sub ($env, $msg) {
 
 
 actor main => sub ($env, $msg) {
-    out::print("-> main starting ...")->send;
+    sys::out::print("-> main starting ...");
 
     my @spinners = map {
         proc::spawn('BusySpinner', until => int(rand(25)))

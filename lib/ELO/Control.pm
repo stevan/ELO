@@ -57,7 +57,7 @@ sub parallel (@statements) {
 actor '!ident' => sub ($env, $msg) {
     match $msg, +{
         id => sub ($val, $callback=undef) {
-            err::log("*/ !ident /* returning val($val)")->send if DEBUG_ACTORS;
+            sys::err::log("*/ !ident /* returning val($val)") if DEBUG_ACTORS;
             $callback->curry($val)->send;
             proc::despawn( PID() );
         },
@@ -70,12 +70,12 @@ actor '!sequence' => sub ($env, $msg) {
     match $msg, +{
         next => sub (@statements) {
             if ( my $statement = shift @statements ) {
-                err::log("*/ !sequence /* calling, ".(scalar @statements)." remain" )->send if DEBUG_ACTORS;
+                sys::err::log("*/ !sequence /* calling, ".(scalar @statements)." remain" ) if DEBUG_ACTORS;
                 $statement->send_from( CALLER() );
                 msg(PID(), next => \@statements)->send_from( CALLER() );
             }
             else {
-                err::log("*/ !sequence /* finished")->send if DEBUG_ACTORS;
+                sys::err::log("*/ !sequence /* finished") if DEBUG_ACTORS;
                 proc::despawn( PID() );
             }
         },
@@ -85,11 +85,11 @@ actor '!sequence' => sub ($env, $msg) {
 actor '!parallel' => sub ($env, $msg) {
     match $msg, +{
         all => sub (@statements) {
-            err::log("*/ !parallel /* sending ".(scalar @statements)." messages" )->send if DEBUG_ACTORS;
+            sys::err::log("*/ !parallel /* sending ".(scalar @statements)." messages" ) if DEBUG_ACTORS;
             foreach my $statement ( @statements ) {
                 $statement->send_from( CALLER() );
             }
-            err::log("*/ !parallel /* finished")->send if DEBUG_ACTORS;
+            sys::err::log("*/ !parallel /* finished") if DEBUG_ACTORS;
             proc::despawn( PID() );
         },
     };

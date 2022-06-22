@@ -17,11 +17,11 @@ actor collector => sub ($env, $msg) {
     state $values = [];
     match $msg, +{
         on_next => sub ($value) {
-            err::log(PID." got value($value)")->send if DEBUG;
+            sys::err::log(PID." got value($value)") if DEBUG;
             push @$values => $value;
         },
         finish => sub () {
-            err::log(PID." finished")->send if DEBUG;
+            sys::err::log(PID." finished") if DEBUG;
             sig::kill(PID)->send;
             eq_or_diff([ sort { $a <=> $b } @$values ], $env->{expected}, '... got the expected values');
         }
@@ -33,7 +33,7 @@ actor counter => sub ($env, $msg) {
     match $msg, +{
         next => sub ($callback) {
             $count++;
-            err::log(PID." sending value ($count) to (".$callback->pid.")")->send if DEBUG;
+            sys::err::log(PID." sending value ($count) to (".$callback->pid.")") if DEBUG;
             $callback->curry( $count )->send;
         },
         finish => sub () {
@@ -58,7 +58,7 @@ actor take_10_and_sync => sub ($env, $msg) {
 };
 
 actor main => sub ($env, $msg) {
-    out::print("-> main starting ...");
+    sys::out::print("-> main starting ...");
 
     my $s = proc::spawn('take_10_and_sync');
     my $p = proc::spawn('counter');

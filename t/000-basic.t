@@ -17,12 +17,12 @@ my $CURRENT_CNT = 0;
 actor bounce => sub ($env, $msg) {
     match $msg, +{
         up => sub ($cnt) {
-            out::print("bounce(UP) => $cnt")->send;
+            sys::out::print("bounce(UP) => $cnt");
             msg( PID, down => [$cnt+1] )->send;
             $CURRENT_CNT = $cnt;
         },
         down => sub ($cnt) {
-            out::print("bounce(DOWN) => $cnt")->send;
+            sys::out::print("bounce(DOWN) => $cnt");
             msg( PID, up => [$cnt+1] )->send;
             $CURRENT_CNT = $cnt;
         },
@@ -37,7 +37,7 @@ actor bounce => sub ($env, $msg) {
 };
 
 actor main => sub ($env, $msg) {
-    out::print("-> main starting ...")->send;
+    sys::out::print("-> main starting ...");
 
     my $bounce = proc::spawn( 'bounce' );
 

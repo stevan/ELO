@@ -62,18 +62,18 @@ package TestObserver {
     );
 
     sub on_next ($self, $val) {
-        out::print(PID." got val($val)")->send;
+        sys::out::print(PID." got val($val)");
         $self->{got}->{$val}++;
     }
 
     sub on_error ($self, $e) {
-        err::log(PID." got error($e)")->send if DEBUG;
+        sys::err::log(PID." got error($e)") if DEBUG;
         $self->exit($e);
     }
 
     sub on_completed ($self) {
-        err::log(PID." completed")->send if DEBUG;
-        err::log(PID." observed values: [" . (join ', ' => map { "$_/".$self->{got}->{$_} } sort { $a <=> $b } keys $self->{got}->%*) . "]")->send if DEBUG;
+        sys::err::log(PID." completed") if DEBUG;
+        sys::err::log(PID." observed values: [" . (join ', ' => map { "$_/".$self->{got}->{$_} } sort { $a <=> $b } keys $self->{got}->%*) . "]") if DEBUG;
         $self->exit();
         eq_or_diff( [ sort { $a <=> $b } keys $self->{got}->%* ], $self->{expected}, '... got the expected values for '.PID);
         eq_or_diff( [ values $self->{got}->%* ], [ map 1, $self->{expected}->@* ], '... got the expected value counts (all 1) for '.PID);
@@ -164,7 +164,7 @@ package SimpleObservable {
 
     sub subscribe ($self, $observer) {
 
-        err::log("SimpleObserveable started, calling ($observer)")->send if DEBUG;
+        sys::err::log("SimpleObserveable started, calling ($observer)") if DEBUG;
 
         sequence(
             (map msg( $observer, on_next => [ $_ ] ), 0 .. 10 ),
@@ -189,7 +189,7 @@ actor MapObservable    => MapObservable->new_actor;
 actor SimpleObservable => SimpleObservable->new_actor;
 
 actor main => sub ($env, $msg) {
-    out::print("-> main starting ...")->send;
+    sys::out::print("-> main starting ...");
 
     my $simple = proc::spawn('SimpleObservable');
     my $map    = proc::spawn('MapObservable',

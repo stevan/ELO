@@ -18,27 +18,27 @@ actor env => sub ($env, $msg) {
     match $msg, +{
         init => sub ($new_env) {
             $env->{$_} = $new_env->{$_} foreach keys %$new_env;
-            err::log("env initialized to => ENV{ ".(join ', ' => map { join ' => ' => $_, $env->{$_} } keys %$env)." }")->send
+            sys::err::log("env initialized to => ENV{ ".(join ', ' => map { join ' => ' => $_, $env->{$_} } keys %$env)." }")
                 if DEBUG;
         },
         get => sub ($key, $callback=undef) {
             if ( exists $env->{$key} ) {
-                err::log("fetching {$key}")->send if DEBUG;
+                sys::err::log("fetching {$key}") if DEBUG;
                 $callback->curry( $env->{$key} )->send;
             }
             else {
-                err::log("not found {$key}")->send if DEBUG;
+                sys::err::log("not found {$key}") if DEBUG;
             }
         },
         set => sub ($key, $value) {
-            err::log("storing $key => $value")->send if DEBUG;
+            sys::err::log("storing $key => $value") if DEBUG;
             $env->{$key} = $value;
 
-            err::log("env is now => ENV{ ".(join ', ' => map { join ' => ' => $_, $env->{$_} } keys %$env)." }")->send
+            sys::err::log("env is now => ENV{ ".(join ', ' => map { join ' => ' => $_, $env->{$_} } keys %$env)." }")
                 if DEBUG;
         },
         finish => sub ($expected_env) {
-            err::log("finishing env and testing output")->send if DEBUG;
+            sys::err::log("finishing env and testing output") if DEBUG;
             sig::kill(PID)->send;
             eq_or_diff($expected_env, $env, '... got the env we expected');
         }
@@ -46,7 +46,7 @@ actor env => sub ($env, $msg) {
 };
 
 actor main => sub ($env, $msg) {
-    out::print("-> main starting ...")->send;
+    sys::out::print("-> main starting ...");
 
     my $e1 = proc::spawn( 'env' );
     my $e2 = proc::spawn( 'env' );

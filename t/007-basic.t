@@ -22,11 +22,11 @@ actor SExpParser => sub ($env, $msg) {
     match $msg, +{
         on_next => sub ($val) {
             if ($val eq '(') {
-                err::log(PID." on_sexp_start")->send if DEBUG;
+                sys::err::log(PID." on_sexp_start") if DEBUG;
                 push @$stack => [];
             }
             elsif ($val eq ')') {
-                err::log(PID." on_sexp_end")->send if DEBUG;
+                sys::err::log(PID." on_sexp_end") if DEBUG;
                 my $child = pop @$stack;
                 if ( $child && @$stack ) {
                     push $stack->[-1]->@* => $child;
@@ -43,11 +43,11 @@ actor SExpParser => sub ($env, $msg) {
             }
         },
         on_error => sub ($e) {
-            out::print( "ERROR: $e" )->send;
+            sys::out::print( "ERROR: $e" );
             sig::kill(PID)->send;
         },
         on_completed => sub () {
-            out::print( (Dumper $stack->[0]) =~ s/^\$VAR1\s/SEXP /r )->send #/
+            sys::out::print( (Dumper $stack->[0]) =~ s/^\$VAR1\s/SEXP /r ) #/
                 if @$stack == 1;
             sig::kill(PID)->send;
             if (my $expected = $env->{expected}) {
@@ -64,17 +64,17 @@ actor DebugObserver => sub ($env, $msg) {
 
     match $msg, +{
         on_next => sub ($val) {
-            out::print(PID." got val($val)")->send;
+            sys::out::print(PID." got val($val)");
             msg($observer, on_next => [ $val ])->send;
             push @$got => $val if $val eq '(' or $val eq ')';
         },
         on_error => sub ($e) {
-            err::log(PID." got error($e)")->send if DEBUG;
+            sys::err::log(PID." got error($e)") if DEBUG;
             msg($observer, error => [ $e ])->send;
             sig::kill(PID)->send;
         },
         on_completed => sub () {
-            err::log( (Dumper $got) =~ s/^\$VAR1\s/VALS /r )->send #/
+            sys::err::log( (Dumper $got) =~ s/^\$VAR1\s/VALS /r ) #/
                 if @$got == 1;
             msg($observer, on_completed => [])->send;
             sig::kill(PID)->send;
@@ -91,7 +91,7 @@ actor SimpleObservable => sub ($env, $msg) {
 
     match $msg, +{
         subscribe => sub ($observer) {
-            err::log(PID." started, calling ($observer)")->send if DEBUG;
+            sys::err::log(PID." started, calling ($observer)") if DEBUG;
 
             sequence(
                 (map msg( $observer, on_next => [ $_ ] ), split '' => $string),
@@ -103,7 +103,7 @@ actor SimpleObservable => sub ($env, $msg) {
 };
 
 actor main => sub ($env, $msg) {
-    out::print("-> main starting ...")->send;
+    sys::out::print("-> main starting ...");
 
     my $parser = proc::spawn('SExpParser', expected => [[ [[], [[]]], [], [[[]]] ]] );
     my $simple = proc::spawn('SimpleObservable', string => '(() (())) () ((()))');

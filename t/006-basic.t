@@ -30,61 +30,61 @@ actor Decoder => sub ($env, $msg) {
 
     my $stack = $env->{stack} //= [];
 
-    err::log(Dumper { stack => $stack })->send if DEBUG_DECODER >= 2;
+    sys::err::log(Dumper { stack => $stack }) if DEBUG_DECODER >= 2;
 
     match $msg, +{
         start_object => sub () {
-            err::log("START OBJECT")->send if DEBUG_DECODER;
+            sys::err::log("START OBJECT") if DEBUG_DECODER;
             push @$stack => {};
         },
 
         end_object => sub () {
-            err::log("END OBJECT")->send if DEBUG_DECODER;
+            sys::err::log("END OBJECT") if DEBUG_DECODER;
         },
 
         start_property => sub () {
-            err::log("START PROPERTY")->send if DEBUG_DECODER;
+            sys::err::log("START PROPERTY") if DEBUG_DECODER;
         },
 
         end_property   => sub () {
             my $value = pop @$stack;
             my $key   = pop @$stack;
-            err::log("ADD PROPERTY $key => $value")->send if DEBUG_DECODER;
+            sys::err::log("ADD PROPERTY $key => $value") if DEBUG_DECODER;
             $stack->[-1]->{$key} = $value;
-            err::log("END PROPERTY")->send if DEBUG_DECODER;
+            sys::err::log("END PROPERTY") if DEBUG_DECODER;
         },
 
-        start_array => sub () { err::log("START ARRAY")->send if DEBUG_DECODER; },
-        end_array   => sub () { err::log("END ARRAY")->send if DEBUG_DECODER; },
+        start_array => sub () { sys::err::log("START ARRAY") if DEBUG_DECODER; },
+        end_array   => sub () { sys::err::log("END ARRAY") if DEBUG_DECODER; },
 
         start_item => sub () {
-            err::log("START ITEM")->send if DEBUG_DECODER;
+            sys::err::log("START ITEM") if DEBUG_DECODER;
         },
         end_item   => sub () {
-            err::log("END ITEM")->send if DEBUG_DECODER;
+            sys::err::log("END ITEM") if DEBUG_DECODER;
         },
 
         add_string => sub ($string) {
-            err::log("ADD STRING ($string)")->send if DEBUG_DECODER;
+            sys::err::log("ADD STRING ($string)") if DEBUG_DECODER;
             push @$stack => $string;
         },
         add_number => sub ($number) {
-            err::log("ADD NUMBER ($number)")->send if DEBUG_DECODER;
+            sys::err::log("ADD NUMBER ($number)") if DEBUG_DECODER;
             push @$stack => $number;
         },
 
-        add_true   => sub () { err::log("ADD TRUE")->send if DEBUG_DECODER; },
-        add_false  => sub () { err::log("ADD FALSE")->send if DEBUG_DECODER; },
-        add_null   => sub () { err::log("ADD NULL")->send if DEBUG_DECODER; },
+        add_true   => sub () { sys::err::log("ADD TRUE") if DEBUG_DECODER; },
+        add_false  => sub () { sys::err::log("ADD FALSE") if DEBUG_DECODER; },
+        add_null   => sub () { sys::err::log("ADD NULL") if DEBUG_DECODER; },
 
         error => sub ($error) {
-            out::print("ERROR!!!! ($error)")->send;
+            sys::out::print("ERROR!!!! ($error)");
             @$stack = ();
             sig::kill(PID)->send;
             is($error, $env->{error}, '... got the error we expected');
         },
         finish     => sub () {
-            out::print( (Dumper $stack->[0]) =~ s/^\$VAR1\s/JSON /r )->send #/
+            sys::out::print( (Dumper $stack->[0]) =~ s/^\$VAR1\s/JSON /r ) #/
                 if @$stack == 1;
             sig::kill(PID)->send;
             eq_or_diff($stack->[0], $env->{expected}, '... got the expected values');
@@ -104,7 +104,7 @@ actor Tokenizer => sub ($env, $msg) {
 
     my $stack = $env->{stack} //= [];
 
-    err::log(Dumper { stack => $stack })->send if DEBUG_TOKENIZER >= 2;
+    sys::err::log(Dumper { stack => $stack }) if DEBUG_TOKENIZER >= 2;
 
     match $msg, +{
         tokenize => sub ($observer, $JSON) {
@@ -120,7 +120,7 @@ actor Tokenizer => sub ($env, $msg) {
         process_tokens => sub ($observer, @chars) {
             my $char;
 
-            err::log("Enter process_tokens (@$stack) : (@chars)")->send if DEBUG_TOKENIZER;
+            sys::err::log("Enter process_tokens (@$stack) : (@chars)") if DEBUG_TOKENIZER;
 
             ($char, @chars) = stip_whitespace \@chars;
 
@@ -152,7 +152,7 @@ actor Tokenizer => sub ($env, $msg) {
         start_object => sub ($observer, @chars) {
             my $char;
 
-            err::log("Enter start_object (@$stack) : (@chars)")->send if DEBUG_TOKENIZER;
+            sys::err::log("Enter start_object (@$stack) : (@chars)") if DEBUG_TOKENIZER;
 
             ($char, @chars) = stip_whitespace \@chars;
 
@@ -174,7 +174,7 @@ actor Tokenizer => sub ($env, $msg) {
         process_object => sub ($observer, @chars) {
             my $char;
 
-            err::log("Enter process_object (@$stack) : (@chars)")->send if DEBUG_TOKENIZER;
+            sys::err::log("Enter process_object (@$stack) : (@chars)") if DEBUG_TOKENIZER;
 
             ($char, @chars) = stip_whitespace \@chars;
 
@@ -197,7 +197,7 @@ actor Tokenizer => sub ($env, $msg) {
         },
         end_object => sub ($observer, @chars) {
 
-            err::log("Enter end_object (@$stack) : (@chars)")->send if DEBUG_TOKENIZER;
+            sys::err::log("Enter end_object (@$stack) : (@chars)") if DEBUG_TOKENIZER;
 
             my $return_call = pop @$stack;
 
@@ -209,7 +209,7 @@ actor Tokenizer => sub ($env, $msg) {
         start_property => sub ($observer, @chars) {
             my $char;
 
-            err::log("Enter start_property (@$stack) : (@chars)")->send if DEBUG_TOKENIZER;
+            sys::err::log("Enter start_property (@$stack) : (@chars)") if DEBUG_TOKENIZER;
 
             ($char, @chars) = stip_whitespace \@chars;
 
@@ -230,7 +230,7 @@ actor Tokenizer => sub ($env, $msg) {
         process_property => sub ($observer, @chars) {
             my $char;
 
-            err::log("Enter process_property (@$stack) : (@chars)")->send if DEBUG_TOKENIZER;
+            sys::err::log("Enter process_property (@$stack) : (@chars)") if DEBUG_TOKENIZER;
 
             ($char, @chars) = stip_whitespace \@chars;
 
@@ -248,7 +248,7 @@ actor Tokenizer => sub ($env, $msg) {
         },
         end_property => sub ($observer, @chars) {
 
-            err::log("Enter end_property (@$stack) : (@chars)")->send if DEBUG_TOKENIZER;
+            sys::err::log("Enter end_property (@$stack) : (@chars)") if DEBUG_TOKENIZER;
 
             my $return_call = pop @$stack;
 
@@ -259,7 +259,7 @@ actor Tokenizer => sub ($env, $msg) {
 
         start_item => sub ($observer, @chars) {
 
-            err::log("Enter start_item (@$stack) : (@chars)")->send if DEBUG_TOKENIZER;
+            sys::err::log("Enter start_item (@$stack) : (@chars)") if DEBUG_TOKENIZER;
 
             msg($observer, start_item => [])->send;
             push @$stack => 'end_item';
@@ -267,7 +267,7 @@ actor Tokenizer => sub ($env, $msg) {
         },
         end_item => sub ($observer, @chars) {
 
-            err::log("Enter end_item (@$stack) : (@chars)")->send if DEBUG_TOKENIZER;
+            sys::err::log("Enter end_item (@$stack) : (@chars)") if DEBUG_TOKENIZER;
 
             msg($observer, end_item => [])->send;
             msg(PID, end_property => [ $observer, @chars ])->send;
@@ -277,7 +277,7 @@ actor Tokenizer => sub ($env, $msg) {
         ## ... literals ...
         collect_string => sub ($observer, @chars) {
 
-            err::log("Enter collect_string (@$stack) : (@chars)")->send if DEBUG_TOKENIZER;
+            sys::err::log("Enter collect_string (@$stack) : (@chars)") if DEBUG_TOKENIZER;
 
             my $char = shift @chars;
 
@@ -299,7 +299,7 @@ actor Tokenizer => sub ($env, $msg) {
         },
         collect_number => sub ($observer, @chars) {
 
-            err::log("Enter collect_number (@$stack) : (@chars)")->send if DEBUG_TOKENIZER;
+            sys::err::log("Enter collect_number (@$stack) : (@chars)") if DEBUG_TOKENIZER;
 
             my $char = shift @chars;
 
@@ -323,7 +323,7 @@ actor Tokenizer => sub ($env, $msg) {
         # ...
         error => sub ($observer, $error) {
 
-            err::log("Enter error (@$stack)")->send if DEBUG_TOKENIZER;
+            sys::err::log("Enter error (@$stack)") if DEBUG_TOKENIZER;
 
             @$stack = (); # clear stack ...
 
@@ -332,7 +332,7 @@ actor Tokenizer => sub ($env, $msg) {
         },
         finish => sub ($observer) {
 
-            err::log("Enter finish (@$stack)")->send if DEBUG_TOKENIZER;
+            sys::err::log("Enter finish (@$stack)") if DEBUG_TOKENIZER;
 
             msg( $observer, finish => [])->send;
             sig::kill(PID)->send;
@@ -341,7 +341,7 @@ actor Tokenizer => sub ($env, $msg) {
 };
 
 actor main => sub ($env, $msg) {
-    out::print("-> main starting ...");
+    sys::out::print("-> main starting ...");
 
     msg(proc::spawn('Tokenizer'), tokenize => [
         proc::spawn('Decoder', error => 'Unexpected token `:` in process_object, expected `}` or `,`'),

@@ -17,13 +17,65 @@ use ELO::Loop;
 
 use ELO::Debug;
 
-our $IN;
-our $OUT;
-our $ERR;
-
 our $STDIN  = \*STDIN;
 our $STDOUT = \*STDOUT;
 our $STDERR = \*STDERR;
+
+sub QUIET () {
+    ELO->DEBUG()
+        # if we are DEBUG-ing, do not be quiet
+        ? 0
+        # if we are testing, be quiet
+        : $Test::ELO::TESTING
+}
+
+sub sys::err::logf ($fmt, $values, $caller=CALLER()) {
+    my $prefix = ON_RED "LOG (".PID().") !!". RESET " ";
+    $STDERR->print(
+        $prefix,
+        (sprintf $fmt, @$values),
+        FAINT " >> [$caller]\n",
+        RESET
+    ) unless QUIET();
+}
+
+sub sys::err::log ($msg, $caller=CALLER()) {
+    my $prefix = ON_RED "LOG (".PID().") !!". RESET " ";
+    $STDERR->print(
+        $prefix,
+        $msg,
+        FAINT " >> [$caller]\n",
+        RESET
+    ) unless QUIET();
+}
+
+sub sys::out::printf ($fmt, @values) {
+    my $prefix = ON_GREEN "OUT (".PID().") >>". RESET " ";
+    $STDOUT->print( $prefix, (sprintf $fmt, @values), "\n" ) unless QUIET();
+}
+
+sub sys::out::print ($value) {
+    my $prefix = ON_GREEN "OUT (".PID().") >>". RESET " ";
+    $STDOUT->print( $prefix, $value, "\n" ) unless QUIET();
+}
+
+sub sys::in::read ($prompt, $callback) {
+    my $prefix = ON_CYAN "IN (".PID().") <<". RESET " ";
+
+    $prompt //= '';
+
+    print( $prefix, $prompt );
+    my $input = <$STDIN>;
+    chomp $input;
+    $callback->curry( $input )->send;
+}
+
+## message interface ...
+
+# process singletons ...
+our $IN;
+our $OUT;
+our $ERR;
 
 sub err::log ($msg, $caller=CALLER()) {
     $ERR //= proc::spawn('#err');
@@ -50,88 +102,25 @@ sub in::read ($prompt=undef) {
     msg($IN, read => [ $prompt // () ]);
 }
 
-## ... actors
-
-sub QUIET () {
-    ELO->DEBUG()
-        # if we are DEBUG-ing, do not be quiet
-        ? 0
-        # if we are testing, be quiet
-        : $Test::ELO::TESTING
-}
-
-my %INDENTS;
+## actors ...
 
 actor '#err' => sub ($env, $msg) {
-    my $prefix = ON_RED "LOG (".CALLER().") !!". RESET " ";
-
     match $msg, +{
-        printf => sub ($fmt, $values, $caller='') {
-
-            if ($caller) {
-                $INDENTS{ CALLER() } = ($INDENTS{ $caller } // 0) + 1
-                    unless exists $INDENTS{ CALLER() };
-
-                $prefix = FAINT
-                    RED
-                        ('-' x $INDENTS{ CALLER() }).'> '
-                    . RESET $prefix;
-            }
-
-            $STDERR->print(
-                $prefix,
-                (sprintf $fmt, @$values),
-                FAINT " >> [$caller]",
-                RESET "\n"
-            ) unless QUIET();
-        },
-        print => sub ($msg, $caller='') {
-
-            if ($caller) {
-                $INDENTS{ CALLER() } = ($INDENTS{ $caller } // 0) + 1
-                    unless exists $INDENTS{ CALLER() };
-
-                $prefix = FAINT
-                    RED
-                        ('-' x $INDENTS{ CALLER() }).'> '
-                    . RESET $prefix;
-            }
-
-            $STDERR->print(
-                $prefix,
-                $msg,
-                FAINT " >> [$caller]",
-                RESET "\n"
-            ) unless QUIET();
-        }
+        printf => \&sys::err::logf,
+        print  => \&sys::err::log,
     };
 };
 
 actor '#out' => sub ($env, $msg) {
-    my $prefix = ON_GREEN "OUT (".CALLER().") >>". RESET " ";
-
     match $msg, +{
-        printf => sub ($fmt, @values) {
-            $STDOUT->print( $prefix, (sprintf $fmt, @values), "\n" ) unless QUIET();
-        },
-        print => sub ($value) {
-            $STDOUT->print( $prefix, $value, "\n" ) unless QUIET();
-        }
+        printf => \&sys::out::printf,
+        print  => \&sys::out::print,
     };
 };
 
 actor '#in' => sub ($env, $msg) {
-    my $prefix = ON_CYAN "IN (".CALLER().") <<". RESET " ";
-
     match $msg, +{
-        read => sub ($prompt, $callback) {
-            $prompt //= '';
-
-            print( $prefix, $prompt );
-            my $input = <$STDIN>;
-            chomp $input;
-            $callback->curry( $input )->send;
-        }
+        read => \&sys::in::read,
     };
 };
 

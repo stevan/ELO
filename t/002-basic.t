@@ -21,7 +21,7 @@ actor TestBuilder => sub ($env, $msg) {
         ok => sub ($value, $msg) {
             $counter++;
             my $ok = $value ? 'ok' : 'not ok';
-            out::print("$ok $counter $msg")->send;
+            sys::out::print("$ok $counter $msg");
             ok($value, $msg);
             push @VALUES => $value;
         },
@@ -29,7 +29,7 @@ actor TestBuilder => sub ($env, $msg) {
 };
 
 actor main => sub ($env, $msg) {
-    out::print("-> main starting ...");
+    sys::out::print("-> main starting ...");
 
     my $builder = proc::spawn( 'TestBuilder' );
 

@@ -39,25 +39,25 @@ actor Decoder => sub ($env, $msg) {
 
     my $stack = $env->{stack} //= [[]];
 
-    err::log(Dumper $env)->send if DEBUG_DECODER >= 2;
+    sys::err::log(Dumper $env) if DEBUG_DECODER >= 2;
 
     match $msg, +{
         start_parens => sub () {
-            err::log("START PARENS")->send if DEBUG_DECODER;
+            sys::err::log("START PARENS") if DEBUG_DECODER;
             push @$stack => [];
         },
         end_parens => sub () {
-            err::log("END PARENS")->send if DEBUG_DECODER;
+            sys::err::log("END PARENS") if DEBUG_DECODER;
             my $top = pop @$stack;
             push $stack->[-1]->@* => $top;
         },
 
         error => sub ($error) {
-            out::print("ERROR!!!! ($error)")->send;
+            sys::out::print("ERROR!!!! ($error)");
             @$stack = ();
         },
         finish     => sub () {
-            out::print( (Dumper $stack->[0]) =~ s/^\$VAR1\s/PARENS /r )->send #/
+            sys::out::print( (Dumper $stack->[0]) =~ s/^\$VAR1\s/PARENS /r ) #/
                 if @$stack == 1;
             sig::kill(PID)->send;
         },
@@ -76,23 +76,23 @@ actor Tokenizer => sub ($env, $msg) {
 
     match $msg, +{
         finish => sub ($producer, $observer) {
-            err::log("Finishing")->send if DEBUG_TOKENIZER;
+            sys::err::log("Finishing") if DEBUG_TOKENIZER;
             msg( $producer, finish => [])->send;
             msg( $observer, finish => [])->send;
             sig::kill(PID)->send;
         },
         error => sub ($producer, $observer, $error) {
             @$stack = ();
-            err::log("Got Error ($error)")->send;
+            sys::err::log("Got Error ($error)");
             msg(PID, finish => [$producer, $observer])->send;
         },
         process_tokens => sub ($producer, $observer) {
-            err::log("process tokens (@$stack)")->send if DEBUG_TOKENIZER;
+            sys::err::log("process tokens (@$stack)") if DEBUG_TOKENIZER;
 
             sync_next($producer, $observer, 'process_token')->send;
         },
         process_token => sub ($producer, $observer, $token) {
-            err::log("process token (@$stack)")->send if DEBUG_TOKENIZER;
+            sys::err::log("process token (@$stack)") if DEBUG_TOKENIZER;
 
             if ($token eq '(') {
                 msg( PID, open_parens => [ $producer, $observer ] )->send;
@@ -107,13 +107,13 @@ actor Tokenizer => sub ($env, $msg) {
 
         # ..
         open_parens => sub ($producer, $observer) {
-            err::log("// open parens (@$stack)")->send if DEBUG_TOKENIZER;
+            sys::err::log("// open parens (@$stack)") if DEBUG_TOKENIZER;
             push @$stack => 'process_parens';
             msg($observer, 'start_parens' => [])->send;
             sync_next($producer, $observer, 'process_parens')->send;
         },
         process_parens => sub ($producer, $observer, $token) {
-            err::log("process parens (@$stack) with `$token`")->send if DEBUG_TOKENIZER;
+            sys::err::log("process parens (@$stack) with `$token`") if DEBUG_TOKENIZER;
             if ($token eq '(') {
                 msg( PID, open_parens => [ $producer, $observer ] )->send;
             }
@@ -134,12 +134,12 @@ actor Tokenizer => sub ($env, $msg) {
                 }
             }
             else {
-                err::log("Loop process parens (@$stack) with `$token`")->send if DEBUG_TOKENIZER;
+                sys::err::log("Loop process parens (@$stack) with `$token`") if DEBUG_TOKENIZER;
                 sync_next($producer, $observer, 'process_parens')->send;
             }
         },
         close_parens => sub ($producer, $observer) {
-            err::log("\\\\ close parens (@$stack)")->send if DEBUG_TOKENIZER;
+            sys::err::log("\\\\ close parens (@$stack)") if DEBUG_TOKENIZER;
             msg($observer, 'end_parens' => [])->send;
             my $frame = pop @$stack;
             sync_next($producer, $observer, $frame)->send;
@@ -149,7 +149,7 @@ actor Tokenizer => sub ($env, $msg) {
 };
 
 actor main => sub ($env, $msg) {
-    out::print("-> main starting ...")->send;
+    sys::out::print("-> main starting ...");
 
     msg(
         proc::spawn('Tokenizer'),

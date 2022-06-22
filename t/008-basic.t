@@ -13,7 +13,7 @@ use Data::Dumper;
 use ELO;
 
 actor main => sub ($env, $msg) {
-    out::print("-> main starting ...")->send;
+    sys::out::print("-> main starting ...");
 
     sig::timer( 0,  out::print("hello -2") )->send;
     sig::timer( 1,  out::print("hello -1") )->send;
