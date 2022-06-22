@@ -14,8 +14,8 @@ use ELO;
 
 use constant EMPTY => '!!EMPTY!!';
 
-use constant DEBUG_TOKENIZER => DEBUG >= 2 ? DEBUG - 1 : 0;
-use constant DEBUG_DECODER   => DEBUG >= 2 ? DEBUG - 1 : 0;
+use constant DEBUG_TOKENIZER => DEBUG() =~ m/TOKENIZER/ ? 1 : 0;
+use constant DEBUG_DECODER   => DEBUG() =~ m/DECODER/   ? 1 : 0;
 
 actor CharacterStream => sub ($env, $msg) {
 
