@@ -17,9 +17,11 @@ actor collector => sub ($env, $msg) {
     state $values = [];
     match $msg, +{
         on_next => sub ($value) {
+            err::log(PID." got value($value)")->send if DEBUG;
             push @$values => $value;
         },
         finish => sub () {
+            err::log(PID." finished")->send if DEBUG;
             sig::kill(PID)->send;
             eq_or_diff([ sort { $a <=> $b } @$values ], $env->{expected}, '... got the expected values');
         }
@@ -30,7 +32,9 @@ actor counter => sub ($env, $msg) {
     state $count = 0;
     match $msg, +{
         next => sub ($callback) {
-            $callback->curry( ++$count )->send;
+            $count++;
+            err::log(PID." sending value ($count) to (".$callback->pid.")")->send if DEBUG;
+            $callback->curry( $count )->send;
         },
         finish => sub () {
             sig::kill(PID)->send;
@@ -43,7 +47,7 @@ actor take_10_and_sync => sub ($env, $msg) {
 
     match $msg, +{
         each => sub ($producer, $consumer) {
-            sig::timer( 10 - $i, msg($producer, next => [ msg($consumer, on_next => []) ]) )->send;
+            sig::timer( 11 - $i, msg($producer, next => [ msg($consumer, on_next => []) ]) )->send;
             $i++;
             msg( PID, each => [ $producer, $consumer ] )->send if $i < 10;
         },
@@ -63,7 +67,7 @@ actor main => sub ($env, $msg) {
     msg( $s, each => [ $p, $c ] )->send;
 
     # cheap hack ...
-    sig::timer( 18,
+    sig::timer( 20,
         parallel(
             msg($s, finish => []),
             msg($p, finish => []),
