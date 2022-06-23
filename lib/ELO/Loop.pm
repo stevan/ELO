@@ -57,7 +57,15 @@ our $CURRENT_TICK; # localized context for TIMERS
 our %TIMERS;       # HASH< $tick_to_fire_at > = [ [ $from, $msg ], ... ]
 our %WAITPIDS;     # HASH< $pid > = [ [ $from, $msg ], ... ]
 
+use Time::HiRes 'time';
+
+use constant STATS => $ENV{STATS} // 0;
+
 sub loop ( $MAX_TICKS, $start_pid ) {
+
+    my %STATS;
+
+    $STATS {start} = time if STATS;
 
     # initialise the system pid singleton
     $ELO::VM::PROCESS_TABLE{ $INIT_PID } = ELO::Core::ProcessRecord->new($INIT_PID, {}, sub ($env, $msg) {
@@ -113,6 +121,8 @@ sub loop ( $MAX_TICKS, $start_pid ) {
     while ($tick < $MAX_TICKS) {
         $tick++;
         _loop_log_line("tick(%d)", $tick) if DEBUG_LOOP;
+
+        $STATS {ticks} {$tick} {start} = time if STATS;
 
         local $CURRENT_TICK = $tick;
 
@@ -173,6 +183,14 @@ sub loop ( $MAX_TICKS, $start_pid ) {
             msg_inbox        => \@ELO::VM::MSG_INBOX,
         } if DEBUG_MSGS;
 
+        if (STATS) {
+            $STATS {ticks} {$tick} {end} = time;
+            $STATS {ticks} {$tick} {dur} =
+                    $STATS {ticks} {$tick} {end}
+                    -
+                    $STATS {ticks} {$tick} {start};
+        }
+
         if ($should_exit) {
             $has_exited++;
             last;
@@ -210,11 +228,56 @@ sub loop ( $MAX_TICKS, $start_pid ) {
         return;
     }
 
+    if (STATS) {
+        $STATS {end} = time;
+        $STATS {dur} = $STATS {end} - $STATS {start};
+
+        #print_stats( \%STATS );
+        print_stats( \%STATS );
+
+        #warn Dumper \%STATS;
+
+    }
+
     return 1;
 }
 
 # XXX - put this into a module along with other similar stuff?
 our $TERM_SIZE = (GetTerminalSize())[0];
+
+sub print_stats ($stats) {
+    state $line_prefix = '== (stats)';
+    state $term_width = $TERM_SIZE - (length $line_prefix) - 2;
+
+    say BLUE (join ' ' => $line_prefix, ('=' x $term_width)), RESET;
+
+    my $ticks = $stats->{ticks};
+    my $total_ticks = 0;
+    foreach my $tick ( sort { $a <=> $b } keys %$ticks ) {
+
+        my $stat = $ticks->{$tick};
+        my $dur_ms = ($stat->{dur} * 1_000);
+
+        $total_ticks += $stat->{dur};
+
+        say(
+            CYAN(sprintf ("[%05d] -> " => $tick)), RESET,
+            MAGENTA(sprintf ("%.2f ms" => $dur_ms)), RESET,
+            FAINT(' : '), RESET,
+            GREEN('~' x (int(($dur_ms * 100) / 10) || 1)), RESET,
+        );
+    }
+    say(CYAN('-' x $TERM_SIZE), RESET);
+    say(
+        CYAN(sprintf("Elapsed ticks(%d) -> " => scalar keys %$ticks)), RESET,
+        '[ ', (join ' / ' =>
+            map { (RED($_).RESET) }
+            (sprintf("ticks %.3f ms" => ($total_ticks  * 1_000))),
+            (sprintf("loop %.3f ms" => ($stats->{dur} * 1_000))),
+        ), RESET, ' ]',
+    );
+    say BLUE ('=' x $TERM_SIZE), RESET;
+}
 
 sub _loop_log_line ( $fmt, $tick ) {
     state $init_pid_prefix = '('.$INIT_PID.')';
