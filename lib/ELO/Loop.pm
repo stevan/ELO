@@ -65,8 +65,6 @@ sub loop ( $MAX_TICKS, $start_pid ) {
 
     my %STATS;
 
-    $STATS {start} = time if STATS;
-
     # initialise the system pid singleton
     $ELO::VM::PROCESS_TABLE{ $INIT_PID } = ELO::Core::ProcessRecord->new($INIT_PID, {}, sub ($env, $msg) {
         my $prefix = ON_MAGENTA "SYS (".CALLER.") ::". RESET " ";
@@ -107,6 +105,8 @@ sub loop ( $MAX_TICKS, $start_pid ) {
         };
     });
 
+    $STATS {start} = time if STATS;
+
     # initialise ...
     my $start = proc::spawn( $start_pid );
 
@@ -142,6 +142,8 @@ sub loop ( $MAX_TICKS, $start_pid ) {
         my @inbox = @ELO::VM::MSG_INBOX;
         @ELO::VM::MSG_INBOX = ();
 
+        $STATS {ticks} {$tick} {inbox} = scalar @inbox if STATS;
+
         while (@inbox) {
             my ($from, $msg) = (shift @inbox)->@*;
 
@@ -168,6 +170,8 @@ sub loop ( $MAX_TICKS, $start_pid ) {
             }
         });
 
+        $STATS {ticks} {$tick} {end} = time if STATS;
+
         warn Dumper \%ELO::VM::PROCESS_TABLE if DEBUG_PROCS;
         warn Dumper \%TIMERS        if DEBUG_TIMERS;
 
@@ -182,14 +186,6 @@ sub loop ( $MAX_TICKS, $start_pid ) {
             active_processes => \@active_processes,
             msg_inbox        => \@ELO::VM::MSG_INBOX,
         } if DEBUG_MSGS;
-
-        if (STATS) {
-            $STATS {ticks} {$tick} {end} = time;
-            $STATS {ticks} {$tick} {dur} =
-                    $STATS {ticks} {$tick} {end}
-                    -
-                    $STATS {ticks} {$tick} {start};
-        }
 
         if ($should_exit) {
             $has_exited++;
@@ -230,7 +226,6 @@ sub loop ( $MAX_TICKS, $start_pid ) {
 
     if (STATS) {
         $STATS {end} = time;
-        $STATS {dur} = $STATS {end} - $STATS {start};
 
         #print_stats( \%STATS );
         print_stats( \%STATS );
@@ -249,22 +244,33 @@ sub print_stats ($stats) {
     state $line_prefix = '== (stats)';
     state $term_width = $TERM_SIZE - (length $line_prefix) - 2;
 
-    say BLUE (join ' ' => $line_prefix, ('=' x $term_width)), RESET;
+    state $graph_scale = 20;
 
+    say "\n", BLUE (join ' ' => $line_prefix, ('=' x $term_width)), RESET;
+
+    my $header = "| inbox | tick  | wallclock | graph (~ = 0.$graph_scale)";
+    say CYAN(
+        UNDERLINE($header . (" " x ($TERM_SIZE - length($header) - 1)))
+    ), RESET;
     my $ticks = $stats->{ticks};
     my $total_ticks = 0;
     foreach my $tick ( sort { $a <=> $b } keys %$ticks ) {
 
-        my $stat = $ticks->{$tick};
-        my $dur_ms = ($stat->{dur} * 1_000);
+        my $stat   = $ticks->{$tick};
+        my $dur    = $stat->{end} - $stat->{start};
+        my $dur_ms = ($dur * 1_000);
 
-        $total_ticks += $stat->{dur};
+        $total_ticks += $dur;
 
         say(
-            CYAN(sprintf ("[%05d] -> " => $tick)), RESET,
-            MAGENTA(sprintf ("%.2f ms" => $dur_ms)), RESET,
-            FAINT(' : '), RESET,
-            GREEN('~' x (int(($dur_ms * 100) / 10) || 1)), RESET,
+            FAINT('| '), RESET,
+            BLUE(sprintf ("@ %03d" => $stat->{inbox})), RESET,
+            FAINT(' | '), RESET,
+            CYAN(sprintf ("%-5d" => $tick)), RESET,
+            FAINT(' | '), RESET,
+            MAGENTA(sprintf("%6s ms" => sprintf ("%.2f" => $dur_ms))), RESET,
+            FAINT(' | '), RESET,
+            GREEN('~' x (int(($dur_ms * 100) / $graph_scale) || 1)), RESET,
         );
     }
     say(CYAN('-' x $TERM_SIZE), RESET);
@@ -273,10 +279,10 @@ sub print_stats ($stats) {
         '[ ', (join ' / ' =>
             map { (RED($_).RESET) }
             (sprintf("ticks %.3f ms" => ($total_ticks  * 1_000))),
-            (sprintf("loop %.3f ms" => ($stats->{dur} * 1_000))),
+            (sprintf("loop %.3f ms" => (($stats->{end} - $stats->{start}) * 1_000))),
         ), RESET, ' ]',
     );
-    say BLUE ('=' x $TERM_SIZE), RESET;
+    say BLUE ('=' x $TERM_SIZE), RESET "\n";
 }
 
 sub _loop_log_line ( $fmt, $tick ) {
