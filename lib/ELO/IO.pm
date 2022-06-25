@@ -47,6 +47,10 @@ sub sys::err::log ($msg, $caller=CALLER()) {
     ) unless QUIET();
 }
 
+sub sys::err::raw (@msgs) {
+    $STDERR->print(@msgs) unless QUIET();
+}
+
 sub sys::out::printf ($fmt, @values) {
     my $prefix = ON_GREEN "OUT (".PID().") >>". RESET " ";
     $STDOUT->print( $prefix, (sprintf $fmt, @values), "\n" ) unless QUIET();

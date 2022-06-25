@@ -71,12 +71,18 @@ sub loop ( $MAX_TICKS, $start_pid ) {
 
         match $msg, +{
             kill => sub ($pid) {
-                warn( $prefix, "killing ... {$pid}\n" ) if DEBUG_SIGS;
-                proc::despawn($pid);
+                my $proc = proc::lookup($pid);
+                if ($proc && !$proc->is_exiting) {
+                    sys::err::raw( $prefix, "killing ... {$pid}\n" ) if DEBUG_SIGS;
+                    proc::despawn($pid);
+                }
+                else {
+                    sys::err::raw( $prefix, "attempted to kill dead process {$pid}\n" ) if DEBUG_SIGS;
+                }
             },
             waitpid => sub ($pid, $callback) {
                 if (proc::exists($pid)) {
-                    warn( $prefix, "setting watcher for ($pid) ...\n" ) if DEBUG_SIGS;
+                    sys::err::raw( $prefix, "setting watcher for ($pid) ...\n" ) if DEBUG_SIGS;
                     push @{ $WAITPIDS{$pid} //=[] } => [
                         CALLER,
                         $callback
@@ -88,7 +94,7 @@ sub loop ( $MAX_TICKS, $start_pid ) {
                 }
             },
             timer => sub ($timeout, $callback) {
-                warn( $prefix, "setting timer for($timeout) ...\n" ) if DEBUG_SIGS;
+                sys::err::raw( $prefix, "setting timer for($timeout) ...\n" ) if DEBUG_SIGS;
 
                 $timeout--; # subtrack one for this tick ...
 
@@ -289,11 +295,11 @@ sub _loop_log_line ( $fmt, $tick ) {
     state $init_pid_prefix = '('.$INIT_PID.')';
     state $term_width = $TERM_SIZE - (length $init_pid_prefix) - 2;
 
-    say FAINT
+    sys::err::raw( FAINT
         (join ' ' => $init_pid_prefix,
             map { ('-' x ($term_width - length $_)) . " $_" }
                 (sprintf $fmt, $tick)),
-                    RESET;
+                    RESET "\n" );
 }
 
 1;
