@@ -6,7 +6,7 @@ use experimental 'signatures', 'postderef';
 
 use Term::ANSIColor ':constants';
 
-#use Test::More;
+use Test::More;
 use Data::Dumper;
 
 use ELO;
@@ -78,9 +78,9 @@ if(my $pid = fork()) {
     $ELO::IO::STDOUT = $log;
     $ELO::IO::STDERR = $log;
 
-    loop(100_000, 'parent_main');
+    ok loop(100_000, 'parent_main'), '... the loop exited correctly';
 
-    exit;
+    done_testing;
 }
 elsif(defined $pid) {
     warn GREEN "Child $$", RESET "\n";
@@ -93,6 +93,5 @@ elsif(defined $pid) {
 
     exit;
 }
-
 
 1;
