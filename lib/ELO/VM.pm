@@ -17,6 +17,7 @@ our $AUTHORITY = 'cpan:STEVAN';
 use Exporter 'import';
 
 our @EXPORT = qw[
+    loop
     msg
 
     $INIT_PID
@@ -50,6 +51,19 @@ sub CALLER () { $CURRENT_CALLER }
 sub new_pid ($name) {
     state $PID_ID = -1;
     sprintf '%03d:%s' => ++$PID_ID, $name;
+}
+
+## ----------------------------------------------------------------------------
+## loop interface
+## ----------------------------------------------------------------------------
+
+sub loop ( $max_ticks, $start ) {
+    ELO::Loop->new(
+        process_table => \%ELO::VM::PROCESS_TABLE,
+        msg_inbox     => \@MSG_INBOX,
+        start         => $start,
+        max_ticks     => $max_ticks,
+    )->run_loop;
 }
 
 ## ----------------------------------------------------------------------------
@@ -104,6 +118,29 @@ sub proc::despawn_all_exiting_pids ( $on_exit ) {
             $on_exit->( $pid );
         }
     }
+}
+
+## ----------------------------------------------------------------------------
+## Signals ... see Actor definitions inside ELO::Loop
+## ----------------------------------------------------------------------------
+
+sub sig::kill($pid) {
+    croak 'You must supply a pid to kill' unless $pid;
+    msg( $INIT_PID, kill => [ $pid ] );
+}
+
+sub sig::timer($timeout, $callback) {
+    croak 'You must supply a timeout value' unless defined $timeout;
+    croak 'You must supply a callback msg()'
+        unless blessed $callback && $callback->isa('ELO::Core::Message');
+    msg( $INIT_PID, timer => [ $timeout, $callback ] );
+}
+
+sub sig::waitpid($pid, $callback) {
+    croak 'You must supply a pid value' unless $pid;
+    croak 'You must supply a callback msg()'
+        unless blessed $callback && $callback->isa('ELO::Core::Message');
+    msg( $INIT_PID, waitpid => [ $pid, $callback ] );
 }
 
 1;

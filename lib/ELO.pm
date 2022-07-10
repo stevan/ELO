@@ -24,7 +24,6 @@ use Exporter 'import';
 our @EXPORT = (
     @ELO::VM::EXPORT,
     @ELO::Actors::EXPORT,
-    @ELO::Loop::EXPORT,
     @ELO::Control::EXPORT,
     @ELO::Debug::EXPORT,
 );
