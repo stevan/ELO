@@ -2,7 +2,7 @@ package ELO::Loop;
 # ABSTRACT: Event Loop Orchestra
 use v5.24;
 use warnings;
-use experimental 'signatures', 'postderef';
+use experimental 'signatures', 'postderef', 'lexical_subs';
 
 use Carp            'croak';
 use Scalar::Util    'blessed';
@@ -12,9 +12,8 @@ use Time::HiRes     'time';
 use Term::ANSIColor ':constants';
 use Term::ReadKey   'GetTerminalSize';
 
-use ELO::VM qw[ $INIT_PID ];
-use ELO::Actors; # one use of `match` in the INIT_PID setup
 use ELO::Core::ProcessRecord;
+use ELO::Core::Message;
 use ELO::Debug;
 
 our $VERSION   = '0.01';
@@ -24,40 +23,68 @@ use constant STATS => $ENV{STATS} // 0;
 
 use parent 'UNIVERSAL::Object';
 use slots (
-    process_table => sub {}, # HASH< $pid > = ELO::Core::ProcessRecord
-    start         => sub {},
-    max_ticks     => sub {},
+    actors    => sub {},
+    start     => sub {},
+    max_ticks => sub {},
     # private
-    _tick      => sub { 0 },
-    _msg_inbox => sub { +[] }, # ARRAY [ [ $caller, $msg ], ... ]
-    _timers    => sub { +{} }, # HASH< $tick_to_fire_at > = [ [ $caller, $msg ], ... ]
-    _waitpids  => sub { +{} }, # HASH< $pid > = [ [ $caller, $msg ], ... ]
-    _stats     => sub { +{} },
+    _tick       => sub { 0 },
+    _proc_table => sub { +{} }, # HASH< $pid > = ELO::Core::ProcessRecord
+    _msg_inbox  => sub { +[] }, # ARRAY [ [ $caller, $msg ], ... ]
+    _timers     => sub { +{} }, # HASH< $tick_to_fire_at > = [ [ $caller, $msg ], ... ]
+    _waitpids   => sub { +{} }, # HASH< $pid > = [ [ $caller, $msg ], ... ]
     # ...
+    _pid_counter => sub { -1 }, # pid counter
+    _init_pid    => sub {}, # the init $pid to interact with the loop
     _start_pid   => sub {}, # the $pid created by calling start
     _active_pid  => sub {}, # the $pid that is currently being called with $msg
     _caller_pid  => sub {}, # the $pid that sent the current $msg
     # ...
     _should_exit => sub { 0 }, # are we almost ready to exit, just need to flush I/O
     _has_exited  => sub { 0 }, # we are ready to exit cleanly now
+    # ...
+    _stats => sub { +{} },
 );
+
+## ----------------------------------------------------------------------------
+
+sub generate_new_pid ($self, $name) {
+    sprintf '%03d:%s' => ++$self->{_pid_counter}, $name;
+}
+
+sub init_pid   ($self) { $self->{_init_pid}   }
+sub start_pid  ($self) { $self->{_start_pid}  }
+sub active_pid ($self) { $self->{_active_pid} }
+sub caller_pid ($self) { $self->{_caller_pid} }
+
+## ----------------------------------------------------------------------------
 
 sub enqueue_msg ( $self, $msg, $from=undef ) {
     push $self->{_msg_inbox}->@* => [ $from // $self->{_active_pid}, $msg ];
 }
 
+sub spawn_process ( $self, $name, %env ) {
+    my $pid     = $self->generate_new_pid( $name );
+    my $process = ELO::Core::ProcessRecord->new( $pid, \%env, $self->{actors}->{$name} );
+    $self->{_proc_table}->{ $pid } = $process;
+    $pid;
+}
+
+sub despawn_process ( $self, $pid ) {
+    $self->{_proc_table}->{ $pid }->set_to_exiting;
+}
+
 ## ----------------------------------------------------------------------------
 
-sub run_loop ( $self ) {
+sub run ( $self ) {
     $self->create_init_pid;
 
     $self->{_stats}->{start} = time if STATS;
     $self->create_start_pid;
-    debug_loop_log("start(%d)", $self->{_tick}) if DEBUG_LOOP;
+    $self->debug_loop_log("start(%d)") if DEBUG_LOOP;
 
     while ($self->{_tick} < $self->{max_ticks}) {
         $self->{_tick}++;
-        debug_loop_log("tick(%d)", $self->{_tick}) if DEBUG_LOOP;
+        $self->debug_loop_log("tick(%d)") if DEBUG_LOOP;
         $self->handle_timers;
         $self->handle_inbox;
         $self->handle_waitpids;
@@ -77,13 +104,16 @@ sub run_loop ( $self ) {
 ## ----------------------------------------------------------------------------
 
 sub create_init_pid ($self) {
+
+    my $INIT_PID = $self->generate_new_pid('<init>');
+
         # initialise the system pid singleton
-    $self->{process_table}->{ $INIT_PID } //= ELO::Core::ProcessRecord->new($INIT_PID, {}, sub ($env, $msg) {
+    $self->{_proc_table}->{ $INIT_PID } //= ELO::Core::ProcessRecord->new($INIT_PID, {}, sub ($env, $msg) {
         my $prefix = ON_MAGENTA "SYS (".$self->{_caller_pid}.") ::". RESET " ";
 
-        match $msg, +{
+        my $signals = {
             kill => sub ($pid) {
-                my $proc = proc::lookup($pid);
+                my $proc = $self->{_proc_table}->{$pid};
                 if ($proc && !$proc->is_exiting) {
                     sys::err::raw( $prefix, "killing ... {$pid}\n" ) if DEBUG_SIGS;
                     proc::despawn($pid);
@@ -93,7 +123,7 @@ sub create_init_pid ($self) {
                 }
             },
             waitpid => sub ($pid, $callback) {
-                if (proc::exists($pid)) {
+                if ($self->{_proc_table}->{$pid}) {
                     sys::err::raw( $prefix, "setting watcher for ($pid) ...\n" ) if DEBUG_SIGS;
                     push @{ $self->{_waitpids}->{$pid} //=[] } => [
                         $self->{_caller_pid},
@@ -121,7 +151,12 @@ sub create_init_pid ($self) {
                 }
             }
         };
+
+        my $signal = $signals->{$msg->action} // die "No match for ".$msg->action;
+        $signal->($msg->body->@*);
     });
+
+    $self->{_init_pid} = $INIT_PID;
 }
 
 sub create_start_pid ( $self ) {
@@ -129,7 +164,7 @@ sub create_start_pid ( $self ) {
     $self->{_start_pid} = proc::spawn( $self->{start} );
     $self->enqueue_msg(
         ELO::Core::Message->new( $self->{_start_pid} => '_' => [] ),
-        $INIT_PID
+        $self->{_init_pid}
     );
 }
 
@@ -159,7 +194,7 @@ sub handle_inbox ( $self ) {
     while (@inbox) {
         my ($from, $msg) = (shift @inbox)->@*;
 
-        my $active = $self->{process_table}->{ $msg->pid };
+        my $active = $self->{_proc_table}->{ $msg->pid };
 
         if (DEBUG_CALLS && !$active) {
             say BLUE " !!! no pid(",
@@ -171,43 +206,51 @@ sub handle_inbox ( $self ) {
         }
         next unless $active;
 
-        local $ELO::VM::CURRENT_PID    = $self->{_active_pid} = $active->pid;
-        local $ELO::VM::CURRENT_CALLER = $self->{_caller_pid} = $from;
+        $self->{_active_pid} = $active->pid;
+        $self->{_caller_pid} = $from;
 
         say BLUE " >>> calling : ", CYAN $msg->to_string, RESET
             if DEBUG_CALLS;
 
         $active->actor->($active->env, $msg);
-
-        $self->{_active_pid} = undef;
-        $self->{_caller_pid} = undef;
     }
+
+    # reset context ...
+    $self->{_active_pid} = undef;
+    $self->{_caller_pid} = undef;
 
     $self->{_stats}->{ticks}->{$self->{_tick}}->{end} = time if STATS;
 }
 
-sub handle_waitpids ( $self  ) {
-    proc::despawn_all_exiting_pids(sub ($pid) {
-        if ( exists $self->{_waitpids}->{$pid} ) {
-            my $watchers = delete $self->{_waitpids}->{$pid};
-            foreach my $watcher ($watchers->@*) {
-                my ($caller, $callback) = @$watcher;
-                $callback->send_from( $caller );
+sub handle_waitpids ( $self ) {
+    foreach my $pid (keys $self->{_proc_table}->%*) {
+        my $proc = $self->{_proc_table}->{$pid};
+        if ( $proc->is_exiting ) {
+            $self->{_msg_inbox}->@* = grep { $_->[1]->pid ne $pid } $self->{_msg_inbox}->@*;
+
+            (delete $self->{_proc_table}->{ $pid })->set_to_done;
+
+            if ( exists $self->{_waitpids}->{$pid} ) {
+                my $watchers = delete $self->{_waitpids}->{$pid};
+                foreach my $watcher ($watchers->@*) {
+                    my ($caller, $callback) = @$watcher;
+                    $callback->send_from( $caller );
+                }
             }
         }
-    });
+    }
 }
 
 sub should_exit ( $self ) {
 
-    warn Dumper $self->{process_table} if DEBUG_PROCS;
-    warn Dumper $self->{_timers}       if DEBUG_TIMERS;
+    warn Dumper $self->{_proc_table} if DEBUG_PROCS;
+    warn Dumper $self->{_timers}     if DEBUG_TIMERS;
 
     my @active_processes =
-        grep !/^\d\d\d:\#/,    # ignore I/O pids
+        grep !/^\d\d\d:\#/,             # ignore I/O pids
         grep $_ ne $self->{_start_pid}, # ignore start pid
-        grep $_ ne $INIT_PID,  # ignore init pid
-        keys $self->{process_table}->%*;
+        grep $_ ne $self->{_init_pid},  # ignore init pid
+        keys $self->{_proc_table}->%*;
 
     warn Dumper {
         msg              => 'Active Procsses and Inbox after tick',
@@ -231,7 +274,7 @@ sub should_exit ( $self ) {
             return 1;
         }
         else {
-            debug_loop_log("flushing(%d)", $self->{_tick}) if DEBUG_LOOP;
+            $self->debug_loop_log("flushing(%d)") if DEBUG_LOOP;
             $self->{_should_exit}++;
         }
     }
@@ -243,15 +286,15 @@ sub exit_loop ( $self ) {
     warn Dumper $self->{_waitpids} if DEBUG_WAITPIDS;
 
     if ( $self->{_has_exited} ) {
-        debug_loop_log("exit(%d)", $self->{_tick}) if DEBUG_LOOP;
+        $self->debug_loop_log("exit(%d)") if DEBUG_LOOP;
     } else {
-        debug_loop_log("halt(%d)", $self->{_tick}) if DEBUG_LOOP;
+        $self->debug_loop_log("halt(%d)") if DEBUG_LOOP;
     }
 
     my @zombies = grep !/^\d\d\d:\#/,             # ignore I/O pids
                   grep $_ ne $self->{_start_pid}, # ignore start pid
-                  grep $_ ne $INIT_PID,           # ignore init pid
-                  keys $self->{process_table}->%*;
+                  grep $_ ne $self->{_init_pid},  # ignore init pid
+                  keys $self->{_proc_table}->%*;
 
     if ( @zombies ) {
         warn("GOT ZOMBIES: ", Dumper(\@zombies)) if DEBUG_LOOP;
@@ -307,14 +350,14 @@ sub display_stats ( $self ) {
     say BLUE ('=' x $TERM_SIZE), RESET "\n";
 }
 
-sub debug_loop_log ( $fmt, $tick ) {
-    state $init_pid_prefix = '('.$INIT_PID.')';
-    state $term_width = $TERM_SIZE - (length $init_pid_prefix) - 2;
+sub debug_loop_log ( $self, $fmt ) {
+    my $init_pid_prefix = '('.$self->{_init_pid}.')';
+    my $term_width = $TERM_SIZE - (length $init_pid_prefix) - 2;
 
     sys::err::raw( FAINT
         (join ' ' => $init_pid_prefix,
             map { ('-' x ($term_width - length $_)) . " $_" }
-                (sprintf $fmt, $tick)),
+                (sprintf $fmt, $self->{_tick})),
                     RESET "\n" );
 }
 

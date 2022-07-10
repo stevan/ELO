@@ -54,12 +54,10 @@ msg
 
 # Loop context constants
 
-TICK PID CALLER
+PID CALLER
 
 # Loop process functions
 
-proc::exists
-proc::lookup
 proc::spawn
 proc::despawn
 
