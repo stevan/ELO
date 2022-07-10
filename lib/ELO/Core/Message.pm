@@ -25,8 +25,8 @@ sub curry ($self, @args) {
     blessed($self)->new( $pid, $action, [ @$body, @args ] );
 }
 
-sub send ($self) { ELO::VM::enqueue_msg($self); $self }
-sub send_from ($self, $caller) { ELO::VM::enqueue_msg($self, $caller); $self }
+sub send ($self) { $ELO::VM::LOOP->enqueue_msg($self); $self }
+sub send_from ($self, $caller) { $ELO::VM::LOOP->enqueue_msg($self, $caller); $self }
 
 sub to_string ($self) {
     join '' =>

@@ -57,13 +57,15 @@ sub new_pid ($name) {
 ## loop interface
 ## ----------------------------------------------------------------------------
 
+our $LOOP;
 sub loop ( $max_ticks, $start ) {
-    ELO::Loop->new(
+    $LOOP = ELO::Loop->new(
         process_table => \%ELO::VM::PROCESS_TABLE,
-        msg_inbox     => \@MSG_INBOX,
         start         => $start,
         max_ticks     => $max_ticks,
-    )->run_loop;
+    );
+
+    $LOOP->run_loop;
 }
 
 ## ----------------------------------------------------------------------------
@@ -71,10 +73,6 @@ sub loop ( $max_ticks, $start ) {
 ## ----------------------------------------------------------------------------
 
 sub msg ($pid, $action, $msg) { ELO::Core::Message->new( $pid, $action, $msg ) }
-
-sub enqueue_msg ($msg, $from=$CURRENT_PID) {
-    push @MSG_INBOX => [ $from, $msg ];
-}
 
 ## namespaces ...
 

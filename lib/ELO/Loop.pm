@@ -12,7 +12,7 @@ use Time::HiRes     'time';
 use Term::ANSIColor ':constants';
 use Term::ReadKey   'GetTerminalSize';
 
-use ELO::VM qw[ $INIT_PID PID CALLER msg ];
+use ELO::VM qw[ $INIT_PID ];
 use ELO::Actors; # one use of `match` in the INIT_PID setup
 use ELO::Core::ProcessRecord;
 use ELO::Debug;
@@ -24,21 +24,27 @@ use constant STATS => $ENV{STATS} // 0;
 
 use parent 'UNIVERSAL::Object';
 use slots (
-    process_table => sub {},
-    msg_inbox     => sub {},
+    process_table => sub {}, # HASH< $pid > = ELO::Core::ProcessRecord
     start         => sub {},
     max_ticks     => sub {},
     # private
-    _tick     => sub { 0 },
-    _timers   => sub { +{} }, # HASH< $tick_to_fire_at > = [ [ $from, $msg ], ... ]
-    _waitpids => sub { +{} }, # HASH< $pid > = [ [ $from, $msg ], ... ]
-    _stats    => sub { +{} },
+    _tick      => sub { 0 },
+    _msg_inbox => sub { +[] }, # ARRAY [ [ $caller, $msg ], ... ]
+    _timers    => sub { +{} }, # HASH< $tick_to_fire_at > = [ [ $caller, $msg ], ... ]
+    _waitpids  => sub { +{} }, # HASH< $pid > = [ [ $caller, $msg ], ... ]
+    _stats     => sub { +{} },
     # ...
-    _start_pid   => sub {},
-    _should_exit => sub { 0 },
-    _has_exited  => sub { 0 },
-
+    _start_pid   => sub {}, # the $pid created by calling start
+    _active_pid  => sub {}, # the $pid that is currently being called with $msg
+    _caller_pid  => sub {}, # the $pid that sent the current $msg
+    # ...
+    _should_exit => sub { 0 }, # are we almost ready to exit, just need to flush I/O
+    _has_exited  => sub { 0 }, # we are ready to exit cleanly now
 );
+
+sub enqueue_msg ( $self, $msg, $from=undef ) {
+    push $self->{_msg_inbox}->@* => [ $from // $self->{_active_pid}, $msg ];
+}
 
 ## ----------------------------------------------------------------------------
 
@@ -73,7 +79,7 @@ sub run_loop ( $self ) {
 sub create_init_pid ($self) {
         # initialise the system pid singleton
     $self->{process_table}->{ $INIT_PID } //= ELO::Core::ProcessRecord->new($INIT_PID, {}, sub ($env, $msg) {
-        my $prefix = ON_MAGENTA "SYS (".CALLER.") ::". RESET " ";
+        my $prefix = ON_MAGENTA "SYS (".$self->{_caller_pid}.") ::". RESET " ";
 
         match $msg, +{
             kill => sub ($pid) {
@@ -90,13 +96,13 @@ sub create_init_pid ($self) {
                 if (proc::exists($pid)) {
                     sys::err::raw( $prefix, "setting watcher for ($pid) ...\n" ) if DEBUG_SIGS;
                     push @{ $self->{_waitpids}->{$pid} //=[] } => [
-                        CALLER,
+                        $self->{_caller_pid},
                         $callback
                     ];
                 }
                 else {
                     # the proc has died, so just call it ...
-                    $callback->send_from(CALLER);
+                    $callback->send_from($self->{_caller_pid});
                 }
             },
             timer => sub ($timeout, $callback) {
@@ -105,11 +111,11 @@ sub create_init_pid ($self) {
                 $timeout--; # subtrack one for this tick ...
 
                 if ( $timeout <= 0 ) {
-                    $callback->send_from(CALLER);
+                    $callback->send_from($self->{_caller_pid});
                 }
                 else {
                     push @{ $self->{_timers}->{ $self->{_tick} + $timeout } //= [] } => [
-                        CALLER,
+                        $self->{_caller_pid},
                         $callback
                     ];
                 }
@@ -121,7 +127,10 @@ sub create_init_pid ($self) {
 sub create_start_pid ( $self ) {
     # initialise ...
     $self->{_start_pid} = proc::spawn( $self->{start} );
-    msg($self->{_start_pid} => '_' => [])->send_from( $INIT_PID );
+    $self->enqueue_msg(
+        ELO::Core::Message->new( $self->{_start_pid} => '_' => [] ),
+        $INIT_PID
+    );
 }
 
 sub handle_timers ( $self ) {
@@ -138,11 +147,11 @@ sub handle_inbox ( $self ) {
 
     warn Dumper {
         msg              => 'Inbox before delivery',
-        msg_inbox        => $self->{msg_inbox},
+        msg_inbox        => $self->{_msg_inbox},
     } if DEBUG_MSGS;
 
-    my @inbox = $self->{msg_inbox}->@*;
-    $self->{msg_inbox}->@* = ();
+    my @inbox = $self->{_msg_inbox}->@*;
+    $self->{_msg_inbox}->@* = ();
 
     $self->{_stats}->{ticks}->{$self->{_tick}}->{start} = time if STATS;
     $self->{_stats}->{ticks}->{$self->{_tick}}->{inbox} = scalar @inbox if STATS;
@@ -152,13 +161,26 @@ sub handle_inbox ( $self ) {
 
         my $active = $self->{process_table}->{ $msg->pid };
 
-        local $ELO::VM::CURRENT_PID    = $active->pid;
-        local $ELO::VM::CURRENT_CALLER = $from;
+        if (DEBUG_CALLS && !$active) {
+            say BLUE " !!! no pid(",
+                    CYAN $msg->pid, RESET,
+                BLUE ") for msg(",
+                    CYAN $msg->to_string, RESET,
+                BLUE ") skipping ...",
+            RESET;
+        }
+        next unless $active;
+
+        local $ELO::VM::CURRENT_PID    = $self->{_active_pid} = $active->pid;
+        local $ELO::VM::CURRENT_CALLER = $self->{_caller_pid} = $from;
 
         say BLUE " >>> calling : ", CYAN $msg->to_string, RESET
             if DEBUG_CALLS;
 
         $active->actor->($active->env, $msg);
+
+        $self->{_active_pid} = undef;
+        $self->{_caller_pid} = undef;
     }
 
     $self->{_stats}->{ticks}->{$self->{_tick}}->{end} = time if STATS;
@@ -190,7 +212,7 @@ sub should_exit ( $self ) {
     warn Dumper {
         msg              => 'Active Procsses and Inbox after tick',
         active_processes => \@active_processes,
-        msg_inbox        => $self->{msg_inbox},
+        msg_inbox        => $self->{_msg_inbox},
     } if DEBUG_MSGS;
 
     if ($self->{_should_exit}) {
@@ -204,7 +226,7 @@ sub should_exit ( $self ) {
                 && scalar(keys $self->{_timers}->%*) == 0
     ) {
         # loop one last time to flush any I/O
-        if ( scalar $self->{msg_inbox}->@* == 0 ) {
+        if ( scalar $self->{_msg_inbox}->@* == 0 ) {
             $self->{_has_exited}++;
             return 1;
         }
