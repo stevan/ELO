@@ -54,3 +54,43 @@ ok loop( 20, 'main' ), '... the event loop exited successfully';
 
 done_testing;
 
+=pod
+
+actor Bounce => sub ($env) {
+
+    has count => sub { 0 };
+
+    action up => sub ($self) {
+        sys::out::print("$self(UP) => ".$self->count );
+        $self->count( $self->count + 1 );
+        $self->send( down => [] );
+    };
+
+    action down => sub ($self) {
+        sys::out::print("$self(DOWN) => ".$self->count);
+        $self->count( $self->count + 1 );
+        $self->send( up => [] );
+    };
+
+    action finish => sub ($self, $expected) {
+        is($self->count, $expected, "... bounce count (".$self->count.") is $expected");
+        $self->exit(1);
+    };
+
+};
+
+actor main => sub ($env) {
+
+    action _ => sub ($self) {
+        sys::out::print("-> main starting ...");
+
+        my $bounce = proc::spawn( 'Bounce' );
+
+        $self->send( $bounce, up => [] );
+
+        loop::timer( 10, msg( $bounce, finish => [ 10 ] ) );
+    }
+};
+
+=cut
+
