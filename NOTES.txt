@@ -1,3 +1,18 @@
+IDEAS:
+
+PID is a struct
+
+Local pid:
+    - "0001:foo" <PID-ID>:<name>
+
+Linked pid:
+    - "0001@54321:foo" <PID-ID>@<OS-PID>:<name>
+
+Distributed pid:
+    - "0001@elo.example.org:foo" <PID-ID>@<hostname>:<name>
+    - "0001@127.0.0.1:foo"       <PID-ID>@<localhost>:<name>
+
+
 TODO:
 
 - move the proc:: stuff into its own module
