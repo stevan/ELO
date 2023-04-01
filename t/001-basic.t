@@ -9,22 +9,22 @@ use Data::Dumper;
 sub init ($this) {
     say "[".$this->pid."] hello world";
 
-    my $greeter = $this->spawn('greet' => \&greeting);
-    $this->send_to( $greeter, 'everyone');
-    $this->send_to( $greeter, 'alemaal');
+    my $greeter = $this->spawn('greeter' => \&greeting);
+    $this->send( $greeter, 'everyone');
+    $this->send( $greeter, 'alemaal');
 
     $greeter->call("y'all");
 
     my $bounce1 = $this->spawn('bounce' => \&bounce);
-    $this->send_to( $bounce1, 5 );
+    $this->send( $bounce1, 5 );
 
     $bounce1->call( 10 );
 
     my $bounce2 = $this->spawn('bounce' => \&bounce);
-    $this->send_to( $bounce2, 3 );
+    $this->send( $bounce2, 3 );
 
     my $bounce_cb = $this->spawn('bounce_cb' => \&bounce_cb);
-    $this->send_to( $bounce_cb, 7, $greeter );
+    $this->send( $bounce_cb, 7, $greeter );
 }
 
 sub greeting ($this, $name) {
@@ -51,7 +51,7 @@ sub bounce_cb ($this, $bounces, $cb) {
     }
 }
 
-Loop->new->start( \&init, () );
+Loop->new->run( \&init, () );
 
 # ...
 
@@ -85,7 +85,7 @@ package Process {
         $self->{loop}->create_process( $name, $f );
     }
 
-    sub send_to ($self, $proc, @msg) {
+    sub send ($self, $proc, @msg) :method {
         $self->{loop}->enqueue_msg([ $proc, @msg ]);
     }
 
@@ -152,7 +152,7 @@ package Loop {
         warn sprintf "-- tick(%03d) : exiting\n" => $tick;
     }
 
-    sub start ($self, $f, @args) {
+    sub run ($self, $f, @args) {
         my $main = $self->create_process('main', $f);
         $self->enqueue_msg([ $main, @args ]);
         $self->loop;
