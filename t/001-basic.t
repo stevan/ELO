@@ -69,6 +69,9 @@ package Process {
         loop => sub {},
         # ...
         _pid => sub {},
+        # TODO: add _parent_pid here, it should be
+        # resolvable at contruction, so we are
+        # still immutable ;)
     );
 
     sub BUILD ($self, $) {
@@ -82,6 +85,9 @@ package Process {
     }
 
     sub spawn ($self, $name, $f) {
+        # TODO:
+        # we should set the parent process here
+        # so that we have a process hierarchy
         $self->{loop}->create_process( $name, $f );
     }
 
@@ -106,6 +112,7 @@ package Loop {
     );
 
     sub create_process ($self, $name, $f) {
+        # TODO : accept parent-process argument (see above)
         my $proc = Process->new(
             name => $name,
             func => $f,
