@@ -27,6 +27,8 @@ sub init ($this) {
 
     my $bounce_cb = $this->spawn('bounce_cb' => \&bounce_cb);
     $this->send( $bounce_cb, 7, $greeter );
+
+    #warn Dumper $this;
 }
 
 sub greeting ($this, $name) {

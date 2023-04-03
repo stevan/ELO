@@ -7,14 +7,12 @@ our $PIDS = 0;
 
 use parent 'UNIVERSAL::Object::Immutable';
 use slots (
-    name => sub {},
-    func => sub {},
-    loop => sub {},
+    name   => sub {},
+    func   => sub {},
+    loop   => sub {},
+    parent => sub {},
     # ...
     _pid => sub {},
-    # TODO: add _parent_pid here, it should be
-    # resolvable at contruction, so we are
-    # still immutable ;)
 );
 
 sub BUILD ($self, $) {
@@ -23,15 +21,17 @@ sub BUILD ($self, $) {
 
 sub pid ($self) { $self->{_pid} }
 
+sub name   ($self) { $self->{name}   }
+sub func   ($self) { $self->{func}   }
+sub loop   ($self) { $self->{loop}   }
+sub parent ($self) { $self->{parent} }
+
 sub call ($self, @args) {
     $self->{func}->( $self, @args );
 }
 
 sub spawn ($self, $name, $f) {
-    # TODO:
-    # we should set the parent process here
-    # so that we have a process hierarchy
-    $self->{loop}->create_process( $name, $f );
+    $self->{loop}->create_process( $name, $f, $self );
 }
 
 sub send ($self, $proc, @msg) :method {

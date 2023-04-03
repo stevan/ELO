@@ -9,16 +9,17 @@ use ELO::Process;
 
 use parent 'UNIVERSAL::Object::Immutable';
 use slots (
+    # ...
     _proc_table => sub { +{} },
     _msg_queue  => sub { +[] },
 );
 
-sub create_process ($self, $name, $f) {
-    # TODO : accept parent-process argument (see above)
+sub create_process ($self, $name, $f, $parent=undef) {
     my $proc = ELO::Process->new(
-        name => $name,
-        func => $f,
-        loop => $self,
+        name   => $name,
+        func   => $f,
+        loop   => $self,
+        parent => $parent,
     );
     $self->{_proc_table}->{ $proc->pid } = $proc;
     return $proc;
@@ -69,7 +70,7 @@ sub loop ($self) {
 }
 
 sub run ($self, $f, @args) {
-    my $main = $self->create_process( main => $f);
+    my $main = $self->create_process( main => $f );
     $self->enqueue_msg([ $main, @args ]);
     $self->loop;
 }
