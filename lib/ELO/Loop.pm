@@ -50,7 +50,7 @@ sub tick ($self) {
             1;
         } or do {
             my $e = $@;
-            die "Message to (".$to_proc->pid.") failed with msg(".(join ", " => @body).") because: $e";
+            die "Message to (".$to_proc->pid.") failed with msg(".(join ", " => map { ref ? @$_ : $_ } @body).") because: $e";
         };
     }
 }

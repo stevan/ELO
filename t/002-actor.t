@@ -8,6 +8,8 @@ use Data::Dumper;
 
 use ELO::Loop;
 
+use constant DEBUG => $ENV{DEBUG} // 0;
+
 sub match ($msg, $table) {
     my ($event, @args) = @$msg;
     my $cb = $table->{ $event } // die "No match for $event";
@@ -21,6 +23,8 @@ sub match ($msg, $table) {
 }
 
 sub Service ($this, $msg) {
+
+    warn Dumper +{ $this->pid => $msg } if DEBUG;
 
     match $msg, +{
 
@@ -52,6 +56,8 @@ sub Service ($this, $msg) {
 }
 
 sub ServiceRegistry ($this, $msg) {
+
+    warn Dumper +{ $this->pid => $msg } if DEBUG;
 
     state $foo = $this->spawn( FooService => \&Service );
     state $bar = $this->spawn( BarService => \&Service );
@@ -94,14 +100,111 @@ sub ServiceRegistry ($this, $msg) {
     }
 }
 
-sub Debugger ($this, $msg) {
-    warn Dumper [ DEBUG => $msg ];
+sub ServiceClient ($this, $msg) {
+
+    warn Dumper +{ $this->pid => $msg } if DEBUG;
+
+    state $registry = $this->spawn( ServiceRegistry => \&ServiceRegistry );
+    state $sessions = +{};
+    state $next_sid = 0;
+
+    state sub session_get    ($id)   {        $sessions->{ $id } }
+    state sub session_delete ($id)   { delete $sessions->{ $id } }
+    state sub session_create ($data) {
+        $sessions->{ ++$next_sid } = $data;
+        $next_sid;
+    }
+
+    match $msg, +{
+
+        # Requests ...
+
+        # $request  = eServiceClientRequest  [ url : Str, action : Str, args : <Any> ]]
+        # $response = eServiceClientResponse [ <Any> ]
+        # $error    = eServiceClientError    [ error : Str ]
+        eServiceClientRequest => sub ($url, $action, $args) {
+
+            my $sid = session_create([ $url, $action, $args ]);
+
+            $this->send( $registry, [
+                eServiceRegistryLookupRequest => (
+                    $sid,  # my session id
+                    $url,  # the url of the service
+                    $this  # where to send the response
+                )
+            ]);
+        },
+
+
+        # Responses ...
+
+        eServiceRegistryLookupResponse => sub ($sid, $service) {
+            my $s = session_get( $sid );
+            my ($url, $action, $args) = $s->@*;
+            # update the service
+            $s->[0] = [ $url, $service ];
+
+            $this->send( $service, [
+                eServiceRequest => ( $sid, $action, $args, $this )
+            ]);
+        },
+
+        eServiceResponse => sub ($sid, $return) {
+            my $request = session_get( $sid );
+            # Horray ... where do we sent this??
+            warn Dumper +{ eServiceResponse => $return };
+        },
+
+        # Errors ...
+
+        eServiceError => sub ($sid, $error) {
+            my $request = session_get( $sid );
+            # ...
+            warn Dumper +{ eServiceError => $error };
+        },
+
+        eServiceRegistryLookupError => sub ($sid, $error) {
+            my $request = session_get( $sid );
+            # ...
+            warn Dumper +{ eServiceRegistryLookupError => $error };
+        },
+
+    }
 }
 
 sub init ($this, $msg=[]) {
-    my $registry = $this->spawn( Registry => \&ServiceRegistry );
-    my $service  = $this->spawn( Service  => \&Service );
-    my $debugger = $this->spawn( Debugger => \&Debugger );
+    my $client = $this->spawn( Service  => \&ServiceClient );
+
+    $this->send( $client, [
+        eServiceClientRequest => (
+            'foo.example.com', add => [ 2, 2 ]
+        )
+    ]);
+
+    $this->send( $client, [
+        eServiceClientRequest => (
+            'bar.example.com', mul => [ 10, 2 ]
+        )
+    ]);
+
+    $this->send( $client, [
+        eServiceClientRequest => (
+            'baz.example.com', mul => [ 10, 2 ]
+        )
+    ]);
+
+    $this->send( $client, [
+        eServiceClientRequest => (
+            'foo.example.com', multiply => [ 10, 2 ]
+        )
+    ]);
+
+}
+
+ELO::Loop->new->run( \&init, () );
+
+
+__END__
 
     # Registry - lookup
 
@@ -141,80 +244,3 @@ sub init ($this, $msg=[]) {
     $this->send( $service->pid,
         [ eServiceRequest => ( 'ID:001', addd => [2, 2], $debugger ) ]
     );
-
-}
-
-ELO::Loop->new->run( \&init, () );
-
-=pod
-
-
-sub ServiceClient ($this, $msg) {
-
-    state $registry = $this->spawn( ServiceRegistry => \&ServiceRegistry );
-    state $sessions = +{};
-    state $next_sid = 0;
-
-    state sub session_get    ($id)   {        $sessions->{ $id } }
-    state sub session_delete ($id)   { delete $sessions->{ $id } }
-    state sub session_create ($data) {
-        $sessions->{ ++$next_sid } = $data;
-        $next_sid;
-    }
-
-    match $msg, +{
-
-        # Requests ...
-
-        # $request  = eServiceClientRequest  [ url : Str, action : Str, args : <Any> ]]
-        # $response = eServiceClientResponse [ <Any> ]
-        # $error    = eServiceClientError    [ error : Str ]
-        eServiceClientRequest => sub ($url, $action, $args) {
-
-            my $sid = session_create([ $url, $action, $args ]);
-
-            $this->send(
-                $registry,
-                eServiceRegistryLookupRequest => (
-                    $sid,       # my session id
-                    $url,       # the url of the service
-                    $this->pid  # where to send the response
-                )
-            );
-        },
-
-
-        # Responses ...
-
-        eServiceRegistryLookupResponse => sub ($sid, $address) {
-            my $s = session_get( $sid );
-            my ($url, $action, $args) = $s->@*;
-            # update the address
-            $s->[0] = [ $url, $address ];
-
-            $this->send(
-                $address,
-                eServiceRequest => ( $sid, $action, $args )
-            );
-        },
-
-        eServiceResponse => sub ($sid, $return) {
-            # Horray ... where do we sent this??
-        }
-
-        # Errors ...
-
-        eServiceError => sub ($sid, $error) {
-            my $request = session_get( $sid );
-            # ...
-        },
-
-        eServiceRegistryLookupError => sub ($sid, $error) {
-            my $request = session_get( $sid );
-            # ...
-        }
-
-    }
-}
-
-
