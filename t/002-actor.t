@@ -152,7 +152,7 @@ sub ServiceClient ($this, $msg) {
         eServiceResponse => sub ($sid, $return) {
             my $request = session_get( $sid );
             # Horray ... where do we sent this??
-            warn Dumper +{ eServiceResponse => $return };
+            warn Dumper +{ eServiceResponse => $return, sid => $sid };
         },
 
         # Errors ...
@@ -160,13 +160,13 @@ sub ServiceClient ($this, $msg) {
         eServiceError => sub ($sid, $error) {
             my $request = session_get( $sid );
             # ...
-            warn Dumper +{ eServiceError => $error };
+            warn Dumper +{ eServiceError => $error, sid => $sid };
         },
 
         eServiceRegistryLookupError => sub ($sid, $error) {
             my $request = session_get( $sid );
             # ...
-            warn Dumper +{ eServiceRegistryLookupError => $error };
+            warn Dumper +{ eServiceRegistryLookupError => $error, sid => $sid };
         },
 
     }
