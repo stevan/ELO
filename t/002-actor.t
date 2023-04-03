@@ -12,6 +12,7 @@ use constant DEBUG => $ENV{DEBUG} // 0;
 
 sub match ($msg, $table) {
     my ($event, @args) = @$msg;
+    #warn "$event : $table";
     my $cb = $table->{ $event } // die "No match for $event";
     eval {
         $cb->(@args);
@@ -26,7 +27,7 @@ sub Service ($this, $msg) {
 
     warn Dumper +{ $this->pid => $msg } if DEBUG;
 
-    match $msg, +{
+    match $msg, state $handlers = +{
 
         # $request  = eServiceRequest  [ sid : SID, action : Str, args : <Any>, caller : PID ]
         # $response = eServiceResponse [ sid : SID, return : <Any> ]
@@ -70,7 +71,7 @@ sub ServiceRegistry ($this, $msg) {
     state sub lookup ($name)           { $services->{ $name } }
     state sub update ($name, $service) { $services->{ $name } = $service }
 
-    match $msg, +{
+    match $msg, state $handlers = +{
 
         # Requests ...
 
@@ -115,7 +116,7 @@ sub ServiceClient ($this, $msg) {
         $next_sid;
     }
 
-    match $msg, +{
+    match $msg, state $handlers = +{
 
         # Requests ...
 
