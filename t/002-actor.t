@@ -6,33 +6,19 @@ use experimental qw[ signatures lexical_subs postderef ];
 
 use Data::Dumper;
 
+use ELO::Loop;
 
-sub ServiceRegistry ($this, $msg) {
-
-    state $services = +{};
-
-    match $msg, +{
-
-        # Requests ...
-
-        # $request  = eServiceRegistryLookupRequest  [ sid : SID, name : Str, caller : PID ]]
-        # $response = eServiceRegistryLookupResponse [ sid : SID, address : Str ]
-        # $error    = eServiceRegistryLookupError    [ sid : SID, error   : Str ]
-        eServiceRegistryLookupRequest => sub ($sid, $name, $caller) {
-            if ( my $address = $sevices->{ $name } ) {
-                $this->send( $caller, eServiceRegistryLookupResponse => $sid, $address );
-            }
-            else {
-                $this->send( $caller,
-                    eServiceRegistryLookupError => (
-                        $sid,  'Could not find service('.$name.')'
-                    )
-                );
-            }
-        }
-    }
+sub match ($msg, $table) {
+    my ($event, @args) = @$msg;
+    my $cb = $table->{ $event } // die "No match for $event";
+    eval {
+        $cb->(@args);
+        1;
+    } or do {
+        warn "!!! Died calling msg(".(join ', ' => map { ref $_ ? '['.(join ', ' => @$_).']' : $_ } @$msg).")";
+        die $@;
+    };
 }
-
 
 sub Service ($this, $msg) {
 
@@ -45,8 +31,7 @@ sub Service ($this, $msg) {
             my ($x, $y) = @$args;
 
             eval {
-                $this->send(
-                    $caller,
+                $this->send( $caller, [
                     eServiceResponse => (
                         $sid,
                         ($action eq 'add') ? ($x + $y) :
@@ -55,15 +40,113 @@ sub Service ($this, $msg) {
                         ($action eq 'div') ? ($x / $y) :
                         die "Invalid Action: $action"
                     )
-                );
+                ]);
                 1;
             } or do {
                 my $e = $@;
-                $this->send( $caller, eServiceError => ( $sid, $e ) );
+                chomp $e;
+                $this->send( $caller, [ eServiceError => ( $sid, $e ) ] );
             };
         }
     }
 }
+
+sub ServiceRegistry ($this, $msg) {
+
+    state $foo = $this->spawn( FooService => \&Service );
+    state $bar = $this->spawn( BarService => \&Service );
+
+    state $services = +{
+        'foo.example.com' => $foo,
+        'bar.example.com' => $bar,
+    };
+
+    state sub lookup ($name)           { $services->{ $name } }
+    state sub update ($name, $service) { $services->{ $name } = $service }
+
+    match $msg, +{
+
+        # Requests ...
+
+        # $request  = eServiceRegistryUpdateRequest  [ sid : SID, name : Str, service : Process, caller : PID ]]
+        # $response = eServiceRegistryUpdateResponse [ sid : SID, name : Str, service : Str ]
+        # $error    = eServiceRegistryUpdateError    [ sid : SID, error : Str ]
+        eServiceRegistryUpdateRequest => sub ($sid, $name, $service, $caller) {
+            update( $name, $service );
+            $this->send( $caller, [ eServiceRegistryUpdateResponse => $sid, $name, $service ] );
+        },
+
+        # $request  = eServiceRegistryLookupRequest  [ sid : SID, name : Str, caller : PID ]]
+        # $response = eServiceRegistryLookupResponse [ sid : SID, service : Str ]
+        # $error    = eServiceRegistryLookupError    [ sid : SID, error   : Str ]
+        eServiceRegistryLookupRequest => sub ($sid, $name, $caller) {
+            if ( my $service = lookup( $name ) ) {
+                $this->send( $caller, [ eServiceRegistryLookupResponse => $sid, $service ] );
+            }
+            else {
+                $this->send( $caller, [
+                    eServiceRegistryLookupError => (
+                        $sid,  'Could not find service('.$name.')'
+                    )
+                ]);
+            }
+        }
+    }
+}
+
+sub Debugger ($this, $msg) {
+    warn Dumper [ DEBUG => $msg ];
+}
+
+sub init ($this, $msg=[]) {
+    my $registry = $this->spawn( Registry => \&ServiceRegistry );
+    my $service  = $this->spawn( Service  => \&Service );
+    my $debugger = $this->spawn( Debugger => \&Debugger );
+
+    # Registry - lookup
+
+    $this->send( $registry,
+        [ eServiceRegistryLookupRequest => ( 'ID:001', 'foo.example.com', $debugger ) ]
+    );
+
+    $this->send( $registry,
+        [ eServiceRegistryLookupRequest => ( 'ID:001', 'bar.example.com', $debugger ) ]
+    );
+
+    # Registry - lookup fail, update and lookup
+
+    my $baz = $this->spawn( BazService  => \&Service );
+
+    $this->send( $registry,
+        [ eServiceRegistryLookupRequest => ( 'ID:001', 'baz.example.com', $debugger ) ]
+    );
+    $this->send( $registry,
+        [ eServiceRegistryUpdateRequest => ( 'ID:001', 'baz.example.com', $baz->pid, $debugger ) ]
+    );
+
+    my $registry_2 = $this->spawn( Registry2 => \&ServiceRegistry );
+
+    $this->send( $registry_2,
+        [ eServiceRegistryLookupRequest => ( 'ID:001', 'baz.example.com', $debugger ) ]
+    );
+
+    # Service - test
+
+    $this->send( $service,
+        [ eServiceRequest => ( 'ID:001', add => [2, 2], $debugger->pid ) ]
+    );
+
+    # Service - error
+
+    $this->send( $service->pid,
+        [ eServiceRequest => ( 'ID:001', addd => [2, 2], $debugger ) ]
+    );
+
+}
+
+ELO::Loop->new->run( \&init, () );
+
+=pod
 
 
 sub ServiceClient ($this, $msg) {
