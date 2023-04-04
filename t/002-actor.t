@@ -13,6 +13,10 @@ use constant DEBUG => $ENV{DEBUG} // 0;
 sub match ($msg, $table) {
     my ($event, @args) = @$msg;
     #warn "$event : $table";
+
+    # TODO:
+    # add support for `_` as a catch all event handler
+
     my $cb = $table->{ $event } // die "No match for $event";
     eval {
         $cb->(@args);
@@ -28,7 +32,6 @@ sub Service ($this, $msg) {
     warn Dumper +{ $this->pid => $msg } if DEBUG;
 
     match $msg, state $handlers = +{
-
         # $request  = eServiceRequest  [ sid : SID, action : Str, args : <Any>, caller : PID ]
         # $response = eServiceResponse [ sid : SID, return : <Any> ]
         # $error    = eServiceError    [ sid : SID, error : Str ]
