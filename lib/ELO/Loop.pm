@@ -31,12 +31,12 @@ sub enqueue_msg ($self, $msg) {
 
 sub tick ($self) {
 
-    my @inbox = $self->{_msg_queue}->@*;
+    my @msg_queue = $self->{_msg_queue}->@*;
     $self->{_msg_queue}->@* = ();
 
-    while (@inbox) {
-        my $msg = shift @inbox;
-        my ($to_proc, @body) = @$msg;
+    while (@msg_queue) {
+        my $msg = shift @msg_queue;
+        my ($to_proc, $event) = @$msg;
 
         # if we have a PID, then look it up
         if (not blessed $to_proc) {
@@ -46,11 +46,12 @@ sub tick ($self) {
         }
 
         eval {
-            $to_proc->call( @body );
+            $to_proc->accept( $event );
+            $to_proc->tick;
             1;
         } or do {
             my $e = $@;
-            die "Message to (".$to_proc->pid.") failed with msg(".(join ", " => map { ref ? @$_ : $_ } @body).") because: $e";
+            die "Message to (".$to_proc->pid.") failed with msg(".(join ', ' => @$event).") because: $e";
         };
     }
 }
@@ -69,9 +70,9 @@ sub loop ($self) {
     warn sprintf "-- tick(%03d) : exiting\n" => $tick;
 }
 
-sub run ($self, $f, @args) {
+sub run ($self, $f, $args=[]) {
     my $main = $self->create_process( main => $f );
-    $self->enqueue_msg([ $main, @args ]);
+    $self->enqueue_msg([ $main, $args ]);
     $self->loop;
 }
 

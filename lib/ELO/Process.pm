@@ -12,34 +12,48 @@ use slots (
     loop   => sub {},
     parent => sub {},
     # ...
-    _pid => sub {},
+    _pid   => sub {},
+    _queue => sub {},
 );
 
 sub BUILD ($self, $) {
-    $self->{_pid} = sprintf '%03d:%s' => ++$PIDS, $self->{name}
+    $self->{_pid}   = sprintf '%03d:%s' => ++$PIDS, $self->{name};
+    $self->{_queue} = [];
 }
 
 sub pid ($self) { $self->{_pid} }
 
+# ...
+
 sub name   ($self) { $self->{name}   }
 sub func   ($self) { $self->{func}   }
-sub loop   ($self) { $self->{loop}   }
 sub parent ($self) { $self->{parent} }
 
-sub call ($self, @args) {
-    $self->{func}->( $self, @args );
-}
+# ...
+
+sub loop ($self) { $self->{loop} }
 
 sub spawn ($self, $name, $f) {
     $self->{loop}->create_process( $name, $f, $self );
 }
 
-sub send ($self, $proc, @msg) :method {
-    $self->{loop}->enqueue_msg([ $proc, @msg ]);
+sub send ($self, $proc, $event) :method {
+    $self->{loop}->enqueue_msg([ $proc, $event ]);
 }
 
-sub send_to_self ($self, @msg) {
-    $self->{loop}->enqueue_msg([ $self, @msg ]);
+sub send_to_self ($self, $event) {
+    $self->{loop}->enqueue_msg([ $self, $event ]);
+}
+
+# ...
+
+sub accept ($self, $event) {
+    push $self->{_queue}->@* => $event;
+}
+
+sub tick ($self) {
+    my $event = shift $self->{_queue}->@*;
+    $self->{func}->( $self, $event );
 }
 
 1;
