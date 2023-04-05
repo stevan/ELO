@@ -189,7 +189,7 @@ sub init ($this, $msg=[]) {
 
 }
 
-ELO::Loop->new->run( \&init, () );
+ELO::Loop->new->run( \&init );
 
 
 __END__
