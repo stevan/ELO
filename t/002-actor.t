@@ -7,25 +7,9 @@ use experimental qw[ signatures lexical_subs postderef ];
 use Data::Dumper;
 
 use ELO::Loop;
+use ELO::Actors qw[ match ];
 
 use constant DEBUG => $ENV{DEBUG} // 0;
-
-sub match ($msg, $table) {
-    my ($event, @args) = @$msg;
-    #warn "$event : $table";
-
-    # TODO:
-    # add support for `_` as a catch all event handler
-
-    my $cb = $table->{ $event } // die "No match for $event";
-    eval {
-        $cb->(@args);
-        1;
-    } or do {
-        warn "!!! Died calling msg(".(join ', ' => map { ref $_ ? '['.(join ', ' => @$_).']' : $_ } @$msg).")";
-        die $@;
-    };
-}
 
 sub Service ($this, $msg) {
 

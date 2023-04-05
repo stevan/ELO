@@ -1,30 +1,18 @@
-# ELO
+#!perl
 
-### Event Loop Orchestra
+use v5.24;
+use warnings;
+use experimental qw[ signatures lexical_subs postderef ];
 
-This is an experiment in adding simple co-operative message passing style concurrency for Perl. 
+use Data::Dumper;
 
-```
-use ELO::Loop;
-
-sub HelloWorld ($this, $name) {
-    say "Hello $name from ".$this->pid;
-}
-
-sub main ($this, $msg) {
-    my $hello = $this->spawn('HelloWorld' => \&HelloWorld);
-    $this->send( $hello, 'World');
-}
-
-ELO::Loop->new->run( \&main, () );
-
-```
-
-With an Actor system implemented on top.
-
-```
 use ELO::Loop;
 use ELO::Actors qw[ match ];
+
+use constant DEBUG => $ENV{DEBUG} // 0;
+
+# See Akka Example:
+# https://alvinalexander.com/scala/scala-akka-actors-ping-pong-simple-example/
 
 sub Ping ($this, $msg) {
 
@@ -72,5 +60,4 @@ sub init ($this, $msg=[]) {
 }
 
 ELO::Loop->new->run( \&init, () );
-```
 
