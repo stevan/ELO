@@ -11,12 +11,20 @@ our @EXPORT = qw[
 
 sub match ($msg, $table) {
     my ($event, @args) = @$msg;
-    #warn "$event : $table";
 
-    # TODO:
-    # add support for `_` as a catch all event handler
+    my $cb = $table->{ $event };
 
-    my $cb = $table->{ $event } // die "No match for $event";
+    # NOTE:
+    # I want to support this, but _ doesn't
+    # really fit in Perl, it already has meaning
+    # and we need something better.
+    #
+    # $cb = $table->{'_'}
+    #     if not defined $cb
+    #     && exists $table->{'_'};
+
+    die "No match for $event" unless $cb;
+
     eval {
         $cb->(@args);
         1;
