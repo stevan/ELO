@@ -10,8 +10,9 @@ use ELO::Process;
 use parent 'UNIVERSAL::Object::Immutable';
 use slots (
     # ...
-    _proc_table => sub { +{} },
-    _msg_queue  => sub { +[] },
+    _process_table  => sub { +{} },
+    _message_queue  => sub { +[] },
+    _callback_queue => sub { +[] },
 );
 
 sub create_process ($self, $name, $f, $parent=undef) {
@@ -21,18 +22,35 @@ sub create_process ($self, $name, $f, $parent=undef) {
         loop   => $self,
         parent => $parent,
     );
-    $self->{_proc_table}->{ $proc->pid } = $proc;
+    $self->{_process_table}->{ $proc->pid } = $proc;
     return $proc;
 }
 
 sub enqueue_msg ($self, $msg) {
-    push $self->{_msg_queue}->@* => $msg;
+    push $self->{_message_queue}->@* => $msg;
+}
+
+sub enqueue_callback ($self, $f) {
+    push $self->{_callback_queue}->@* => $f;
 }
 
 sub tick ($self) {
 
-    my @msg_queue = $self->{_msg_queue}->@*;
-    $self->{_msg_queue}->@* = ();
+    my @cb_queue = $self->{_callback_queue}->@*;
+    $self->{_callback_queue}->@* = ();
+
+    while (@cb_queue) {
+        my $f = shift @cb_queue;
+        eval {
+            $f->(); 1;
+        } or do {
+            my $e = $@;
+            die "Callback failed ($f) because: $e";
+        };
+    }
+
+    my @msg_queue = $self->{_message_queue}->@*;
+    $self->{_message_queue}->@* = ();
 
     while (@msg_queue) {
         my $msg = shift @msg_queue;
@@ -41,8 +59,8 @@ sub tick ($self) {
         # if we have a PID, then look it up
         if (not blessed $to_proc) {
             die "Unable to find process for PID($to_proc)"
-                unless exists $self->{_proc_table}->{ $to_proc };
-            $to_proc = $self->{_proc_table}->{ $to_proc };
+                unless exists $self->{_process_table}->{ $to_proc };
+            $to_proc = $self->{_process_table}->{ $to_proc };
         }
 
         #use Data::Dumper;
@@ -64,7 +82,7 @@ sub loop ($self) {
 
     warn sprintf "-- tick(%03d) : starting\n" => $tick;
 
-    while ( $self->{_msg_queue}->@* ) {
+    while ( $self->{_message_queue}->@* || $self->{_callback_queue}->@* ) {
         warn sprintf "-- tick(%03d)\n" => $tick;
         $self->tick;
         $tick++

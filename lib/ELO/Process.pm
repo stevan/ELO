@@ -45,6 +45,10 @@ sub send_to_self ($self, $event) {
     $self->{loop}->enqueue_msg([ $self, $event ]);
 }
 
+sub next_tick ($self, $f) {
+    $self->{loop}->enqueue_callback( $f );
+}
+
 # ...
 
 sub accept ($self, $event) {
