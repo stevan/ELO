@@ -89,7 +89,7 @@ sub init ($this, $msg=[]) {
 
     $this->send( $client, [
         eServiceClientRequest => (
-            $service, # add => [ 2, 2 ]
+            $service,
             sum => [
                 [ add => [ 2, 2 ] ],
                 [ add => [ 3, 3 ] ],
