@@ -29,7 +29,7 @@ sub match ($msg, $table) {
         $cb->(@args);
         1;
     } or do {
-        warn "!!! Died calling msg(".(join ', ' => map { ref $_ ? '['.(join ', ' => @$_).']' : $_ } @$msg).")";
+        #warn "!!! Died calling msg(".(join ', ' => map { ref $_ ? '['.(join ', ' => @$_).']' : $_ } @$msg).")";
         die $@;
     };
 }

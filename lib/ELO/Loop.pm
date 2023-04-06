@@ -45,6 +45,9 @@ sub tick ($self) {
             $to_proc = $self->{_proc_table}->{ $to_proc };
         }
 
+        #use Data::Dumper;
+        #warn Dumper { MessageToBeDelivered => 1, event => $event, proc => $to_proc->pid };
+
         eval {
             $to_proc->accept( $event );
             $to_proc->tick;

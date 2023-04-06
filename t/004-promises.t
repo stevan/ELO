@@ -16,34 +16,84 @@ package Promise {
     use warnings;
     use experimental qw[ signatures lexical_subs postderef ];
 
+    use Scalar::Util 'blessed';
+
+    use constant IN_PROGRESS => 'in progress';
+    use constant RESOLVED    => 'resolved';
+    use constant REJECTED    => 'rejected';
+
     use parent 'UNIVERSAL::Object';
     use slots (
-        value   => sub {},
-        error   => sub {},
-        then    => sub {},
-        catch   => sub {},
+        result => sub {},
+        error  => sub {},
+        # ...
+        _status   => sub { IN_PROGRESS },
+        _resolved => sub { +[] },
+        _rejected => sub { +[] },
     );
 
+    sub is_in_progress ($self) { $self->{_status} eq IN_PROGRESS }
+    sub is_resolved    ($self) { $self->{_status} eq RESOLVED }
+    sub is_rejected    ($self) { $self->{_status} eq REJECTED }
+
     sub then ($self, $then, $catch=undef) {
-        $self->{then}  = $then;
-        $self->{catch} = $catch // sub {};
+        my $p = Promise->new;
+        push $self->{_resolved}->@* => $self->_wrap( $p, $then );
+        push $self->{_rejected}->@* => $self->_wrap( $p, $catch // sub {} );
+        $p;
+    }
+
+    sub resolve ($self, $result) {
+        $self->{_status} = RESOLVED;
+        $self->{result} = $result;
+        $self->_notify( $result, $self->{_resolved} );
         $self;
     }
 
-    sub resolve ($self, $value) {
-        $self->{value}   = $value;
-        $self->{then}->($value);
+    sub reject ($self, $error) {
+        $self->{_status} = REJECTED;
+        $self->{error}  = $error;
+        $self->_notify( $error, $self->{_rejected} );
+        $self;
     }
 
-    sub reject ($self, $error) {
-        $self->{error}   = $error;
-        $self->{catch}->($error);
+    sub _notify ($self, $value, $cbs) {
+        # NOTE: should be happening in next_tick()
+        $_->($value) foreach $cbs->@*;
+    }
+
+    sub _wrap ($self, $p, $then) {
+        return sub ($value) {
+            my ($result, $error);
+            eval {
+                $result = $then->( $value );
+                1;
+            } or do {
+                my $e = $@;
+                chomp $e;
+                $error = $e;
+            };
+
+            if ($error) {
+                $p->reject( $error );
+            }
+            if ( blessed $result && $result->isa(__PACKAGE__) ) {
+                $result->then(
+                    sub { $p->resolve(@_); () },
+                    sub { $p->reject(@_);  () },
+                );
+            }
+            else {
+                $p->resolve( $result );
+            }
+            return;
+        };
     }
 }
 
 sub Service ($this, $msg) {
 
-    warn Dumper +{ $this->pid => $msg } if DEBUG;
+    warn Dumper +{ ServiceGotMessage => 1, $this->pid => $msg } if DEBUG;
 
     match $msg, state $handlers = +{
         # $request  = eServiceRequest  [ action : Str, args : [Int, Int], caller : PID ]
@@ -74,41 +124,29 @@ sub Service ($this, $msg) {
 
 sub ServiceClient ($this, $msg) {
 
-    warn Dumper +{ $this->pid => $msg } if DEBUG;
+    warn Dumper +{ ServiceClientGotMessage => 1, $this->pid => $msg } if DEBUG;
 
     match $msg, state $handlers = +{
 
         # Requests ...
         eServiceClientRequest => sub ($service, $action, $args) {
 
-            my $promise1 = Promise->new;
-            my $promise2 = Promise->new;
+            my $p = Promise->new;
+            $this->send( $service, [ eServiceRequest => ( $action, $args, $p ) ]);
+            $p->then(
+                sub ($result) {
+                    my ($etype, $value) = @$result;
 
-            $this->send( $service, [
-                eServiceRequest => (
-                    $action,
-                    $args,
-                    $promise1
-                )
-            ]);
+                    warn Dumper { result1 => $result };
 
-            $promise1->then(
-                sub ($msg) {
-                    my ($etype, $response) = @$msg;
-                    $this->send( $service, [
-                        eServiceRequest => (
-                            $action,
-                            [ $response, $response ],
-                            $promise2
-                        )
-                    ]);
+                    my $p = Promise->new;
+                    $this->send( $service, [ eServiceRequest => ( $action, [ $value, $value ], $p ) ]);
+                    $p;
                 },
-                sub ($error) { warn Dumper { request => 1, error => $error } }
-            );
-
-            $promise2->then(
-                sub ($msg)   { warn Dumper { request => 2, response => $msg   } },
-                sub ($error) { warn Dumper { request => 2, error    => $error } }
+                sub ($error) { warn Dumper { error1 => $error } }
+            )->then(
+                sub ($result) { warn Dumper { result2 => $result } },
+                sub ($error) { warn Dumper { error2 => $error } }
             );
         },
     }
@@ -121,15 +159,12 @@ sub init ($this, $msg=[]) {
     $this->send( $client, [
         eServiceClientRequest => (
             $service, add => [ 2, 2 ]
+            #sum => [
+            #    [ add => [ 2, 2 ] ],
+            #    [ add => [ 3, 3 ] ],
+            #]
         )
     ]);
-
-    $this->send( $client, [
-        eServiceClientRequest => (
-            $service, add => [ 5, 5 ]
-        )
-    ]);
-
 
 }
 
