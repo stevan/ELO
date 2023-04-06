@@ -30,7 +30,7 @@ sub enqueue_msg ($self, $msg) {
     push $self->{_message_queue}->@* => $msg;
 }
 
-sub enqueue_callback ($self, $f) {
+sub next_tick ($self, $f) {
     push $self->{_callback_queue}->@* => $f;
 }
 

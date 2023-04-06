@@ -5,6 +5,8 @@ use experimental qw[ signatures lexical_subs postderef ];
 
 use Scalar::Util 'blessed';
 
+our $LOOP;
+
 use constant IN_PROGRESS => 'in progress';
 use constant RESOLVED    => 'resolved';
 use constant REJECTED    => 'rejected';
@@ -32,7 +34,10 @@ sub then ($self, $then, $catch=undef) {
 }
 
 sub resolve ($self, $result) {
-    #warn "RESOLVED! $self";
+    die "Cannot resolve. Already  " . $self->status
+        unless $self->is_in_progress;
+
+    #warn "RESOLVED $self";
     $self->{_status} = RESOLVED;
     $self->{result} = $result;
     $self->_notify;
@@ -40,7 +45,10 @@ sub resolve ($self, $result) {
 }
 
 sub reject ($self, $error) {
-    #warn "REJECTED! $self";
+    die "Cannot reject. Already  " . $self->status
+        unless $self->is_in_progress;
+
+    #warn "REJECTED $self";
     $self->{_status} = REJECTED;
     $self->{error}  = $error;
     $self->_notify;
@@ -63,8 +71,15 @@ sub _notify ($self) {
         die "Bad Notify State";
     }
 
-    # NOTE: should be happening in next_tick()
-    $_->($value) foreach $cbs->@*;
+    $self->{_resolved} = [];
+    $self->{_rejected} = [];
+
+    if ($LOOP) {
+        $LOOP->next_tick(sub { $_->($value) foreach $cbs->@* });
+    }
+    else {
+        $_->($value) foreach $cbs->@*;
+    }
 }
 
 sub _wrap ($self, $p, $then) {
@@ -104,12 +119,14 @@ sub collect (@promises) {
         my @results;
         $collector = $collector
             ->then(sub ($result) {
+                #warn "hello from 1 for $p";
                 #warn Dumper { p => "$p", state => 1, collector => [ @results ], result => $result };
                 push @results => @$result;
                 #warn Dumper { p => "$p", state => 1.5, collector => [ @results ] };
                 $p;
             })
             ->then(sub ($result) {
+                #warn "hello from 2 for $p";
                 #warn Dumper { p => "$p", state => 2, collector => [ @results ], result => $result };
                 my $r = [ @results, $result ];
                 #warn Dumper { p => "$p", state => 2.5, collector => $r };

@@ -14,7 +14,7 @@ use constant DEBUG => $ENV{DEBUG} // 0;
 
 sub Service ($this, $msg) {
 
-    warn Dumper +{ ServiceGotMessage => 1, $this->pid => $msg } if DEBUG;
+    warn Dumper +{ ServiceGotMessage => 1, $this->pid => $msg } if DEBUG > 2;
 
     match $msg, state $handlers = +{
         # $request  = eServiceRequest  [ action : Str, args : [Int, Int], caller : PID ]
@@ -48,7 +48,7 @@ sub Service ($this, $msg) {
 
 sub ServiceClient ($this, $msg) {
 
-    warn Dumper +{ ServiceClientGotMessage => 1, $this->pid => $msg } if DEBUG;
+    warn Dumper +{ ServiceClientGotMessage => 1, $this->pid => $msg } if DEBUG > 2;
 
     match $msg, state $handlers = +{
 
@@ -101,7 +101,7 @@ sub init ($this, $msg=[]) {
 
 }
 
-ELO::Loop->new->run( \&init );
+($ELO::Promise::LOOP = ELO::Loop->new)->run( \&init );
 
 
 __END__
