@@ -47,7 +47,7 @@ sub Service ($this, $msg) {
 }
 
 sub init ($this, $msg=[]) {
-    my $service = $this->spawn( Service  => \&Service       );
+    my $service = $this->spawn( Service  => \&Service );
 
     my $promise = ELO::Promise->new;
 

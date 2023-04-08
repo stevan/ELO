@@ -6,6 +6,8 @@ use experimental qw[ signatures lexical_subs postderef ];
 
 use Data::Dumper;
 
+use Hash::Util qw[fieldhash];
+
 use ELO::Loop;
 use ELO::Actors qw[ match ];
 
@@ -16,19 +18,29 @@ use constant DEBUG => $ENV{DEBUG} // 0;
 
 sub Ping ($this, $msg) {
 
-    state $count = 0;
+    # NOTE:
+    # it would be nicer if we could
+    # just do `state $count` and it
+    # would have one `$count` per
+    # instance of the Actor.
+    #
+    # Instead we need to use inside-out
+    # objects with `$this` being our
+    # object-id key.
 
-    match $msg, state $handlers = +{
+    fieldhash state %count;
+
+    match $msg, +{
         eStartPing => sub ( $pong ) {
-            $count++;
-            say "Starting with ($count)";
+            $count{$this}++;
+            say $this->pid." Starting with (".$count{$this}.")";
             $this->send( $pong, [ ePing => $this ]);
         },
         ePong => sub ( $pong ) {
-            $count++;
-            say "Pong with ($count)";
-            if ( $count > 10 ) {
-                say "... Stopping Ping";
+            $count{$this}++;
+            say $this->pid." Pong with (".$count{$this}.")";
+            if ( $count{$this} >= 5 ) {
+                say $this->pid." ... Stopping Ping";
                 $this->send( $pong, [ 'eStop' ]);
             }
             else {
@@ -40,13 +52,17 @@ sub Ping ($this, $msg) {
 
 sub Pong ($this, $msg) {
 
-    match $msg, state $handlers = +{
+    # NOTE:
+    # this is a stateless actor, so
+    # nothing going on here :)
+
+    match $msg, +{
         ePing => sub ( $ping ) {
-            say "... Ping";
+            say $this->pid." ... Ping";
             $this->send( $ping, [ ePong => $this ]);
         },
         eStop => sub () {
-            say "... Stopping Pong";
+            say $this->pid." ... Stopping Pong";
         },
     };
 }
@@ -57,6 +73,10 @@ sub init ($this, $msg=[]) {
 
     $this->send( $ping, [ eStartPing => $pong ]);
 
+    my $ping2 = $this->spawn( Ping2  => \&Ping );
+    my $pong2 = $this->spawn( Pong2  => \&Pong );
+
+    $this->send( $ping2, [ eStartPing => $pong2 ]);
 }
 
 ELO::Loop->new->run( \&init );

@@ -5,6 +5,7 @@ use experimental qw[ signatures lexical_subs postderef ];
 
 use Scalar::Util 'blessed';
 
+# FIXME: do better than this ...
 our $LOOP;
 
 use constant IN_PROGRESS => 'in progress';

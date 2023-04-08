@@ -12,11 +12,19 @@ use ELO::Promise;
 
 use constant DEBUG => $ENV{DEBUG} // 0;
 
+# Could we do this??
+# sub Service ($this, $msg) : Promise( eServiceResponse, eServiceError ) {
+
 sub Service ($this, $msg) {
 
     warn Dumper +{ ServiceGotMessage => 1, $this->pid => $msg } if DEBUG > 2;
 
-    match $msg, state $handlers = +{
+    # NOTE:
+    # this is basically a stateless service,
+    # and uses Promises instead of the callback
+    # format used in other tests.
+
+    match $msg, +{
         # $request  = eServiceRequest  [ action : Str, args : [Int, Int], caller : PID ]
         # $response = eServiceResponse [ Int ]
         # $error    = eServiceError    [ error : Str ]
@@ -50,7 +58,7 @@ sub ServiceClient ($this, $msg) {
 
     warn Dumper +{ ServiceClientGotMessage => 1, $this->pid => $msg } if DEBUG > 2;
 
-    match $msg, state $handlers = +{
+    match $msg, +{
 
         # Requests ...
         eServiceClientRequest => sub ($service, $action, $args) {
@@ -95,6 +103,18 @@ sub init ($this, $msg=[]) {
                 [ add => [ 3, 3 ] ],
                 [ add => [ 4, 4 ] ],
                 [ add => [ 5, 5 ] ],
+            ]
+        )
+    ]);
+
+    $this->send( $client, [
+        eServiceClientRequest => (
+            $service,
+            sum => [
+                [ add => [ 12, 12 ] ],
+                [ add => [ 13, 13 ] ],
+                [ add => [ 14, 14 ] ],
+                [ add => [ 15, 15 ] ],
             ]
         )
     ]);

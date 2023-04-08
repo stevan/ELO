@@ -15,7 +15,12 @@ sub Service ($this, $msg) {
 
     warn Dumper +{ $this->pid => $msg } if DEBUG;
 
-    match $msg, state $handlers = +{
+    # NOTE:
+    # this is basically a state-less actor, which
+    # is actually kind of the ideal form, it keeps
+    # it less complex.
+
+    match $msg, +{
         # $request  = eServiceRequest  [ sid : SID, action : Str, args : <Any>, caller : PID ]
         # $response = eServiceResponse [ sid : SID, return : <Any> ]
         # $error    = eServiceError    [ sid : SID, error : Str ]
@@ -47,6 +52,23 @@ sub ServiceRegistry ($this, $msg) {
 
     warn Dumper +{ $this->pid => $msg } if DEBUG;
 
+    # NOTE:
+    # this is an actor which has shared state
+    # across all instances. This is no need for
+    # locks because all message-sends will
+    # happen in sequence during the loop->tick
+    #
+    # you can think of this as a
+    # shared in-memory data base
+    # if you want to, but it is
+    # a bit of a stretch ;)
+
+    # NOTE:
+    # all these variables below are shared
+    # across all instances of the ServiceRegistry
+    # see NOTE in the ServiceClient for more
+    # details
+
     state $foo = $this->spawn( FooService => \&Service );
     state $bar = $this->spawn( BarService => \&Service );
 
@@ -58,7 +80,7 @@ sub ServiceRegistry ($this, $msg) {
     state sub lookup ($name)           { $services->{ $name } }
     state sub update ($name, $service) { $services->{ $name } = $service }
 
-    match $msg, state $handlers = +{
+    match $msg, +{
 
         # Requests ...
 
@@ -92,10 +114,30 @@ sub ServiceClient ($this, $msg) {
 
     warn Dumper +{ $this->pid => $msg } if DEBUG;
 
+    # NOTE:
+    # This is another example of a shared state
+    # across all instances, in this case it is
+    # to create a session system that will allow
+    # for the client to handle multiple concurrent
+    # requests.
+
+    # NOTE:
+    # all these variables below are shared
+    # across all instances of the ServiceClient
     state $registry = $this->spawn( ServiceRegistry => \&ServiceRegistry );
     state $sessions = +{};
     state $next_sid = 0;
 
+    # NOTE:
+    # Careful not to close over any values
+    # other than the `state` variables created
+    # above, otherwise issues will come up
+    #
+    # For instance, closing over $this will
+    # end up closing over the first instance
+    # that is created. This is not what you want.
+    # If you need to use $this inside these, then
+    # it should be passed in to these subs
     state sub session_get    ($id)   {        $sessions->{ $id } }
     state sub session_delete ($id)   { delete $sessions->{ $id } }
     state sub session_create ($data) {
@@ -103,7 +145,7 @@ sub ServiceClient ($this, $msg) {
         $next_sid;
     }
 
-    match $msg, state $handlers = +{
+    match $msg, +{
 
         # Requests ...
 
@@ -125,6 +167,14 @@ sub ServiceClient ($this, $msg) {
 
 
         # Responses ...
+
+        # Ideally these should not be part of the
+        # protocol of the Actor, but it needs to
+        # happen with the $caller style that
+        # we are using.
+        #
+        # It is possible to do all this with Promises
+        # instead, but this is a different test :)
 
         eServiceRegistryLookupResponse => sub ($sid, $service) {
             my $s = session_get( $sid );
