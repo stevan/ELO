@@ -18,10 +18,12 @@
 
 - make a Message class
 
-### Questions
-
 - should messages have headers?
     - they are a great way to control messaging
+    - we could pass things like:
+        - session ids
+        - PID to call back
+        - promises
 
 - should we add `from`?
     - and should it be exposed to the Actors?
@@ -41,8 +43,6 @@
     - to define events    ... `state $eFoo = event( eFoo => Str, Int);`
     - to create instances ... `Event[ $eFoo, "bar", 10 ]`
 
-### Questions
-
 - should we make an Error class as well?
     - this would help with Error handling
 
@@ -61,8 +61,6 @@
         - though how often do you have two loops in a single process?
     - either way it is kinda ugly and should be improved
 
-### Questions
-
 - should we add an `ask` method similar to `send`
     - this will automatically add the promise
     - if so, where should this live?
@@ -79,18 +77,33 @@
 
 ### ToDo
 
+- actor state is complex, the sub versions have limits
+    - ideally it is stateless
+        - or passes state via messages & self calls
+    - shared state works with `state` variables
+    - instance state works with inside-out object on the `$this` value
+    - a proper class based Actor would give the most flexibility
+        - and be more comfortable to users
+
 - make a way to mark a given Actor as accepting Promises
     - `sub SomeActor ($this, $msg) : Promise { ... }`
     - this could be used to implement `ask` like behavior perhaps
         - `ask` could create and return the promise
             - but throw an exception of the recieving Actor doesn't do `Promise` trait
 
-### Questions
-
 - currently there is no way to pass constructor arguments to Actors
     - this maybe needs a Factory?
     - or maybe make a proper OO Actor to support this style
         - and let the functional style stay as is
+
+- does it make sense to try and type the actors?
+    - `sub SomeActor ($this, $msg) : Promise(eResponse, eError) { ... }`
+        - this tells the system, that actor wants promises
+        - it can also say the events is expects to get back
+    - `sub SomeActor ($this, $msg) : Callback { ... }`
+        - this tells it it needs a PID callback
+    - `sub SomeActor ($this, $msg) : SessionId { ... }`
+        - this tells that a session ID is expected
 
 -----------------------------------------------------------
 ## Process
@@ -102,8 +115,6 @@
     - Whenever an actor is stopped ...
         - all of its children are recursively stopped too.
 
-### Questions
-
 - should we support blocking behavior at all?
     - this will almost be needed for Futures
 
@@ -111,7 +122,15 @@
 ## Futures
 -----------------------------------------------------------
 
-### Questions
+Futures can be thought of as the read-side of Promises,
+and in most systems can be used in a blocking manner.
+However, we don't want to allow blocking, so this really
+is not what we want. It is better if we stick with
+promises only.
+
+It causes issues with distributed Actors, since Promises
+don't serialize, but we can deal with this when we get
+to the distributed part anyway.
 
 - should we add them?
     - if so, would they block?
