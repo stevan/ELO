@@ -12,16 +12,27 @@ use ELO::Promise;
 
 use constant DEBUG => $ENV{DEBUG} // 0;
 
+# NOTE:
+# We need to add tests that verify
+# the hex address of certain things
+# match
+
 sub StateTester ($this, $msg) {
 
-    state $id = 0;
+    state $id = 0; # shared across all instances
     $id++;
 
-    my    $bar = [0];
-    state $foo = [0];
+    my    $bar = [0]; # created on every request
+    state $foo = [0]; # shared across all instances
 
+    # since this closes over a `state` var
+    # it can be a `state` sub ...
     state sub update_foo() { ++$foo->[0] }
 
+    # since this closes over the `my` var
+    # it needs to be a `my` sub. But it should
+    # be noted that this sub gets re-created
+    # every request, so is not ideal
     my sub update_counters() {
         update_foo();
         ++$bar->[0];
