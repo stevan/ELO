@@ -11,7 +11,7 @@ use Hash::Util qw[fieldhash];
 use ELO::Loop;
 use ELO::Actors qw[ match ];
 
-use constant DEBUG => $ENV{DEBUG} // 0;
+use constant DEBUG => $ENV{DEBUG} || 0;
 
 # See Akka Example:
 # https://alvinalexander.com/scala/scala-akka-actors-ping-pong-simple-example/

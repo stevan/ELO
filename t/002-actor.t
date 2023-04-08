@@ -9,7 +9,7 @@ use Data::Dumper;
 use ELO::Loop;
 use ELO::Actors qw[ match ];
 
-use constant DEBUG => $ENV{DEBUG} // 0;
+use constant DEBUG => $ENV{DEBUG} || 0;
 
 sub Service ($this, $msg) {
 

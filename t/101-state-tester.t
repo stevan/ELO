@@ -10,7 +10,7 @@ use ELO::Loop;
 use ELO::Actors qw[ match ];
 use ELO::Promise;
 
-use constant DEBUG => $ENV{DEBUG} // 0;
+use constant DEBUG => $ENV{DEBUG} || 0;
 
 # NOTE:
 # We need to add tests that verify
