@@ -4,7 +4,7 @@
 
 This is an experiment in adding simple co-operative message passing style concurrency for Perl. 
 
-```
+```perl
 use ELO::Loop;
 
 sub HelloWorld ($this, $msg) {
@@ -24,25 +24,28 @@ ELO::Loop->new->run( \&main );
 
 With an Actor system implemented on top.
 
-```
+```perl
 use ELO::Loop;
 use ELO::Actors qw[ match ];
+use Hash::Util  qw[ fieldhash ];
 
 sub Ping ($this, $msg) {
 
-    state $count = 0;
+    # use inside-out objects
+    # for per-Actor state
+    fieldhash state %count;
 
-    match $msg, state $handlers = +{
+    match $msg, +{
         eStartPing => sub ( $pong ) {
-            $count++;
-            say "Starting with ($count)";
+            $count{$this}++;
+            say $this->pid." Starting with (".$count{$this}.")";
             $this->send( $pong, [ ePing => $this ]);
         },
         ePong => sub ( $pong ) {
-            $count++;
-            say "Pong with ($count)";
-            if ( $count > 10 ) {
-                say "... Stopping Ping";
+            $count{$this}++;
+            say $this->pid." Pong with (".$count{$this}.")";
+            if ( $count{$this} >= 5 ) {
+                say $this->pid." ... Stopping Ping";
                 $this->send( $pong, [ 'eStop' ]);
             }
             else {
@@ -54,7 +57,7 @@ sub Ping ($this, $msg) {
 
 sub Pong ($this, $msg) {
 
-    match $msg, state $handlers = +{
+    match $msg, +{
         ePing => sub ( $ping ) {
             say "... Ping";
             $this->send( $ping, [ ePong => $this ]);
