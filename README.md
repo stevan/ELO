@@ -79,3 +79,55 @@ sub init ($this, $msg=[]) {
 ELO::Loop->new->run( \&init );
 ```
 
+And a Promise mechanism to coordinate between Actors.
+
+```perl
+use ELO::Loop;
+use ELO::Actors qw[ match ];
+use ELO::Promise;
+
+sub Service ($this, $msg) {
+
+    match $msg, state $handlers = +{
+        eServiceRequest => sub ($action, $args, $promise) {
+            eval {
+                my ($x, $y) = @$args;
+
+                $promise->resolve([
+                    eServiceResponse => (
+                        ($action eq 'add') ? ($x + $y) :
+                        ($action eq 'sub') ? ($x - $y) :
+                        ($action eq 'mul') ? ($x * $y) :
+                        ($action eq 'div') ? ($x / $y) :
+                        die "Invalid Action: $action"
+                    )
+                ]);
+                1;
+            } or do {
+                my $e = $@;
+                chomp $e;
+                $promise->reject([ eServiceError => ( $e ) ]);
+            };
+        }
+    }
+}
+
+sub init ($this, $msg=[]) {
+    my $service = $this->spawn( Service  => \&Service );
+
+    my $promise = ELO::Promise->new;
+
+    $this->send( $service,
+        [ eServiceRequest => ( add => [ 2, 2 ], $promise ) ]
+    );
+
+    $promise->then(
+        sub ($event) {
+            my ($etype, $result) = @$event;
+            say "Got Result: $result";
+        }
+    );
+}
+
+($ELO::Promise::LOOP = ELO::Loop->new)->run( \&init );
+```
