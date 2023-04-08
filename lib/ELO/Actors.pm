@@ -5,7 +5,7 @@ use experimental qw[ signatures lexical_subs postderef ];
 
 use Exporter 'import';
 
-our @EXPORT = qw[
+our @EXPORT_OK = qw[
     match
 ];
 
