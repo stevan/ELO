@@ -36,7 +36,7 @@ my @METHODS = (
 
 use parent 'UNIVERSAL::Object::Immutable';
 use slots (
-    min_level => sub { INFO  },
+    min_level => sub { ($ENV{ELO_DEBUG} ? DEBUG : INFO) },
     max_level => sub { FATAL },
 );
 

@@ -11,9 +11,7 @@ use ELO::Actors qw[ match ];
 
 use ELO::Util::Logger;
 
-my $log = ELO::Util::Logger->new(
-    min_level => ($ENV{DEBUG} ? ELO::Util::Logger->DEBUG : ELO::Util::Logger->INFO)
-);
+my $log = ELO::Util::Logger->new;
 
 sub Service ($this, $msg) {
 
