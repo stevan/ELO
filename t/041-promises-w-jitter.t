@@ -11,21 +11,23 @@ use ELO::Actors   qw[ match ];
 use ELO::Timers   qw[ timer ];
 use ELO::Promises qw[ promise collect ];
 
-use constant DEBUG => $ENV{DEBUG} || 0;
+use ELO::Util::Logger;
+
+my $log = ELO::Util::Logger->new;
 
 sub jitter { int(rand(25)) }
 
 sub Service ($this, $msg) {
 
-    warn Dumper +{ ServiceGotMessage => 1, $this->pid => $msg } if DEBUG > 3;
+    $log->debug( $this, [ $msg->@[ 0 .. $#{$msg}-1 ], "".$msg->[-1] ] );
 
     match $msg, state $handlers = +{
         # $request  = eServiceRequest  [ action : Str, args : [Int, Int], caller : PID ]
         # $response = eServiceResponse [ Int ]
         # $error    = eServiceError    [ error : Str ]
         eServiceRequest => sub ($action, $args, $promise) {
-            warn "HELLO FROM Service :: eServiceRequest" if DEBUG;
-            warn Dumper { action => $action, args => $args, promise => "$promise" } if DEBUG;
+            $log->debug( $this, "HELLO FROM Service :: eServiceRequest" );
+            $log->debug( $this, +{ action => $action, args => $args, promise => "$promise" });
 
             my $timeout = jitter();
             timer(
@@ -33,7 +35,7 @@ sub Service ($this, $msg) {
                 $timeout,
                 sub {
                     my ($x, $y) = @$args;
-                    say "Resolving Promise[$x] : ($promise) after timeout($timeout)";
+                    $log->info( $this, "Resolving Promise[$x] : ($promise) after timeout($timeout)" );
                     eval {
                         $promise->resolve([
                             eServiceResponse => (
@@ -67,14 +69,14 @@ sub init ($this, $msg=[]) {
             $this,
             $timeout,
             sub {
-                say "Sending Promise[$i] : ($promise) after timeout($timeout)";
+                $log->info( $this, "Sending Promise[$i] : ($promise) after timeout($timeout)" );
                 $this->send( $service, [ eServiceRequest => ( add => [ $i, $i ], $promise ) ] );
             }
         );
         $promise->then(
             sub ($event) {
                 my ($etype, $result) = @$event;
-                say "Got Result Promise[$i] : ($promise) with result($result)";
+                $log->info( $this, "Got Result Promise[$i] : ($promise) with result($result)" );
             }
         );
 
@@ -85,9 +87,9 @@ sub init ($this, $msg=[]) {
         ->then(
             sub ($events) {
                 my @values = map $_->[1], @$events;
-                say "GOT FINAL RESULTS:[ " . (join ", " => @values)." ]";
+                $log->info( $this, +{ results => \@values } );
             },
-            sub ($error) { warn Dumper +{ error => $error } }
+            sub ($error) { $log->error( $this, $error ) }
         );
 }
 

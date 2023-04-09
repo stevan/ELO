@@ -11,7 +11,9 @@ use Hash::Util qw[fieldhash];
 use ELO::Loop;
 use ELO::Actors qw[ match ];
 
-use constant DEBUG => $ENV{DEBUG} || 0;
+use ELO::Util::Logger;
+
+my $log = ELO::Util::Logger->new;
 
 # See Akka Example:
 # https://alvinalexander.com/scala/scala-akka-actors-ping-pong-simple-example/
@@ -33,18 +35,18 @@ sub Ping ($this, $msg) {
     match $msg, +{
         eStartPing => sub ( $pong ) {
             $count{$this}++;
-            say $this->pid." Starting with (".$count{$this}.")";
-            $this->send( $pong, [ ePing => $this ]);
+            $log->info( $this, " Starting with (".$count{$this}.")" );
+            $this->send( $pong, [ ePing => $this->pid ]);
         },
         ePong => sub ( $pong ) {
             $count{$this}++;
-            say $this->pid." Pong with (".$count{$this}.")";
+            $log->info( $this, " Pong with (".$count{$this}.")" );
             if ( $count{$this} >= 5 ) {
-                say $this->pid." ... Stopping Ping";
+                $log->info( $this, " ... Stopping Ping" );
                 $this->send( $pong, [ 'eStop' ]);
             }
             else {
-                $this->send( $pong, [ ePing => $this ]);
+                $this->send( $pong, [ ePing => $this->pid ]);
             }
         },
     };
@@ -58,11 +60,11 @@ sub Pong ($this, $msg) {
 
     match $msg, +{
         ePing => sub ( $ping ) {
-            say $this->pid." ... Ping";
-            $this->send( $ping, [ ePong => $this ]);
+            $log->info( $this, " ... Ping" );
+            $this->send( $ping, [ ePong => $this->pid ]);
         },
         eStop => sub () {
-            say $this->pid." ... Stopping Pong";
+            $log->info( $this, " ... Stopping Pong" );
         },
     };
 }
@@ -71,12 +73,12 @@ sub init ($this, $msg=[]) {
     my $ping = $this->spawn( Ping  => \&Ping );
     my $pong = $this->spawn( Pong  => \&Pong );
 
-    $this->send( $ping, [ eStartPing => $pong ]);
+    $this->send( $ping, [ eStartPing => $pong->pid ]);
 
     my $ping2 = $this->spawn( Ping2  => \&Ping );
     my $pong2 = $this->spawn( Pong2  => \&Pong );
 
-    $this->send( $ping2, [ eStartPing => $pong2 ]);
+    $this->send( $ping2, [ eStartPing => $pong2->pid ]);
 }
 
 ELO::Loop->run( \&init );

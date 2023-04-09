@@ -10,19 +10,21 @@ use ELO::Loop;
 use ELO::Actors   qw[ match ];
 use ELO::Promises qw[ promise ];
 
-use constant DEBUG => $ENV{DEBUG} || 0;
+use ELO::Util::Logger;
+
+my $log = ELO::Util::Logger->new;
 
 sub Service ($this, $msg) {
 
-    warn Dumper +{ ServiceGotMessage => 1, $this->pid => $msg } if DEBUG > 3;
+    $log->debug( $this, [ $msg->@[ 0 .. $#{$msg}-1 ], "".$msg->[-1] ] );
 
     match $msg, state $handlers = +{
         # $request  = eServiceRequest  [ action : Str, args : [Int, Int], caller : PID ]
         # $response = eServiceResponse [ Int ]
         # $error    = eServiceError    [ error : Str ]
         eServiceRequest => sub ($action, $args, $promise) {
-            warn "HELLO FROM Service :: eServiceRequest" if DEBUG;
-            warn Dumper { action => $action, args => $args, promise => "$promise" } if DEBUG;
+            $log->debug( $this, "HELLO FROM Service :: eServiceRequest" );
+            $log->debug( $this, +{ action => $action, args => $args, promise => "$promise" });
 
             my ($x, $y) = @$args;
 
@@ -56,10 +58,8 @@ sub init ($this, $msg=[]) {
     );
 
     $promise->then(
-        sub ($event) {
-            my ($etype, $result) = @$event;
-            say "Got Result: $result";
-        }
+        sub ($event) { $log->info( $this, $event ) },
+        sub ($error) { $log->error( $this, $error ) }
     );
 }
 

@@ -10,14 +10,16 @@ use ELO::Loop;
 use ELO::Actors   qw[ match ];
 use ELO::Promises qw[ promise collect ];
 
-use constant DEBUG => $ENV{DEBUG} || 0;
+use ELO::Util::Logger;
+
+my $log = ELO::Util::Logger->new;
 
 # Could we do this??
 # sub Service ($this, $msg) : Promise( eServiceResponse, eServiceError ) {
 
 sub Service ($this, $msg) {
 
-    warn Dumper +{ ServiceGotMessage => 1, $this->pid => $msg } if DEBUG > 2;
+    $log->debug( $this, [ $msg->@[ 0 .. $#{$msg}-1 ], "".$msg->[-1] ] );
 
     # NOTE:
     # this is basically a stateless service,
@@ -29,8 +31,8 @@ sub Service ($this, $msg) {
         # $response = eServiceResponse [ Int ]
         # $error    = eServiceError    [ error : Str ]
         eServiceRequest => sub ($action, $args, $promise) {
-            warn "HELLO FROM Service :: eServiceRequest" if DEBUG;
-            warn Dumper { action => $action, args => $args, promise => "$promise" } if DEBUG;
+            $log->debug( $this, "HELLO FROM Service :: eServiceRequest" );
+            $log->debug( $this, +{ action => $action, args => $args, promise => "$promise" });
 
             my ($x, $y) = @$args;
 
@@ -56,14 +58,14 @@ sub Service ($this, $msg) {
 
 sub ServiceClient ($this, $msg) {
 
-    warn Dumper +{ ServiceClientGotMessage => 1, $this->pid => $msg } if DEBUG > 2;
+    $log->debug( $this, $msg );
 
     match $msg, +{
 
         # Requests ...
         eServiceClientRequest => sub ($service, $action, $args) {
-            warn "HELLO FROM ServiceClient :: eServiceClientRequest" if DEBUG;
-            warn Dumper { service => $service->pid, action => $action, args => $args } if DEBUG;
+            $log->debug( $this, "HELLO FROM ServiceClient :: eServiceClientRequest" );
+            $log->debug( $this, +{ service => $service, action => $action, args => $args });
 
             my @promises;
             foreach my $op ( @$args ) {
@@ -84,8 +86,8 @@ sub ServiceClient ($this, $msg) {
                     }
                 )
                 ->then(
-                    sub ($result) { warn Dumper { result => $result } },
-                    sub ($error)  { warn Dumper { error  => $error } },
+                    sub ($result) { $log->info( $this, $result ) },
+                    sub ($error)  { $log->error( $this, $error ) },
                 );
         },
     }
@@ -97,7 +99,7 @@ sub init ($this, $msg=[]) {
 
     $this->send( $client, [
         eServiceClientRequest => (
-            $service,
+            $service->pid,
             sum => [
                 [ add => [ 2, 2 ] ],
                 [ add => [ 3, 3 ] ],
@@ -109,7 +111,7 @@ sub init ($this, $msg=[]) {
 
     $this->send( $client, [
         eServiceClientRequest => (
-            $service,
+            $service->pid,
             sum => [
                 [ add => [ 12, 12 ] ],
                 [ add => [ 13, 13 ] ],

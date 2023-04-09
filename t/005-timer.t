@@ -8,20 +8,24 @@ use Data::Dumper;
 
 use ELO::Loop;
 use ELO::Timers qw[
-    timer    cancel_timer
-    interval cancel_interval
+    timer
+    cancel_timer
+    interval
+    cancel_interval
 ];
 
-use constant DEBUG => $ENV{DEBUG} || 0;
+use ELO::Util::Logger;
+
+my $log = ELO::Util::Logger->new;
 
 sub Responder ($this, $msg) {
-    warn $this->pid.' : ENTERED' if DEBUG;
+    $log->debug( $this, "ENTERED" );
 
-    warn Dumper $msg;
+    $log->info( $this, $msg );
 }
 
 sub init ($this, $msg) {
-    warn $this->pid.' : ENTERED' if DEBUG;
+    $log->debug( $this, "ENTERED" );
     my $r = $this->spawn( Responder => \&Responder );
 
     my $t0 = timer( $this, 0, [ $r, ['Hello ... timeout(0)'] ] );
