@@ -9,11 +9,20 @@ use Data::Dumper;
 use ELO::Loop;
 use ELO::Actors qw[ match ];
 
-use constant DEBUG => $ENV{DEBUG} || 0;
+use ELO::Util::Logger;
+
+my $log = ELO::Util::Logger->new(
+    #max_level => ELO::Util::Logger->WARN,
+    min_level => $ENV{DEBUG}
+        ? ELO::Util::Logger->DEBUG
+        : ELO::Util::Logger->INFO
+);
 
 sub Service ($this, $msg) {
 
-    warn Dumper +{ $this->pid => $msg } if DEBUG;
+    $log->debug( $this, $msg );
+
+    #warn Dumper +{ $this->pid => $msg } if DEBUG;
 
     # NOTE:
     # this is basically a state-less actor, which
@@ -50,7 +59,9 @@ sub Service ($this, $msg) {
 
 sub ServiceRegistry ($this, $msg) {
 
-    warn Dumper +{ $this->pid => $msg } if DEBUG;
+    $log->debug( $this, $msg );
+
+    #warn Dumper +{ $this->pid => $msg } if DEBUG;
 
     # NOTE:
     # this is an actor which has shared state
@@ -89,7 +100,7 @@ sub ServiceRegistry ($this, $msg) {
         # $error    = eServiceRegistryUpdateError    [ sid : SID, error : Str ]
         eServiceRegistryUpdateRequest => sub ($sid, $name, $service, $caller) {
             update( $name, $service );
-            $this->send( $caller, [ eServiceRegistryUpdateResponse => $sid, $name, $service ] );
+            $this->send( $caller, [ eServiceRegistryUpdateResponse => $sid, $name, $service->pid ] );
         },
 
         # $request  = eServiceRegistryLookupRequest  [ sid : SID, name : Str, caller : PID ]]
@@ -97,9 +108,13 @@ sub ServiceRegistry ($this, $msg) {
         # $error    = eServiceRegistryLookupError    [ sid : SID, error   : Str ]
         eServiceRegistryLookupRequest => sub ($sid, $name, $caller) {
             if ( my $service = lookup( $name ) ) {
-                $this->send( $caller, [ eServiceRegistryLookupResponse => $sid, $service ] );
+                $this->send( $caller, [ eServiceRegistryLookupResponse => $sid, $service->pid ] );
             }
             else {
+                $log->warn( $this, +{
+                    msg => "Could not find service",
+                    name => $name, sid => $sid
+                });
                 $this->send( $caller, [
                     eServiceRegistryLookupError => (
                         $sid,  'Could not find service('.$name.')'
@@ -112,7 +127,9 @@ sub ServiceRegistry ($this, $msg) {
 
 sub ServiceClient ($this, $msg) {
 
-    warn Dumper +{ $this->pid => $msg } if DEBUG;
+    $log->debug( $this, $msg );
+
+    #warn Dumper +{ $this->pid => $msg } if DEBUG;
 
     # NOTE:
     # This is another example of a shared state
@@ -160,7 +177,7 @@ sub ServiceClient ($this, $msg) {
                 eServiceRegistryLookupRequest => (
                     $sid,  # my session id
                     $url,  # the url of the service
-                    $this  # where to send the response
+                    $this->pid  # where to send the response
                 )
             ]);
         },
@@ -183,28 +200,37 @@ sub ServiceClient ($this, $msg) {
             $s->[0] = [ $url, $service ];
 
             $this->send( $service, [
-                eServiceRequest => ( $sid, $action, $args, $this )
+                eServiceRequest => ( $sid, $action, $args, $this->pid )
             ]);
         },
 
         eServiceResponse => sub ($sid, $return) {
             my $request = session_get( $sid );
+
+            $log->info( $this, +{ eServiceResponse => $return, sid => $sid } );
+
             # Horray ... where do we sent this??
-            warn Dumper +{ eServiceResponse => $return, sid => $sid };
+            #warn Dumper +{ eServiceResponse => $return, sid => $sid };
         },
 
         # Errors ...
 
         eServiceError => sub ($sid, $error) {
             my $request = session_get( $sid );
+
+            $log->error( $this, +{ eServiceError => $error, sid => $sid } );
+
             # ...
-            warn Dumper +{ eServiceError => $error, sid => $sid };
+            #warn Dumper +{ eServiceError => $error, sid => $sid };
         },
 
         eServiceRegistryLookupError => sub ($sid, $error) {
             my $request = session_get( $sid );
+
+            $log->error( $this, +{ eServiceRegistryLookupError => $error, sid => $sid } );
+
             # ...
-            warn Dumper +{ eServiceRegistryLookupError => $error, sid => $sid };
+            #warn Dumper +{ eServiceRegistryLookupError => $error, sid => $sid };
         },
 
     }
@@ -236,6 +262,8 @@ sub init ($this, $msg=[]) {
             'foo.example.com', multiply => [ 10, 2 ]
         )
     ]);
+
+    $log->fatal( $this, +{ oh => 'noes!' });
 
 }
 
