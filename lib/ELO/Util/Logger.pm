@@ -4,7 +4,6 @@ use warnings;
 use experimental qw[ signatures lexical_subs postderef ];
 
 use JSON;
-use Sub::Util       qw[ subname ];
 use Term::ANSIColor qw[ colored ];
 
 use constant LEVELS => [qw[
@@ -67,11 +66,11 @@ my sub dump_msg ($msg) {
 }
 
 my sub colored_pid ($pid) {
-    state %pid_colors;
+    state %pid_colors_cache;
 
-    $pid_colors{$pid} //= 'on_ansi'.int($pid =~ s/^(\d+)\:.*$/$1/r);
+    $pid_colors_cache{$pid} //= 'on_ansi'.int($pid =~ s/^(\d+)\:.*$/$1/r);
 
-    lpad( colored( pad($pid), $pid_colors{$pid} ) );
+    lpad( colored( pad($pid), $pid_colors_cache{$pid} ) );
 }
 
 # ...
