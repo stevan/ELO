@@ -7,7 +7,7 @@ use experimental qw[ signatures lexical_subs postderef ];
 use Data::Dumper;
 
 use ELO::Loop;
-use ELO::Timer qw[
+use ELO::Timers qw[
     timer    cancel_timer
     interval cancel_interval
 ];
@@ -36,6 +36,6 @@ sub init ($this, $msg) {
 
 }
 
-ELO::Loop->new->run( \&init );
+ELO::Loop->run( \&init );
 
 1;

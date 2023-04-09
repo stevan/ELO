@@ -8,7 +8,6 @@ use Data::Dumper;
 
 use ELO::Loop;
 use ELO::Actors qw[ match ];
-use ELO::Promise;
 
 use constant DEBUG => $ENV{DEBUG} || 0;
 
@@ -66,6 +65,6 @@ sub init ($this, $msg=[]) {
     $this->send( $tester3, [ eTest => () ] );
 }
 
-ELO::Loop->new->run( \&init );
+ELO::Loop->run( \&init );
 
 1;

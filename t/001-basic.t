@@ -57,6 +57,6 @@ sub bounce_cb ($this, $msg) {
     }
 }
 
-ELO::Loop->new->run( \&init );
+ELO::Loop->run( \&init );
 
 1;

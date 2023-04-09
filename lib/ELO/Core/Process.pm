@@ -1,4 +1,4 @@
-package ELO::Process;
+package ELO::Core::Process;
 use v5.24;
 use warnings;
 use experimental qw[ signatures lexical_subs postderef ];

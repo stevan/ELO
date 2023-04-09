@@ -7,8 +7,8 @@ use experimental qw[ signatures lexical_subs postderef ];
 use Data::Dumper;
 
 use ELO::Loop;
-use ELO::Actors qw[ match ];
-use ELO::Promise;
+use ELO::Actors   qw[ match ];
+use ELO::Promises qw[ promise ];
 
 use constant DEBUG => $ENV{DEBUG} || 0;
 
@@ -49,7 +49,7 @@ sub Service ($this, $msg) {
 sub init ($this, $msg=[]) {
     my $service = $this->spawn( Service  => \&Service );
 
-    my $promise = ELO::Promise->new;
+    my $promise = promise;
 
     $this->send( $service,
         [ eServiceRequest => ( add => [ 2, 2 ], $promise ) ]
@@ -63,7 +63,7 @@ sub init ($this, $msg=[]) {
     );
 }
 
-($ELO::Promise::LOOP = ELO::Loop->new)->run( \&init );
+ELO::Loop->run( \&init, with_promises => 1 );
 
 
 __END__

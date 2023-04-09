@@ -1,4 +1,4 @@
-package ELO::Promise;
+package ELO::Core::Promise;
 use v5.24;
 use warnings;
 use experimental qw[ signatures lexical_subs postderef ];
@@ -109,33 +109,6 @@ sub _wrap ($self, $p, $then) {
         }
         return;
     };
-}
-
-# ...
-
-sub collect (@promises) {
-    my $collector = __PACKAGE__->new->resolve([]);
-
-    foreach my $p ( @promises ) {
-        my @results;
-        $collector = $collector
-            ->then(sub ($result) {
-                #warn "hello from 1 for $p";
-                #warn Dumper { p => "$p", state => 1, collector => [ @results ], result => $result };
-                push @results => @$result;
-                #warn Dumper { p => "$p", state => 1.5, collector => [ @results ] };
-                $p;
-            })
-            ->then(sub ($result) {
-                #warn "hello from 2 for $p";
-                #warn Dumper { p => "$p", state => 2, collector => [ @results ], result => $result };
-                my $r = [ @results, $result ];
-                #warn Dumper { p => "$p", state => 2.5, collector => $r };
-                return $r;
-            })
-    }
-
-    return $collector;
 }
 
 1;

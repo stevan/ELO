@@ -7,9 +7,9 @@ use experimental qw[ signatures lexical_subs postderef ];
 use Data::Dumper;
 
 use ELO::Loop;
-use ELO::Actors qw[ match ];
-use ELO::Timer  qw[ timer ];
-use ELO::Promise;
+use ELO::Actors   qw[ match ];
+use ELO::Timers   qw[ timer ];
+use ELO::Promises qw[ promise collect ];
 
 use constant DEBUG => $ENV{DEBUG} || 0;
 
@@ -61,7 +61,7 @@ sub init ($this, $msg=[]) {
 
     my @promises;
     foreach my $i (0 .. 10) {
-        my $promise = ELO::Promise->new;
+        my $promise = promise;
         my $timeout = jitter();
         timer(
             $this,
@@ -81,7 +81,7 @@ sub init ($this, $msg=[]) {
         push @promises => $promise;
     }
 
-    ELO::Promise::collect( @promises )
+    collect( @promises )
         ->then(
             sub ($events) {
                 my @values = map $_->[1], @$events;
@@ -91,7 +91,7 @@ sub init ($this, $msg=[]) {
         );
 }
 
-($ELO::Promise::LOOP = ELO::Loop->new)->run( \&init );
+ELO::Loop->run( \&init, with_promises => 1 );
 
 
 __END__
