@@ -35,17 +35,16 @@ my @METHODS = (
     \&fatal,
 );
 
-use parent 'UNIVERSAL::Object'; #::Immutable';
+use parent 'UNIVERSAL::Object::Immutable';
 use slots (
-    min_level => sub { 0 },
-    max_level => sub { 4 },
+    min_level => sub { INFO  },
+    max_level => sub { FATAL },
 );
 
 sub log ($self, $level, $process, $msg) {
     my $method = $METHODS[ $level ] || die "Unknown log level($level) : " . LEVELS->[$level];
     $self->$method( $process, $msg );
 }
-
 
 # ...
 
