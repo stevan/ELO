@@ -259,10 +259,9 @@ sub init ($this, $msg=[]) {
     ]);
 
     $log->fatal( $this, +{ oh => 'noes!' });
-
 }
 
-ELO::Loop->run( \&init );
+ELO::Loop->run( \&init, logger => $log );
 
 
 __END__

@@ -7,16 +7,28 @@ use ELO::Core::Loop;
 
 # static method/functions ...
 
-sub run ($class, $f, %options) {
+sub run ($class, $f,  %options) {
+
+    my $args;
+    my $logger;
+
     my $loop = ELO::Core::Loop->new;
-    if ( keys %options ) {
-        if ( $options{with_promises} ) {
-            require ELO::Core::Promise;
-            $ELO::Core::Promise::LOOP = $loop;
-        }
+
+    # process options ...
+
+    if ( $options{with_promises} ) {
+        require ELO::Core::Promise;
+        $ELO::Core::Promise::LOOP = $loop;
     }
-    $loop->run( $f );
-    return $loop;
+
+    $args   = $options{args}   if $options{args};
+    $logger = $options{logger} if $options{logger};
+
+    # run the loop
+
+    $loop->run( $f, $args, $logger );
+
+    return;
 }
 
 1;

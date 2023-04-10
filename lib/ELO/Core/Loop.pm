@@ -77,24 +77,29 @@ sub tick ($self) {
     }
 }
 
-sub loop ($self) {
+sub loop ($self, $logger=undef) {
     my $tick = 0;
 
-    warn sprintf "== tick(%03d):START ".('=' x 80)."\n" => $tick;
+    $logger->tick( $logger->DEBUG, $self, $tick, 'INIT' )  if $logger;
+    $logger->tick( $logger->INFO,  $self, $tick, 'START' ) if $logger;
 
     while ( $self->{_message_queue}->@* || $self->{_callback_queue}->@* ) {
-        warn sprintf "-- tick(%03d) ".('-' x 86)."\n" => $tick;
+        $logger->tick( $logger->INFO, $self, $tick ) if $logger;
         $self->tick;
         $tick++
     }
 
-    warn sprintf "== tick(%03d):EXIT ".('=' x 81)."\n" => $tick;
+    $logger->tick( $logger->INFO,  $self, $tick, 'END'  ) if $logger;
+    $logger->tick( $logger->DEBUG, $self, $tick, 'EXIT' ) if $logger;
+
+    return;
 }
 
-sub run ($self, $f, $args=[]) {
+sub run ($self, $f, $args=[], $logger=undef) {
     my $main = $self->create_process( main => $f );
     $self->enqueue_msg([ $main, $args ]);
-    $self->loop;
+    $self->loop( $logger );
+    return;
 }
 
 1;
