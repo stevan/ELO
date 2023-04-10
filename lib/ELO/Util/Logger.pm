@@ -55,6 +55,9 @@ my sub lpad   ($string) { " $string"  }
 my sub level  ($level)  { sprintf '[%5s]' => LEVELS->[$level] }
 
 my sub dump_msg ($msg) {
+    local $Data::Dump::INDENT    = '    ';
+    local $Data::Dump::LINEWIDTH = 90;
+
     my $out;
     eval {
         $out = Data::Dump::dumpf( $msg, sub ($ctx, $obj) {
