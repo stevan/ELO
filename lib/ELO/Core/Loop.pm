@@ -73,7 +73,7 @@ sub tick ($self) {
             1;
         } or do {
             my $e = $@;
-            die "Message to (".$to_proc->pid.") failed with msg(".(join ', ' => @$event).") because: $e";
+            die "Message to (".$to_proc->pid.") failed with msg(".(join ', ' => @{ $event // []}).") because: $e";
         };
     }
 }

@@ -4,19 +4,21 @@ use v5.24;
 use warnings;
 use experimental qw[ signatures lexical_subs postderef ];
 
-use Data::Dumper;
+use Test::More;
+use Test::Differences;
+use Test::ELO;
 
-use ELO::Loop;
-use ELO::Timers qw[
+use Data::Dump;
+
+use ok 'ELO::Loop';
+use ok 'ELO::Timers', qw[
     timer
     cancel_timer
     interval
     cancel_interval
 ];
 
-use ELO::Util::Logger;
-
-my $log = ELO::Util::Logger->new;
+my $log = Test::ELO->create_logger;
 
 sub Responder ($this, $msg) {
     $log->debug( $this, "ENTERED" );
@@ -41,5 +43,7 @@ sub init ($this, $msg) {
 }
 
 ELO::Loop->run( \&init, logger => $log );
+
+done_testing;
 
 1;

@@ -4,9 +4,13 @@ use v5.24;
 use warnings;
 use experimental qw[ signatures lexical_subs postderef ];
 
-use Data::Dumper;
+use Test::More;
+use Test::Differences;
+use Test::ELO;
 
-use ELO::Loop;
+use Data::Dump;
+
+use ok 'ELO::Loop';
 
 sub init ($this, $msg) {
     say "Hello world";
@@ -19,5 +23,7 @@ sub init ($this, $msg) {
 }
 
 ELO::Loop->run( \&init );
+
+done_testing;
 
 1;

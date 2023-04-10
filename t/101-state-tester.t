@@ -4,12 +4,14 @@ use v5.24;
 use warnings;
 use experimental qw[ signatures lexical_subs postderef ];
 
-use Data::Dumper;
+use Test::More;
+use Test::Differences;
+use Test::ELO;
 
-use ELO::Loop;
-use ELO::Actors qw[ match ];
+use Data::Dump;
 
-use constant DEBUG => $ENV{DEBUG} || 0;
+use ok 'ELO::Loop';
+use ok 'ELO::Actors', qw[ match ];
 
 # NOTE:
 # We need to add tests that verify
@@ -40,12 +42,12 @@ sub StateTester ($this, $msg) {
 
     match $msg, +{
         eTest => sub {
-            warn $this->pid.' -> eTest = '.$this.' -> [foo => '.$foo.', bar => '.$bar.', id => '.$id.']';
+            #warn $this->pid.' -> eTest = '.$this.' -> [foo => '.$foo.', bar => '.$bar.', id => '.$id.']';
             $this->send_to_self([ eAgain => $this ]);
         },
         eAgain => sub ($from_pid) {
             update_counters();
-            warn $this->pid.' -> eAgain (from: '.$from_pid.') = '.$this.' -> [foo => '.$foo.', bar => '.$bar.', id => '.$id.']';
+            #warn $this->pid.' -> eAgain (from: '.$from_pid.') = '.$this.' -> [foo => '.$foo.', bar => '.$bar.', id => '.$id.']';
         }
     }
 }
@@ -56,9 +58,9 @@ sub init ($this, $msg=[]) {
     my $tester2 = $this->spawn( StateTester => \&StateTester );
     my $tester3 = $this->spawn( StateTester => \&StateTester );
 
-    warn $tester1->pid." -> Tester1 = $tester1";
-    warn $tester2->pid." -> Tester2 = $tester2";
-    warn $tester3->pid." -> Tester3 = $tester3";
+    #warn $tester1->pid." -> Tester1 = $tester1";
+    #warn $tester2->pid." -> Tester2 = $tester2";
+    #warn $tester3->pid." -> Tester3 = $tester3";
 
     $this->send( $tester1, [ eTest => () ] );
     $this->send( $tester2, [ eTest => () ] );
@@ -66,5 +68,7 @@ sub init ($this, $msg=[]) {
 }
 
 ELO::Loop->run( \&init );
+
+done_testing;
 
 1;

@@ -4,15 +4,17 @@ use v5.24;
 use warnings;
 use experimental qw[ signatures lexical_subs postderef ];
 
-use Data::Dumper;
+use Test::More;
+use Test::Differences;
+use Test::ELO;
 
-use ELO::Loop;
-use ELO::Actors   qw[ match ];
-use ELO::Promises qw[ promise ];
+use Data::Dump;
 
-use ELO::Util::Logger;
+use ok 'ELO::Loop';
+use ok 'ELO::Actors',   qw[ match ];
+use ok 'ELO::Promises', qw[ promise ];
 
-my $log = ELO::Util::Logger->new;
+my $log = Test::ELO->create_logger;
 
 sub Service ($this, $msg) {
 
@@ -65,6 +67,7 @@ sub init ($this, $msg=[]) {
 
 ELO::Loop->run( \&init, with_promises => 1, logger => $log );
 
+done_testing;
 
 __END__
 
