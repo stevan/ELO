@@ -1,13 +1,7 @@
 # ELO TODO
 
-- ELO::Logger
-    - diff debug levels
-    - diff debug type (promises, timers, etc)
-    - colored output
-
 - Process needs
     - despawn()
-    - Process %ENV
 
 - we need to add
     - waitpid()

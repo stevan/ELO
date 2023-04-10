@@ -4,16 +4,17 @@ use v5.24;
 use warnings;
 use experimental qw[ signatures lexical_subs postderef ];
 
-use Data::Dumper;
+use Test::More;
+use Test::Differences;
+use Test::ELO;
 
+use Data::Dump;
 use Hash::Util qw[fieldhash];
 
-use ELO::Loop;
-use ELO::Actors qw[ match ];
+use ok 'ELO::Loop';
+use ok 'ELO::Actors', qw[ match ];
 
-use ELO::Util::Logger;
-
-my $log = ELO::Util::Logger->new;
+my $log = Test::ELO->create_logger;
 
 # See Akka Example:
 # https://alvinalexander.com/scala/scala-akka-actors-ping-pong-simple-example/
@@ -39,6 +40,8 @@ sub Ping ($this, $msg) {
             $count{$this}++;
             $log->info( $this, " Starting with (".$count{$this}.")" );
             $this->send( $pong, [ ePing => $this ]);
+
+            pass('... '.$this->name.' started with '.$this->env('max_pings').' max pings');
         },
         ePong => sub ( $pong ) {
             $count{$this}++;
@@ -46,6 +49,8 @@ sub Ping ($this, $msg) {
             if ( $count{$this} >= $this->env('max_pings') ) {
                 $log->info( $this, " ... Stopping Ping" );
                 $this->send( $pong, [ 'eStop' ]);
+
+                pass('... '.$this->name.' finished with '.$count{$this}.' pings');
             }
             else {
                 $this->send( $pong, [ ePing => $this ]);
@@ -69,6 +74,8 @@ sub Pong ($this, $msg) {
         },
         eStop => sub () {
             $log->info( $this, " ... Stopping Pong" );
+
+            pass('... '.$this->name.' finished');
         },
     };
 }
@@ -86,4 +93,8 @@ sub init ($this, $msg=[]) {
 }
 
 ELO::Loop->run( \&init, logger => $log );
+
+done_testing;
+
+
 

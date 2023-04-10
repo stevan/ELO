@@ -16,11 +16,12 @@ use constant LEVELS => [qw[
     FATAL
 ]];
 
-use constant DEBUG => 0;
-use constant INFO  => 1;
-use constant WARN  => 2;
-use constant ERROR => 3;
-use constant FATAL => 4;
+use constant DEBUG   => 0;
+use constant INFO    => 1;
+use constant WARN    => 2;
+use constant ERROR   => 3;
+use constant FATAL   => 4;
+use constant TESTING => 5; # internal state
 
 sub debug;
 sub info;
@@ -41,9 +42,9 @@ my $MAX_DUMP_WIDTH = 90;
 
 use parent 'UNIVERSAL::Object::Immutable';
 use slots (
-    min_level  => sub { ($ENV{ELO_DEBUG} ? DEBUG : INFO) },
-    max_level  => sub { FATAL },
     filehandle => sub { \*STDERR },
+    max_level  => sub { FATAL },
+    min_level  => sub { $ENV{ELO_DEBUG} ? DEBUG : ($ENV{ELO_LOG} // INFO) },
 );
 
 sub BUILD ($self, $) {
@@ -51,12 +52,6 @@ sub BUILD ($self, $) {
     # a TTY (terminal) then we want to turn
     # off the colors
     $ENV{ANSI_COLORS_DISABLED} = 1 unless -t $self->{filehandle};
-}
-
-
-sub log ($self, $level, $process, $msg) {
-    my $method = $METHODS[ $level ] || die "Unknown log level($level) : " . LEVELS->[$level];
-    $self->$method( $process, $msg );
 }
 
 # ...
@@ -144,6 +139,11 @@ sub tick ($self, $level, $loop, $tick, $msg=undef) {
         ($level == DEBUG ? ("\n".colored( lpad(dump_msg($loop)), 'italic grey20' )) : ()),
         "\n"
     );
+}
+
+sub log ($self, $level, $process, $msg) {
+    my $method = $METHODS[ $level ] || die "Unknown log level($level) : " . LEVELS->[$level];
+    $self->$method( $process, $msg );
 }
 
 sub debug ($self, $process, $msg) {

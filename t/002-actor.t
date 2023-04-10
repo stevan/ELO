@@ -4,14 +4,16 @@ use v5.24;
 use warnings;
 use experimental qw[ signatures lexical_subs postderef ];
 
-use Data::Dumper;
+use Test::More;
+use Test::Differences;
+use Test::ELO;
 
-use ELO::Loop;
-use ELO::Actors qw[ match ];
+use Data::Dump;
 
-use ELO::Util::Logger;
+use ok 'ELO::Loop';
+use ok 'ELO::Actors', qw[ match ];
 
-my $log = ELO::Util::Logger->new;
+my $log = Test::ELO->create_logger;
 
 sub Service ($this, $msg) {
 
@@ -194,6 +196,14 @@ sub ServiceClient ($this, $msg) {
             # update the service
             $s->[0] = [ $url, $service ];
 
+            my %expected = (
+                1 => 'FooService',
+                2 => 'BarService',
+                4 => 'FooService',
+            );
+            ok($expected{$sid}, '... got the expected session id with lookup response');
+            is($service->name, $expected{$sid}, '... got the expected lookup response');
+
             $this->send( $service, [
                 eServiceRequest => ( $sid, $action, $args, $this )
             ]);
@@ -204,8 +214,13 @@ sub ServiceClient ($this, $msg) {
 
             $log->info( $this, +{ eServiceResponse => $return, sid => $sid } );
 
-            # Horray ... where do we sent this??
-            #warn Dumper +{ eServiceResponse => $return, sid => $sid };
+            my %expected = (
+                1 => 4,
+                2 => 20,
+            );
+
+            ok($expected{$sid}, '... got the expected session id with service response');
+            is($return, $expected{$sid}, '... got the expected service response');
         },
 
         # Errors ...
@@ -215,8 +230,8 @@ sub ServiceClient ($this, $msg) {
 
             $log->error( $this, +{ eServiceError => $error, sid => $sid } );
 
-            # ...
-            #warn Dumper +{ eServiceError => $error, sid => $sid };
+            like($error, qr/^Invalid Action\: multiply/, '... got the expected service error');
+            is($sid, 4, '... got the expected session id for service error');
         },
 
         eServiceRegistryLookupError => sub ($sid, $error) {
@@ -224,15 +239,15 @@ sub ServiceClient ($this, $msg) {
 
             $log->error( $this, +{ eServiceRegistryLookupError => $error, sid => $sid } );
 
-            # ...
-            #warn Dumper +{ eServiceRegistryLookupError => $error, sid => $sid };
+            is($error, 'Could not find service(baz.example.com)', '... got the expected lookup error');
+            is($sid, 3, '... got the expected session id for lookup error');
         },
 
     }
 }
 
 sub init ($this, $msg=[]) {
-    my $client = $this->spawn( Service  => \&ServiceClient );
+    my $client = $this->spawn( ServiceClient  => \&ServiceClient );
 
     $this->send( $client, [
         eServiceClientRequest => (
@@ -257,11 +272,10 @@ sub init ($this, $msg=[]) {
             'foo.example.com', multiply => [ 10, 2 ]
         )
     ]);
-
-    $log->fatal( $this, +{ oh => 'noes!' });
 }
 
 ELO::Loop->run( \&init, logger => $log );
 
+done_testing;
 
 __END__
