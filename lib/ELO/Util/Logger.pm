@@ -65,7 +65,7 @@ my sub pad    ($string) { " $string " }
 my sub rpad   ($string) {  "$string " }
 my sub lpad   ($string) { " $string"  }
 
-my sub level  ($level)  { sprintf '[%5s]' => LEVELS->[$level] }
+my sub level  ($level)  { sprintf '[%-5s]' => LEVELS->[$level] }
 
 my sub dump_msg ($msg) {
     local $Data::Dump::INDENT    = '    ';
@@ -83,28 +83,28 @@ my sub dump_msg ($msg) {
             # the system.
 
             return +{
-                object  => +{
+                object  => bless {
                     type             => 'ELO::Core::Loop',
                     active_processes => [ sort keys $obj->{_process_table}->%* ],
-                }
+                } => 'ELO::DEBUG::Loop'
             } if $ctx->object_isa('ELO::Core::Loop');
 
             return +{
-                object  => +{
+                object  => bless {
                     type => 'ELO::Core::Process',
                     pid  => $obj->pid,
                     name => $obj->name,
                     func => Sub::Util::subname( $obj->func ),
-                }
+                } => 'ELO::DEBUG::Process'
             } if $ctx->object_isa('ELO::Core::Process');
 
             return +{
-                object  => +{
+                object  => bless {
                     type   => 'ELO::Core::Promise',
                     status => $obj->status,
                     result => $obj->result,
                     error  => $obj->error,
-                }
+                } => 'ELO::DEBUG::Promise'
             } if $ctx->object_isa('ELO::Core::Promise');
 
             return;

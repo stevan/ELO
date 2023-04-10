@@ -43,7 +43,7 @@ sub Ping ($this, $msg) {
         ePong => sub ( $pong ) {
             $count{$this}++;
             $log->info( $this, " Pong with (".$count{$this}.")" );
-            if ( $count{$this} >= 5 ) {
+            if ( $count{$this} >= $this->env('NUM_PINGS') ) {
                 $log->info( $this, " ... Stopping Ping" );
                 $this->send( $pong, [ 'eStop' ]);
             }
@@ -74,12 +74,12 @@ sub Pong ($this, $msg) {
 }
 
 sub init ($this, $msg=[]) {
-    my $ping = $this->spawn( Ping  => \&Ping );
+    my $ping = $this->spawn( Ping  => \&Ping, { NUM_PINGS => 5 } );
     my $pong = $this->spawn( Pong  => \&Pong );
 
     $this->send( $ping, [ eStartPing => $pong ]);
 
-    my $ping2 = $this->spawn( Ping2  => \&Ping );
+    my $ping2 = $this->spawn( Ping2  => \&Ping, { NUM_PINGS => 10 });
     my $pong2 = $this->spawn( Pong2  => \&Pong );
 
     $this->send( $ping2, [ eStartPing => $pong2 ]);

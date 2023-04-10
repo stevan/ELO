@@ -15,12 +15,13 @@ use slots (
     _callback_queue => sub { +[] },
 );
 
-sub create_process ($self, $name, $f, $parent=undef) {
+sub create_process ($self, $name, $f, $env=undef, $parent=undef) {
     my $proc = ELO::Core::Process->new(
         name   => $name,
         func   => $f,
         loop   => $self,
         parent => $parent,
+        env    => $env,
     );
     $self->{_process_table}->{ $proc->pid } = $proc;
     return $proc;
@@ -95,8 +96,8 @@ sub loop ($self, $logger=undef) {
     return;
 }
 
-sub run ($self, $f, $args=[], $logger=undef) {
-    my $main = $self->create_process( main => $f );
+sub run ($self, $f, $args=[], $logger=undef, $env=undef) {
+    my $main = $self->create_process( main => $f, $env );
     $self->enqueue_msg([ $main, $args ]);
     $self->loop( $logger );
     return;

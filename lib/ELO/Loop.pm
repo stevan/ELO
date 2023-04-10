@@ -11,6 +11,7 @@ sub run ($class, $f,  %options) {
 
     my $args;
     my $logger;
+    my $env;
 
     my $loop = ELO::Core::Loop->new;
 
@@ -23,10 +24,11 @@ sub run ($class, $f,  %options) {
 
     $args   = $options{args}   if $options{args};
     $logger = $options{logger} if $options{logger};
+    $env    = $options{env}    if $options{env};
 
     # run the loop
 
-    $loop->run( $f, $args, $logger );
+    $loop->run( $f, $args, $logger, $env );
 
     return;
 }
