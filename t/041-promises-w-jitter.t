@@ -19,7 +19,7 @@ sub jitter { int(rand(25)) }
 
 sub Service ($this, $msg) {
 
-    $log->debug( $this, [ $msg->@[ 0 .. $#{$msg}-1 ], "".$msg->[-1] ] );
+    $log->debug( $this, $msg );
 
     match $msg, state $handlers = +{
         # $request  = eServiceRequest  [ action : Str, args : [Int, Int], caller : PID ]
@@ -27,7 +27,7 @@ sub Service ($this, $msg) {
         # $error    = eServiceError    [ error : Str ]
         eServiceRequest => sub ($action, $args, $promise) {
             $log->debug( $this, "HELLO FROM Service :: eServiceRequest" );
-            $log->debug( $this, +{ action => $action, args => $args, promise => "$promise" });
+            $log->debug( $this, +{ action => $action, args => $args, promise => $promise });
 
             my $timeout = jitter();
             timer(

@@ -22,6 +22,10 @@ use slots (
     _rejected => sub { +[] },
 );
 
+sub status ($self) { $self->{_status} }
+sub result ($self) { $self->{result}  }
+sub error  ($self) { $self->{error}   }
+
 sub is_in_progress ($self) { $self->{_status} eq IN_PROGRESS }
 sub is_resolved    ($self) { $self->{_status} eq RESOLVED }
 sub is_rejected    ($self) { $self->{_status} eq REJECTED }

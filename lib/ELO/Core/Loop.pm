@@ -80,15 +80,15 @@ sub tick ($self) {
 sub loop ($self) {
     my $tick = 0;
 
-    warn sprintf "== tick(%03d):START ".('=' x 60)."\n" => $tick;
+    warn sprintf "== tick(%03d):START ".('=' x 80)."\n" => $tick;
 
     while ( $self->{_message_queue}->@* || $self->{_callback_queue}->@* ) {
-        warn sprintf "-- tick(%03d) ".('-' x 66)."\n" => $tick;
+        warn sprintf "-- tick(%03d) ".('-' x 86)."\n" => $tick;
         $self->tick;
         $tick++
     }
 
-    warn sprintf "== tick(%03d):EXIT ".('=' x 61)."\n" => $tick;
+    warn sprintf "== tick(%03d):EXIT ".('=' x 81)."\n" => $tick;
 }
 
 sub run ($self, $f, $args=[]) {

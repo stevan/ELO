@@ -3,7 +3,9 @@ use v5.24;
 use warnings;
 use experimental qw[ signatures lexical_subs postderef ];
 
-use JSON;
+use JSON       ();
+use Data::Dump ();
+use Sub::Util  ();
 use Term::ANSIColor qw[ colored ];
 
 use constant LEVELS => [qw[
@@ -56,7 +58,38 @@ my sub level  ($level)  { sprintf '[%5s]' => LEVELS->[$level] }
 my sub dump_msg ($msg) {
     my $out;
     eval {
-        $out = JSON->new->canonical->encode( $msg );
+        #$out = JSON->new->canonical->encode( $msg );
+        $out = Data::Dump::dumpf( $msg, sub ($ctx, $obj) {
+            return +{
+                blessed => 'ELO::Core::Loop',
+                object  => +{
+                    type  => 'LOOP',
+                    procs => [ sort keys $obj->{_process_table}->%* ]
+                }
+            } if $ctx->object_isa('ELO::Core::Loop');
+
+            return +{
+                blessed => 'ELO::Core::Process',
+                object  => +{
+                    type => 'PROCESS',
+                    pid  => $obj->pid,
+                    name => $obj->name,
+                    func => Sub::Util::subname( $obj->func ),
+                }
+            } if $ctx->object_isa('ELO::Core::Process');
+
+            return +{
+                blessed => 'ELO::Core::Promise',
+                object  => +{
+                    type   => 'PROMISE',
+                    status => $obj->status,
+                    result => $obj->result,
+                    error  => $obj->error,
+                }
+            } if $ctx->object_isa('ELO::Core::Promise');
+
+            return;
+        } );
         1;
     } or do {
         my $e = $@;

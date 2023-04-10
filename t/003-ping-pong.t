@@ -20,6 +20,8 @@ my $log = ELO::Util::Logger->new;
 
 sub Ping ($this, $msg) {
 
+    $log->debug( $this, $msg );
+
     # NOTE:
     # it would be nicer if we could
     # just do `state $count` and it
@@ -36,7 +38,7 @@ sub Ping ($this, $msg) {
         eStartPing => sub ( $pong ) {
             $count{$this}++;
             $log->info( $this, " Starting with (".$count{$this}.")" );
-            $this->send( $pong, [ ePing => $this->pid ]);
+            $this->send( $pong, [ ePing => $this ]);
         },
         ePong => sub ( $pong ) {
             $count{$this}++;
@@ -46,13 +48,15 @@ sub Ping ($this, $msg) {
                 $this->send( $pong, [ 'eStop' ]);
             }
             else {
-                $this->send( $pong, [ ePing => $this->pid ]);
+                $this->send( $pong, [ ePing => $this ]);
             }
         },
     };
 }
 
 sub Pong ($this, $msg) {
+
+    $log->debug( $this, $msg );
 
     # NOTE:
     # this is a stateless actor, so
@@ -61,7 +65,7 @@ sub Pong ($this, $msg) {
     match $msg, +{
         ePing => sub ( $ping ) {
             $log->info( $this, " ... Ping" );
-            $this->send( $ping, [ ePong => $this->pid ]);
+            $this->send( $ping, [ ePong => $this ]);
         },
         eStop => sub () {
             $log->info( $this, " ... Stopping Pong" );
@@ -73,12 +77,12 @@ sub init ($this, $msg=[]) {
     my $ping = $this->spawn( Ping  => \&Ping );
     my $pong = $this->spawn( Pong  => \&Pong );
 
-    $this->send( $ping, [ eStartPing => $pong->pid ]);
+    $this->send( $ping, [ eStartPing => $pong ]);
 
     my $ping2 = $this->spawn( Ping2  => \&Ping );
     my $pong2 = $this->spawn( Pong2  => \&Pong );
 
-    $this->send( $ping2, [ eStartPing => $pong2->pid ]);
+    $this->send( $ping2, [ eStartPing => $pong2 ]);
 }
 
 ELO::Loop->run( \&init );

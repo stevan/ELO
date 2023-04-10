@@ -41,7 +41,7 @@ sub StateTester ($this, $msg) {
     match $msg, +{
         eTest => sub {
             warn $this->pid.' -> eTest = '.$this.' -> [foo => '.$foo.', bar => '.$bar.', id => '.$id.']';
-            $this->send_to_self([ eAgain => $this->pid ]);
+            $this->send_to_self([ eAgain => $this ]);
         },
         eAgain => sub ($from_pid) {
             update_counters();

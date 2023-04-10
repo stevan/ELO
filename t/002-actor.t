@@ -95,7 +95,7 @@ sub ServiceRegistry ($this, $msg) {
         # $error    = eServiceRegistryUpdateError    [ sid : SID, error : Str ]
         eServiceRegistryUpdateRequest => sub ($sid, $name, $service, $caller) {
             update( $name, $service );
-            $this->send( $caller, [ eServiceRegistryUpdateResponse => $sid, $name, $service->pid ] );
+            $this->send( $caller, [ eServiceRegistryUpdateResponse => $sid, $name, $service ] );
         },
 
         # $request  = eServiceRegistryLookupRequest  [ sid : SID, name : Str, caller : PID ]]
@@ -103,7 +103,7 @@ sub ServiceRegistry ($this, $msg) {
         # $error    = eServiceRegistryLookupError    [ sid : SID, error   : Str ]
         eServiceRegistryLookupRequest => sub ($sid, $name, $caller) {
             if ( my $service = lookup( $name ) ) {
-                $this->send( $caller, [ eServiceRegistryLookupResponse => $sid, $service->pid ] );
+                $this->send( $caller, [ eServiceRegistryLookupResponse => $sid, $service ] );
             }
             else {
                 $log->warn( $this, +{
@@ -172,7 +172,7 @@ sub ServiceClient ($this, $msg) {
                 eServiceRegistryLookupRequest => (
                     $sid,  # my session id
                     $url,  # the url of the service
-                    $this->pid  # where to send the response
+                    $this  # where to send the response
                 )
             ]);
         },
@@ -195,7 +195,7 @@ sub ServiceClient ($this, $msg) {
             $s->[0] = [ $url, $service ];
 
             $this->send( $service, [
-                eServiceRequest => ( $sid, $action, $args, $this->pid )
+                eServiceRequest => ( $sid, $action, $args, $this )
             ]);
         },
 
@@ -266,42 +266,3 @@ ELO::Loop->run( \&init );
 
 
 __END__
-
-    # Registry - lookup
-
-    $this->send( $registry,
-        [ eServiceRegistryLookupRequest => ( 'ID:001', 'foo.example.com', $debugger ) ]
-    );
-
-    $this->send( $registry,
-        [ eServiceRegistryLookupRequest => ( 'ID:001', 'bar.example.com', $debugger ) ]
-    );
-
-    # Registry - lookup fail, update and lookup
-
-    my $baz = $this->spawn( BazService  => \&Service );
-
-    $this->send( $registry,
-        [ eServiceRegistryLookupRequest => ( 'ID:001', 'baz.example.com', $debugger ) ]
-    );
-    $this->send( $registry,
-        [ eServiceRegistryUpdateRequest => ( 'ID:001', 'baz.example.com', $baz->pid, $debugger ) ]
-    );
-
-    my $registry_2 = $this->spawn( Registry2 => \&ServiceRegistry );
-
-    $this->send( $registry_2,
-        [ eServiceRegistryLookupRequest => ( 'ID:001', 'baz.example.com', $debugger ) ]
-    );
-
-    # Service - test
-
-    $this->send( $service,
-        [ eServiceRequest => ( 'ID:001', add => [2, 2], $debugger->pid ) ]
-    );
-
-    # Service - error
-
-    $this->send( $service->pid,
-        [ eServiceRequest => ( 'ID:001', addd => [2, 2], $debugger ) ]
-    );

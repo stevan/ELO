@@ -19,7 +19,7 @@ my $log = ELO::Util::Logger->new;
 
 sub Service ($this, $msg) {
 
-    $log->debug( $this, [ $msg->@[ 0 .. $#{$msg}-1 ], "".$msg->[-1] ] );
+    $log->debug( $this, $msg );
 
     # NOTE:
     # this is basically a stateless service,
@@ -32,7 +32,7 @@ sub Service ($this, $msg) {
         # $error    = eServiceError    [ error : Str ]
         eServiceRequest => sub ($action, $args, $promise) {
             $log->debug( $this, "HELLO FROM Service :: eServiceRequest" );
-            $log->debug( $this, +{ action => $action, args => $args, promise => "$promise" });
+            $log->debug( $this, +{ action => $action, args => $args, promise => $promise });
 
             my ($x, $y) = @$args;
 
@@ -99,7 +99,7 @@ sub init ($this, $msg=[]) {
 
     $this->send( $client, [
         eServiceClientRequest => (
-            $service->pid,
+            $service,
             sum => [
                 [ add => [ 2, 2 ] ],
                 [ add => [ 3, 3 ] ],
@@ -111,7 +111,7 @@ sub init ($this, $msg=[]) {
 
     $this->send( $client, [
         eServiceClientRequest => (
-            $service->pid,
+            $service,
             sum => [
                 [ add => [ 12, 12 ] ],
                 [ add => [ 13, 13 ] ],
