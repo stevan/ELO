@@ -3,7 +3,6 @@ use v5.24;
 use warnings;
 use experimental qw[ signatures lexical_subs postderef ];
 
-use JSON       ();
 use Data::Dump ();
 use Sub::Util  ();
 use Term::ANSIColor qw[ colored ];
@@ -58,7 +57,6 @@ my sub level  ($level)  { sprintf '[%5s]' => LEVELS->[$level] }
 my sub dump_msg ($msg) {
     my $out;
     eval {
-        #$out = JSON->new->canonical->encode( $msg );
         $out = Data::Dump::dumpf( $msg, sub ($ctx, $obj) {
             return +{
                 blessed => 'ELO::Core::Loop',
