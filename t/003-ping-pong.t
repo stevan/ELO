@@ -85,5 +85,5 @@ sub init ($this, $msg=[]) {
     $this->send( $ping2, [ eStartPing => $pong2 ]);
 }
 
-ELO::Loop->run( \&init );
+ELO::Loop->run( \&init, logger => $log );
 

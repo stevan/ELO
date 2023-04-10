@@ -63,7 +63,7 @@ sub init ($this, $msg=[]) {
     );
 }
 
-ELO::Loop->run( \&init, with_promises => 1 );
+ELO::Loop->run( \&init, with_promises => 1, logger => $log );
 
 
 __END__

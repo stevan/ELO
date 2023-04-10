@@ -40,6 +40,6 @@ sub init ($this, $msg) {
 
 }
 
-ELO::Loop->run( \&init );
+ELO::Loop->run( \&init, logger => $log );
 
 1;
