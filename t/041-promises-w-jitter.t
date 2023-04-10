@@ -90,6 +90,11 @@ sub init ($this, $msg=[]) {
             sub ($events) {
                 my @values = map $_->[1], @$events;
                 $log->info( $this, +{ results => \@values } );
+                eq_or_diff(
+                    \@values,
+                    [ 0, 2, 4, 6, 8, 10, 12, 14, 16, 18, 20 ],
+                    '... got the expected response values'
+                );
             },
             sub ($error) { $log->error( $this, $error ) }
         );
