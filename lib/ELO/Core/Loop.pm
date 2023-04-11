@@ -33,13 +33,22 @@ sub create_process ($self, $name, $f, $env=undef, $parent=undef) {
 
 sub destroy_process ($self, $process, $status) {
     # NOTE: ignore if the PID does not exist (for now)
-    delete $self->{_process_table}->{ $process->pid };
 
+    # handle any links that exist ...
     if ( my $links = delete $self->{_process_links}->{ $process->pid } ) {
         foreach my $link (@$links) {
-            $link->send_to_self([ SIGEXIT, $process, $status ]);
+            # let link know we exited
+            $process->send( $link, [ SIGEXIT, $process, $status ] );
         }
     }
+
+    # remove self from the process table ...
+    delete $self->{_process_table}->{ $process->pid };
+
+    # XXX:
+    # - what about removing messages?
+    #    - if we ignore calls to unknown PIDs or unregistered processes this doesnt matter
+    # - we cannot easily remove callbacks that know about this?
 
     return;
 }
@@ -98,9 +107,11 @@ sub tick ($self) {
                 unless exists $self->{_process_table}->{ $to_proc };
             $to_proc = $self->{_process_table}->{ $to_proc };
         }
-
-        #use Data::Dumper;
-        #warn Dumper { MessageToBeDelivered => 1, event => $event, proc => $to_proc->pid };
+        # if we have an Object, make sure it is active1
+        else {
+            die "The process PID(".$to_proc->pid.") is not active"
+                unless exists $self->{_process_table}->{ $to_proc->pid };
+        }
 
         eval {
             $to_proc->accept( $event );

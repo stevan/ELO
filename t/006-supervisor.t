@@ -66,7 +66,7 @@ sub Supervisor ($this, $msg) {
 
             delete $active_workers{$this}->{ $from->pid };
 
-            $this->unlink( $from );
+            $this->unlink( $from ); # <- technically redundant, the exiting process already clear them
             $this->exit(0) if not scalar keys $active_workers{$this}->%*;
         }
     };
