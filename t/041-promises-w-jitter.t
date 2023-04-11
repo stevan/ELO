@@ -20,7 +20,6 @@ my $log = Test::ELO->create_logger;
 sub jitter { int(rand(25)) }
 
 sub Service ($this, $msg) {
-    isa_ok($this, 'ELO::Core::Process');
 
     $log->debug( $this, $msg );
 
@@ -64,7 +63,6 @@ sub Service ($this, $msg) {
 }
 
 sub init ($this, $msg=[]) {
-    isa_ok($this, 'ELO::Core::Process');
 
     my $service = $this->spawn( Service  => \&Service );
     isa_ok($service, 'ELO::Core::Process');

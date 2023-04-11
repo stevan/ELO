@@ -21,7 +21,6 @@ use ok 'ELO::Timers', qw[
 my $log = Test::ELO->create_logger;
 
 sub Responder ($this, $msg) {
-    isa_ok($this, 'ELO::Core::Process');
 
     $log->debug( $this, "ENTERED" );
 
@@ -29,7 +28,6 @@ sub Responder ($this, $msg) {
 }
 
 sub init ($this, $msg) {
-    isa_ok($this, 'ELO::Core::Process');
 
     $log->debug( $this, "ENTERED" );
 

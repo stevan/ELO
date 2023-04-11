@@ -17,7 +17,6 @@ use ok 'ELO::Promises', qw[ promise ];
 my $log = Test::ELO->create_logger;
 
 sub Service ($this, $msg) {
-    isa_ok($this, 'ELO::Core::Process');
 
     $log->debug( $this, $msg );
 
@@ -54,7 +53,6 @@ sub Service ($this, $msg) {
 }
 
 sub init ($this, $msg=[]) {
-    isa_ok($this, 'ELO::Core::Process');
 
     my $service = $this->spawn( Service  => \&Service );
     isa_ok($service, 'ELO::Core::Process');

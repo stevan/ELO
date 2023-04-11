@@ -7,32 +7,67 @@ use Scalar::Util 'blessed';
 
 use ELO::Core::Process;
 
+use constant SIGEXIT => 'SIGEXIT';
+use constant SIGTERM => 'SIGTERM';
+
 use parent 'UNIVERSAL::Object::Immutable';
 use slots (
     # ...
     _process_table  => sub { +{} },
+    _process_links  => sub { +{} },
     _message_queue  => sub { +[] },
     _callback_queue => sub { +[] },
 );
 
 sub create_process ($self, $name, $f, $env=undef, $parent=undef) {
-    my $proc = ELO::Core::Process->new(
+    my $process = ELO::Core::Process->new(
         name   => $name,
         func   => $f,
         loop   => $self,
         parent => $parent,
         env    => $env,
     );
-    $self->{_process_table}->{ $proc->pid } = $proc;
-    return $proc;
+    $self->{_process_table}->{ $process->pid } = $process;
+    return $process;
+}
+
+sub destroy_process ($self, $process, $status) {
+    # NOTE: ignore if the PID does not exist (for now)
+    delete $self->{_process_table}->{ $process->pid };
+
+    if ( my $links = $self->{_process_links}->{ $process->pid } ) {
+        foreach my $link (@$links) {
+            $link->send_to_self([ SIGEXIT, $process, $status ]);
+        }
+    }
+
+    return;
+}
+
+sub link_process ($self, $to_process, $from_process) {
+    my $links = $self->{_process_links}->{ $from_process->pid } //= [];
+    push @$links => $to_process;
+    return;
+}
+
+sub unlink_process ($self, $to_process, $from_process) {
+    #use Data::Dump; Data::Dump::dump( { unlink => $to_process->pid, from => $from_process->pid });
+    if ( my $links = $self->{_process_links}->{ $from_process->pid } ) {
+        #use Data::Dump; Data::Dump::dump( { unlink => $to_process->pid, from => $from_process->pid, links => [ map { $_->pid } @$links ] });
+        @$links = grep { $_->pid ne $to_process->pid } @$links;
+        #use Data::Dump; Data::Dump::dump( { unlink => $to_process->pid, from => $from_process->pid, links => [ map { $_->pid } @$links ] });
+    }
+    return;
 }
 
 sub enqueue_msg ($self, $msg) {
     push $self->{_message_queue}->@* => $msg;
+    return;
 }
 
 sub next_tick ($self, $f) {
     push $self->{_callback_queue}->@* => $f;
+    return;
 }
 
 sub tick ($self) {
@@ -76,6 +111,8 @@ sub tick ($self) {
             die "Message to (".$to_proc->pid.") failed with msg(".(join ', ' => @{ $event // []}).") because: $e";
         };
     }
+
+    return;
 }
 
 sub loop ($self, $logger=undef) {

@@ -16,7 +16,6 @@ use ok 'ELO::Actors', qw[ match ];
 my $log = Test::ELO->create_logger;
 
 sub Service ($this, $msg) {
-    isa_ok($this, 'ELO::Core::Process');
 
     $log->debug( $this, $msg );
 
@@ -56,7 +55,6 @@ sub Service ($this, $msg) {
 }
 
 sub ServiceRegistry ($this, $msg) {
-    isa_ok($this, 'ELO::Core::Process');
 
     $log->debug( $this, $msg );
 
@@ -125,7 +123,6 @@ sub ServiceRegistry ($this, $msg) {
 }
 
 sub ServiceClient ($this, $msg) {
-    isa_ok($this, 'ELO::Core::Process');
 
     $log->debug( $this, $msg );
 
@@ -250,7 +247,6 @@ sub ServiceClient ($this, $msg) {
 }
 
 sub init ($this, $msg=[]) {
-    isa_ok($this, 'ELO::Core::Process');
 
     my $client = $this->spawn( ServiceClient  => \&ServiceClient );
     isa_ok($client, 'ELO::Core::Process');

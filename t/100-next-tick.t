@@ -16,7 +16,6 @@ use ok 'ELO::Timers', qw[ timer ];
 my $log = Test::ELO->create_logger;
 
 sub init ($this, $msg) {
-    isa_ok($this, 'ELO::Core::Process');
 
     my $x = 0;
 

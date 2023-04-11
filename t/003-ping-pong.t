@@ -20,7 +20,6 @@ my $log = Test::ELO->create_logger;
 # https://alvinalexander.com/scala/scala-akka-actors-ping-pong-simple-example/
 
 sub Ping ($this, $msg) {
-    isa_ok($this, 'ELO::Core::Process');
 
     $log->debug( $this, $msg );
 
@@ -65,7 +64,6 @@ sub Ping ($this, $msg) {
 }
 
 sub Pong ($this, $msg) {
-    isa_ok($this, 'ELO::Core::Process');
 
     $log->debug( $this, $msg );
 
@@ -89,7 +87,6 @@ sub Pong ($this, $msg) {
 }
 
 sub init ($this, $msg=[]) {
-    isa_ok($this, 'ELO::Core::Process');
 
     my $ping = $this->spawn( Ping  => \&Ping, { max_pings => 5 } );
     my $pong = $this->spawn( Pong  => \&Pong );

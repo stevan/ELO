@@ -11,6 +11,12 @@
     - kill()
     - signal()
 
+- signals
+
+    SIGEXIT      Child has stopped or terminated
+    SIGTERM      Termination signal
+
+
 - review code to
     - make sure we catch/handle all exceptions
 

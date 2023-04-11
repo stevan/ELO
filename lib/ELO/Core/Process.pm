@@ -53,6 +53,18 @@ sub send_to_self ($self, $event) {
     $self->{loop}->enqueue_msg([ $self, $event ]);
 }
 
+sub link ($self, $process) {
+    $self->{loop}->link_process( $self, $process );
+}
+
+sub unlink ($self, $process) {
+    $self->{loop}->unlink_process( $self, $process );
+}
+
+sub exit ($self, $status=0) {
+    $self->{loop}->destroy_process( $self, $status );
+}
+
 # ...
 
 sub accept ($self, $event) {

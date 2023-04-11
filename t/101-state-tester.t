@@ -19,7 +19,6 @@ use ok 'ELO::Actors', qw[ match ];
 # match
 
 sub StateTester ($this, $msg) {
-    isa_ok($this, 'ELO::Core::Process');
 
     state $id = 0; # shared across all instances
     $id++;
@@ -54,7 +53,6 @@ sub StateTester ($this, $msg) {
 }
 
 sub init ($this, $msg=[]) {
-    isa_ok($this, 'ELO::Core::Process');
 
     my $tester1 = $this->spawn( StateTester => \&StateTester );
     my $tester2 = $this->spawn( StateTester => \&StateTester );

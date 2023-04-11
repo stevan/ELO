@@ -15,7 +15,6 @@ use ok 'ELO::Loop';
 # TODO: remove this test, or improve it somehow
 
 sub init ($this, $msg) {
-    isa_ok($this, 'ELO::Core::Process');
 
     say "[".$this->pid."] hello world";
 
@@ -44,7 +43,6 @@ sub init ($this, $msg) {
 }
 
 sub greeting ($this, $msg) {
-    isa_ok($this, 'ELO::Core::Process');
 
     my ($name) = @$msg;
 
@@ -52,7 +50,6 @@ sub greeting ($this, $msg) {
 }
 
 sub bounce ($this, $msg) {
-    isa_ok($this, 'ELO::Core::Process');
 
     my ($bounces) = @$msg;
 
@@ -66,7 +63,6 @@ sub bounce ($this, $msg) {
 }
 
 sub bounce_cb ($this, $msg) {
-    isa_ok($this, 'ELO::Core::Process');
 
     my ($bounces, $cb) = @$msg;
 

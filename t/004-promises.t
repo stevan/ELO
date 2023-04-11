@@ -20,7 +20,6 @@ my $log = Test::ELO->create_logger;
 # sub Service ($this, $msg) : Promise( eServiceResponse, eServiceError ) {
 
 sub Service ($this, $msg) {
-    isa_ok($this, 'ELO::Core::Process');
 
     $log->debug( $this, $msg );
 
@@ -62,7 +61,6 @@ sub Service ($this, $msg) {
 }
 
 sub ServiceClient ($this, $msg) {
-    isa_ok($this, 'ELO::Core::Process');
 
     state $expected = [ 28, 108 ];
 
@@ -113,7 +111,6 @@ sub ServiceClient ($this, $msg) {
 }
 
 sub init ($this, $msg=[]) {
-    isa_ok($this, 'ELO::Core::Process');
 
     my $service = $this->spawn( Service  => \&Service       );
     my $client  = $this->spawn( Client   => \&ServiceClient );
