@@ -35,7 +35,7 @@ sub destroy_process ($self, $process, $status) {
     # NOTE: ignore if the PID does not exist (for now)
     delete $self->{_process_table}->{ $process->pid };
 
-    if ( my $links = $self->{_process_links}->{ $process->pid } ) {
+    if ( my $links = delete $self->{_process_links}->{ $process->pid } ) {
         foreach my $link (@$links) {
             $link->send_to_self([ SIGEXIT, $process, $status ]);
         }
