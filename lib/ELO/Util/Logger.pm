@@ -44,7 +44,7 @@ use parent 'UNIVERSAL::Object::Immutable';
 use slots (
     filehandle => sub { \*STDERR },
     max_level  => sub { FATAL },
-    min_level  => sub { $ENV{ELO_DEBUG} ? DEBUG : ($ENV{ELO_LOG} // INFO) },
+    min_level  => sub { $ENV{ELO_DEBUG} ? DEBUG : ($ENV{ELO_LOG} || INFO) },
 );
 
 sub BUILD ($self, $) {
@@ -135,8 +135,8 @@ sub tick ($self, $level, $loop, $tick, $msg=undef) {
     $out .= ('-' x ($MAX_LINE_WIDTH - length($out)));
 
     $self->{filehandle}->print(
-        colored( $out, 'grey20' ),
-        ($level == DEBUG ? ("\n".colored( lpad(dump_msg($loop)), 'italic grey20' )) : ()),
+        colored( $out, 'grey15' ),
+        ($level == DEBUG ? ("\n".colored( lpad(dump_msg($loop)), 'italic grey15' )) : ()),
         "\n"
     );
 }

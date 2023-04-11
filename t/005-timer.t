@@ -21,14 +21,20 @@ use ok 'ELO::Timers', qw[
 my $log = Test::ELO->create_logger;
 
 sub Responder ($this, $msg) {
+    isa_ok($this, 'ELO::Core::Process');
+
     $log->debug( $this, "ENTERED" );
 
     $log->info( $this, $msg );
 }
 
 sub init ($this, $msg) {
+    isa_ok($this, 'ELO::Core::Process');
+
     $log->debug( $this, "ENTERED" );
+
     my $r = $this->spawn( Responder => \&Responder );
+    isa_ok($r, 'ELO::Core::Process');
 
     my $t0 = timer( $this, 0, [ $r, ['Hello ... timeout(0)'] ] );
     my $t1 = timer( $this, 1, [ $r, ['Hello ... timeout(1)'] ] );

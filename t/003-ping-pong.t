@@ -20,6 +20,7 @@ my $log = Test::ELO->create_logger;
 # https://alvinalexander.com/scala/scala-akka-actors-ping-pong-simple-example/
 
 sub Ping ($this, $msg) {
+    isa_ok($this, 'ELO::Core::Process');
 
     $log->debug( $this, $msg );
 
@@ -37,6 +38,8 @@ sub Ping ($this, $msg) {
 
     match $msg, +{
         eStartPing => sub ( $pong ) {
+            isa_ok($pong, 'ELO::Core::Process');
+
             $count{$this}++;
             $log->info( $this, " Starting with (".$count{$this}.")" );
             $this->send( $pong, [ ePing => $this ]);
@@ -44,6 +47,8 @@ sub Ping ($this, $msg) {
             pass('... '.$this->name.' started with '.$this->env('max_pings').' max pings');
         },
         ePong => sub ( $pong ) {
+            isa_ok($pong, 'ELO::Core::Process');
+
             $count{$this}++;
             $log->info( $this, " Pong with (".$count{$this}.")" );
             if ( $count{$this} >= $this->env('max_pings') ) {
@@ -60,6 +65,7 @@ sub Ping ($this, $msg) {
 }
 
 sub Pong ($this, $msg) {
+    isa_ok($this, 'ELO::Core::Process');
 
     $log->debug( $this, $msg );
 
@@ -69,6 +75,8 @@ sub Pong ($this, $msg) {
 
     match $msg, +{
         ePing => sub ( $ping ) {
+            isa_ok($ping, 'ELO::Core::Process');
+
             $log->info( $this, " ... Ping" );
             $this->send( $ping, [ ePong => $this ]);
         },
@@ -81,13 +89,21 @@ sub Pong ($this, $msg) {
 }
 
 sub init ($this, $msg=[]) {
+    isa_ok($this, 'ELO::Core::Process');
+
     my $ping = $this->spawn( Ping  => \&Ping, { max_pings => 5 } );
     my $pong = $this->spawn( Pong  => \&Pong );
+
+    isa_ok($ping, 'ELO::Core::Process');
+    isa_ok($pong, 'ELO::Core::Process');
 
     $this->send( $ping, [ eStartPing => $pong ]);
 
     my $ping2 = $this->spawn( Ping2  => \&Ping, { max_pings => 10 });
     my $pong2 = $this->spawn( Pong2  => \&Pong );
+
+    isa_ok($ping2, 'ELO::Core::Process');
+    isa_ok($pong2, 'ELO::Core::Process');
 
     $this->send( $ping2, [ eStartPing => $pong2 ]);
 }

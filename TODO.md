@@ -1,19 +1,16 @@
 # ELO TODO
 
-- Process needs
-    - despawn()
-
-- we need to add
-    - waitpid()
-    - kill()
-
 -----------------------------------------------------------
 ## General
 -----------------------------------------------------------
 
 ### To Do
 
-- convert tests into proper perl tests
+- we need to add something akin to ???
+    - waitpid()
+    - kill()
+    - signal()
+
 - review code to
     - make sure we catch/handle all exceptions
 

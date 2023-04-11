@@ -17,6 +17,7 @@ use ok 'ELO::Promises', qw[ promise ];
 my $log = Test::ELO->create_logger;
 
 sub Service ($this, $msg) {
+    isa_ok($this, 'ELO::Core::Process');
 
     $log->debug( $this, $msg );
 
@@ -27,6 +28,8 @@ sub Service ($this, $msg) {
         eServiceRequest => sub ($action, $args, $promise) {
             $log->debug( $this, "HELLO FROM Service :: eServiceRequest" );
             $log->debug( $this, +{ action => $action, args => $args, promise => $promise });
+
+            isa_ok($promise, 'ELO::Core::Promise');
 
             my ($x, $y) = @$args;
 
@@ -51,17 +54,29 @@ sub Service ($this, $msg) {
 }
 
 sub init ($this, $msg=[]) {
+    isa_ok($this, 'ELO::Core::Process');
+
     my $service = $this->spawn( Service  => \&Service );
+    isa_ok($service, 'ELO::Core::Process');
 
     my $promise = promise;
+    isa_ok($promise, 'ELO::Core::Promise');
 
     $this->send( $service,
         [ eServiceRequest => ( add => [ 2, 2 ], $promise ) ]
     );
 
     $promise->then(
-        sub ($event) { $log->info( $this, $event ) },
-        sub ($error) { $log->error( $this, $error ) }
+        sub ($result) {
+            $log->info( $this, $result );
+
+            is($result->[1], 4, '... got the expected result');
+        },
+        sub ($error)  {
+            $log->error( $this, $error );
+
+            fail('... got an unexpected error: '.$error);
+        },
     );
 }
 

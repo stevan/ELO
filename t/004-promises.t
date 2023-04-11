@@ -20,6 +20,7 @@ my $log = Test::ELO->create_logger;
 # sub Service ($this, $msg) : Promise( eServiceResponse, eServiceError ) {
 
 sub Service ($this, $msg) {
+    isa_ok($this, 'ELO::Core::Process');
 
     $log->debug( $this, $msg );
 
@@ -35,6 +36,8 @@ sub Service ($this, $msg) {
         eServiceRequest => sub ($action, $args, $promise) {
             $log->debug( $this, "HELLO FROM Service :: eServiceRequest" );
             $log->debug( $this, +{ action => $action, args => $args, promise => $promise });
+
+            isa_ok($promise, 'ELO::Core::Promise');
 
             my ($x, $y) = @$args;
 
@@ -59,6 +62,9 @@ sub Service ($this, $msg) {
 }
 
 sub ServiceClient ($this, $msg) {
+    isa_ok($this, 'ELO::Core::Process');
+
+    state $expected = [ 28, 108 ];
 
     $log->debug( $this, $msg );
 
@@ -66,12 +72,15 @@ sub ServiceClient ($this, $msg) {
 
         # Requests ...
         eServiceClientRequest => sub ($service, $action, $args) {
+            isa_ok($service, 'ELO::Core::Process');
+
             $log->debug( $this, "HELLO FROM ServiceClient :: eServiceClientRequest" );
             $log->debug( $this, +{ service => $service, action => $action, args => $args });
 
             my @promises;
             foreach my $op ( @$args ) {
                 my $p = promise;
+                isa_ok($p, 'ELO::Core::Promise');
                 $this->send( $service, [ eServiceRequest => ( @$op, $p ) ]);
                 push @promises => $p;
             }
@@ -88,16 +97,29 @@ sub ServiceClient ($this, $msg) {
                     }
                 )
                 ->then(
-                    sub ($result) { $log->info( $this, $result ) },
-                    sub ($error)  { $log->error( $this, $error ) },
+                    sub ($result) {
+                        $log->info( $this, $result );
+
+                        is($result, (shift @$expected), '... got the expected result');
+                    },
+                    sub ($error)  {
+                        $log->error( $this, $error );
+
+                        fail('... got an unexpected error: '.$error);
+                    },
                 );
         },
     }
 }
 
 sub init ($this, $msg=[]) {
+    isa_ok($this, 'ELO::Core::Process');
+
     my $service = $this->spawn( Service  => \&Service       );
     my $client  = $this->spawn( Client   => \&ServiceClient );
+
+    isa_ok($service, 'ELO::Core::Process');
+    isa_ok($client, 'ELO::Core::Process');
 
     $this->send( $client, [
         eServiceClientRequest => (

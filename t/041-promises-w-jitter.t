@@ -20,6 +20,7 @@ my $log = Test::ELO->create_logger;
 sub jitter { int(rand(25)) }
 
 sub Service ($this, $msg) {
+    isa_ok($this, 'ELO::Core::Process');
 
     $log->debug( $this, $msg );
 
@@ -30,6 +31,8 @@ sub Service ($this, $msg) {
         eServiceRequest => sub ($action, $args, $promise) {
             $log->debug( $this, "HELLO FROM Service :: eServiceRequest" );
             $log->debug( $this, +{ action => $action, args => $args, promise => $promise });
+
+            isa_ok($promise, 'ELO::Core::Promise');
 
             my $timeout = jitter();
             timer(
@@ -61,11 +64,16 @@ sub Service ($this, $msg) {
 }
 
 sub init ($this, $msg=[]) {
+    isa_ok($this, 'ELO::Core::Process');
+
     my $service = $this->spawn( Service  => \&Service );
+    isa_ok($service, 'ELO::Core::Process');
 
     my @promises;
     foreach my $i (0 .. 10) {
         my $promise = promise;
+        isa_ok($promise, 'ELO::Core::Promise');
+
         my $timeout = jitter();
         timer(
             $this,
@@ -96,7 +104,11 @@ sub init ($this, $msg=[]) {
                     '... got the expected response values'
                 );
             },
-            sub ($error) { $log->error( $this, $error ) }
+            sub ($error)  {
+                $log->error( $this, $error );
+
+                fail('... got an unexpected error: '.$error);
+            },
         );
 }
 
