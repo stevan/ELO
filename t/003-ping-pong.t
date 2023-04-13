@@ -14,6 +14,8 @@ use Hash::Util qw[fieldhash];
 use ok 'ELO::Loop';
 use ok 'ELO::Actors', qw[ match ];
 
+use ok 'ELO::Core::Constants', qw[ $SIGEXIT ];
+
 my $log = Test::ELO->create_logger;
 
 # See Akka Example:
@@ -55,6 +57,7 @@ sub Ping ($this, $msg) {
                 $this->send( $pong, [ 'eStop' ]);
 
                 pass('... '.$this->name.' finished with '.$count{$this}.' pings');
+                $this->exit(0);
             }
             else {
                 $this->send( $pong, [ ePing => $this ]);
@@ -88,21 +91,48 @@ sub Pong ($this, $msg) {
 
 sub init ($this, $msg=[]) {
 
-    my $ping = $this->spawn( Ping  => \&Ping, { max_pings => 5 } );
-    my $pong = $this->spawn( Pong  => \&Pong );
+    state $ping = $this->spawn( Ping  => \&Ping, { max_pings => 5 } );
+    state $pong = $this->spawn( Pong  => \&Pong );
 
-    isa_ok($ping, 'ELO::Core::Process');
-    isa_ok($pong, 'ELO::Core::Process');
+    state $ping2 = $this->spawn( Ping2  => \&Ping, { max_pings => 10 });
+    state $pong2 = $this->spawn( Pong2  => \&Pong );
 
-    $this->send( $ping, [ eStartPing => $pong ]);
+    unless ($msg && @$msg) {
+        isa_ok($ping, 'ELO::Core::Process');
+        isa_ok($pong, 'ELO::Core::Process');
 
-    my $ping2 = $this->spawn( Ping2  => \&Ping, { max_pings => 10 });
-    my $pong2 = $this->spawn( Pong2  => \&Pong );
+        isa_ok($ping2, 'ELO::Core::Process');
+        isa_ok($pong2, 'ELO::Core::Process');
 
-    isa_ok($ping2, 'ELO::Core::Process');
-    isa_ok($pong2, 'ELO::Core::Process');
+        # link the ping/pong pairs ...
+        # it doesn't matter which way we link
+        # they are bi-directional
 
-    $this->send( $ping2, [ eStartPing => $pong2 ]);
+        $ping->link( $pong );
+        $pong2->link( $ping2 );
+
+        $this->send( $ping,  [ eStartPing => $pong  ]);
+        $this->send( $ping2, [ eStartPing => $pong2 ]);
+
+        # set our process up to link to all
+        # these processes, so we can see when
+        # they exit
+
+        $this->trap( $SIGEXIT );
+        $this->link( $_ ) foreach ($ping, $pong, $ping2, $pong2);
+
+        return;
+    }
+
+    state $expected = [ $ping, $pong, $ping2, $pong2 ];
+
+    match $msg, +{
+        $SIGEXIT => sub ($from) {
+            $log->warn( $this, '... got SIGEXIT from ('.$from->pid.')');
+
+            is($from, shift(@$expected), '... got the expected process');
+        }
+    }
 }
 
 ELO::Loop->run( \&init, logger => $log );
