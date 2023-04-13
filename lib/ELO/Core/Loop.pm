@@ -187,7 +187,7 @@ sub tick ($self) {
         };
 
         # is the signal trapped?
-        if ( $to_proc->is_trapped( $signal ) ) {
+        if ( $to_proc->is_trapping( $signal ) ) {
 
             # convert this into a message
             $to_proc->accept( [ $signal, @$event ] );

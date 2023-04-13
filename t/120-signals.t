@@ -1,4 +1,3 @@
-
 #!perl
 
 use v5.24;
@@ -26,27 +25,32 @@ sub SigExitCatcher ($this, $msg) {
     match $msg, +{
         $SIGEXIT => sub ($from) {
             $log->info( $this, "Got $SIGEXIT from (".$from->pid."), ignoring");
+            pass('... got the SIGEXIT in SigExitCatcher, as we expected');
         }
     }
 }
 
 sub SigExitIgnore ($this, $msg) {
 
-    $log->info( $this, '... got message, ignoring');
-
-    match $msg, +{};
+    $log->error( $this, '... got message in SigExitIgnore, this should not happen');
+    fail('... we should never get a message here');
 }
 
 sub init ($this, $msg) {
 
+    state $t1 = $this->spawn( SigExitCatcher => \&SigExitCatcher );
+    state $t2 = $this->spawn( SigExitIgnore => \&SigExitIgnore );
+
     unless ($msg && @$msg) {
 
-
-        my $t1 = $this->spawn( SigExitCatcher => \&SigExitCatcher );
-        my $t2 = $this->spawn( SigExitIgnore => \&SigExitIgnore );
+        isa_ok($t1, 'ELO::Core::Process');
+        isa_ok($t2, 'ELO::Core::Process');
 
         $this->trap( $SIGEXIT );
         $t1->trap( $SIGEXIT );
+
+        ok($this->is_trapping( $SIGEXIT ), '... init can trap SIGEXIT');
+        ok($t1->is_trapping( $SIGEXIT ), '... t1 can trap SIGEXIT');
 
         $log->info( $this, '... linking to '.$t1->pid);
         $this->link( $t1 );
@@ -72,9 +76,13 @@ sub init ($this, $msg) {
         return;
     }
 
+    state $expected = [ $t2, $t1 ];
+
     match $msg, +{
         $SIGEXIT => sub ($from) {
-            $log->info( $this, '... got SIGEXIT from ('.$from->pid.')');
+            $log->warn( $this, '... got SIGEXIT from ('.$from->pid.')');
+
+            is($from, shift(@$expected), '... got the expected process');
         }
     }
 }

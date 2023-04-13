@@ -70,7 +70,7 @@ sub trap ($self, $signal) {
     $self->{_trap_signals}->{ $signal }++;
 }
 
-sub is_trapped ($self, $signal) {
+sub is_trapping ($self, $signal) {
     !! exists $self->{_trap_signals}->{ $signal };
 }
 
