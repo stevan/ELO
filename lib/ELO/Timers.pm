@@ -3,7 +3,7 @@ use v5.24;
 use warnings;
 use experimental qw[ signatures lexical_subs postderef ];
 
-use constant DEBUG => $ENV{DEBUG} || 0;
+use constant DEBUG => $ENV{TIMER_DEBUG} || 0;
 
 use Exporter 'import';
 
@@ -39,8 +39,11 @@ sub interval ($this, $duration, $callback) {
 
         warn "!!! Interval($interval) tick ... interval($timeout)\n" if DEBUG > 2;
         if ($timeout <= 1) {
-            warn "<< Interval($interval) done!\n" if DEBUG;
-            $this->loop->next_tick($cb);
+            warn "<< Interval($interval) call!\n" if DEBUG;
+            $this->loop->next_tick(sub {
+                # just to be sure, check the tid
+                $$tid or $cb->()
+            });
             $timeout = $duration;
             $this->loop->next_tick($interval);
         }
@@ -82,7 +85,10 @@ sub timer ($this, $timeout, $callback) {
         warn "!!! Timer($timer) tick ... timeout($timeout)\n" if DEBUG > 2;
         if ($timeout <= 0) {
             warn "<< Timer($timer) done!\n" if DEBUG;
-            $this->loop->next_tick($cb);
+            $this->loop->next_tick(sub {
+                # just to be sure, check the tid
+                $$tid or $cb->()
+            });
         }
         else {
             warn ">> Timer($timer) still waiting ...\n" if DEBUG > 2;
