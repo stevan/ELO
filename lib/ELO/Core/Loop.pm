@@ -6,12 +6,7 @@ use experimental qw[ signatures lexical_subs postderef ];
 use Scalar::Util 'blessed';
 
 use ELO::Core::Process;
-
-our $SIGEXIT = 'SIGEXIT';
-
-our %SIG_HANDLERS = (
-    $SIGEXIT => sub ($p) { $p->exit(1) },
-);
+use ELO::Core::Constants qw[ $SIGEXIT ];
 
 use parent 'UNIVERSAL::Object::Immutable';
 use slots (
@@ -118,19 +113,12 @@ sub lookup_process ($self, $to_proc) {
 
 sub tick ($self) {
 
-    my @cb_queue = $self->{_callback_queue}->@*;
-    $self->{_callback_queue}->@* = ();
-
-    while (@cb_queue) {
-        my $f = shift @cb_queue;
-        eval {
-            $f->(); 1;
-        } or do {
-            my $e = $@;
-            die "Callback failed ($f) because: $e";
-        };
-    }
-
+    # Signals are handled first, as they
+    # are meant to be async interrupts
+    # (ala unix signals) but we wont
+    # interrupt any other code, so we
+    # do the next best-ish thing by
+    # handling the signals first
     my @sig_queue = $self->{_signal_queue}->@*;
     $self->{_signal_queue}->@* = ();
 
@@ -151,7 +139,25 @@ sub tick ($self) {
             1;
         } or do {
             my $e = $@;
-            die "Message to (".$to_proc->pid.") failed with sig($signal, ".(join ', ' => @{ $event // []}).") because: $e";
+            die "Unhandled signal for (".$to_proc->pid.") failed with sig($signal, ".(join ', ' => @{ $event // []}).") because: $e";
+        };
+    }
+
+    # next comes the Callback queue, these are
+    # meant to be kind of internal events, and
+    # so they need some priority, though not as
+    # much as the signals, hence their place in
+    # this ordering.
+    my @cb_queue = $self->{_callback_queue}->@*;
+    $self->{_callback_queue}->@* = ();
+
+    while (@cb_queue) {
+        my $f = shift @cb_queue;
+        eval {
+            $f->(); 1;
+        } or do {
+            my $e = $@;
+            die "Callback failed ($f) because: $e";
         };
     }
 
@@ -184,7 +190,10 @@ sub loop ($self, $logger=undef) {
     $logger->tick( $logger->DEBUG, $self, $tick, 'INIT' )  if $logger;
     $logger->tick( $logger->INFO,  $self, $tick, 'START' ) if $logger;
 
-    while ( $self->{_message_queue}->@* || $self->{_callback_queue}->@* ) {
+    while ( $self->{_signal_queue}->@*   ||
+            $self->{_callback_queue}->@* ||
+            $self->{_message_queue}->@*  ){
+
         $logger->tick( $logger->INFO, $self, $tick ) if $logger;
         $self->tick;
         $tick++

@@ -3,7 +3,7 @@ use v5.24;
 use warnings;
 use experimental qw[ signatures lexical_subs postderef ];
 
-our $PIDS = 0;
+my $PIDS = 0;
 
 use parent 'UNIVERSAL::Object::Immutable';
 use slots (
@@ -13,6 +13,7 @@ use slots (
     parent => sub { die 'A `parent` is required' },
     # ...
     _pid           => sub {},
+    _flags         => sub {},
     _sig_handlers  => sub {},
     _msg_inbox     => sub {},
     _environment   => sub {},
@@ -20,6 +21,7 @@ use slots (
 
 sub BUILD ($self, $params) {
     $self->{_pid}          = sprintf '%03d:%s' => ++$PIDS, $self->{name};
+    $self->{_flags}        = [];
     $self->{_sig_handlers} = {};
     $self->{_msg_inbox}    = [];
     $self->{_environment}  = { ($params->{env} // $params->{ENV} // {})->%* };

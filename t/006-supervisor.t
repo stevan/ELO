@@ -91,7 +91,7 @@ sub init ($this, $msg) {
 
     # catch the trapped exits
     match $msg, +{
-        SIGEXIT => sub ($from, $status) {
+        SIGEXIT => sub ($from) {
             isa_ok($from, 'ELO::Core::Process', 'SIGEXIT($from='.$from->pid.')');
             $log->info( $this, '... trapped EXIT from Supervisor' );
 
