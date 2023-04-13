@@ -12,9 +12,8 @@ use Data::Dump;
 use Hash::Util qw[fieldhash];
 
 use ok 'ELO::Loop';
-use ok 'ELO::Actors', qw[ match ];
-
-use ok 'ELO::Core::Constants', qw[ $SIGEXIT ];
+use ok 'ELO::Actors',    qw[ match ];
+use ok 'ELO::Constants', qw[ $SIGEXIT ];
 
 my $log = Test::ELO->create_logger;
 

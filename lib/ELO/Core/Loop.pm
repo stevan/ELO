@@ -7,7 +7,7 @@ use Carp         'confess';
 use Scalar::Util 'blessed';
 
 use ELO::Core::Process;
-use ELO::Core::Constants qw[ $SIGEXIT ];
+use ELO::Constants qw[ $SIGEXIT ];
 
 use parent 'UNIVERSAL::Object::Immutable';
 use slots (

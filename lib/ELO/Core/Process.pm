@@ -5,7 +5,7 @@ use experimental qw[ signatures lexical_subs postderef ];
 
 my $PIDS = 0;
 
-use ELO::Core::Constants qw[ $SIGEXIT ];
+use ELO::Constants qw[ $SIGEXIT ];
 
 use parent 'UNIVERSAL::Object::Immutable';
 use slots (
