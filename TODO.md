@@ -11,10 +11,22 @@
     - kill()
     - signal()
 
+- links & monitors
+    - links are bi-directional, and signals can be sent from either side
+    - monitors are uni-directional, and only the monitor receieves from the watched items
+
 - signals
 
     SIGEXIT      Child has stopped or terminated
     SIGTERM      Termination signal
+
+    - should untrapped signals be interpretted as the signal itself being sent?
+        - parent creates & links child
+        - child dies and sendts SIGEXIT
+        - parent either:
+            - catches SIGEXIT and handles it
+            - or doesn't catch it and treats it as a SIGEXIT sent to itself
+    - basically should we propogate signals from child to parent?
 
 
 - review code to

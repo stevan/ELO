@@ -12,21 +12,23 @@ use slots (
     loop   => sub { die 'A `loop` is required'   },
     parent => sub { die 'A `parent` is required' },
     # ...
-    _pid   => sub {},
-    _queue => sub {},
-    _env   => sub {},
+    _pid           => sub {},
+    _sig_handlers  => sub {},
+    _msg_inbox     => sub {},
+    _environment   => sub {},
 );
 
 sub BUILD ($self, $params) {
-    $self->{_pid}   = sprintf '%03d:%s' => ++$PIDS, $self->{name};
-    $self->{_queue} = [];
-    $self->{_env}   = { ($params->{env} // $params->{ENV} // {})->%* };
+    $self->{_pid}          = sprintf '%03d:%s' => ++$PIDS, $self->{name};
+    $self->{_sig_handlers} = {};
+    $self->{_msg_inbox}    = [];
+    $self->{_environment}  = { ($params->{env} // $params->{ENV} // {})->%* };
 }
 
 sub pid ($self) { $self->{_pid} }
 
 sub env ($self, $key) {
-    $self->{_env}->{ $key };
+    $self->{_environment}->{ $key };
     # XXX - should we check the parent
     # if we find nothing in the local?
 }
@@ -45,13 +47,25 @@ sub spawn ($self, $name, $f, $env=undef) {
     $self->{loop}->create_process( $name, $f, $env, $self );
 }
 
-sub send ($self, $proc, $event) :method {
+sub exit ($self, $status=0) {
+    $self->{loop}->destroy_process( $self, $status );
+}
+
+# ...
+
+sub signal ($self, $proc, $signal, $event) {
+    $self->{loop}->enqueue_signal([ $proc, $signal, $event ]);
+}
+
+sub send ($self, $proc, $event) : method {
     $self->{loop}->enqueue_msg([ $proc, $event ]);
 }
 
 sub send_to_self ($self, $event) {
     $self->{loop}->enqueue_msg([ $self, $event ]);
 }
+
+# ...
 
 sub link ($self, $process) {
     $self->{loop}->link_process( $self, $process );
@@ -61,18 +75,17 @@ sub unlink ($self, $process) {
     $self->{loop}->unlink_process( $self, $process );
 }
 
-sub exit ($self, $status=0) {
-    $self->{loop}->destroy_process( $self, $status );
-}
-
 # ...
 
 sub accept ($self, $event) {
-    push $self->{_queue}->@* => $event;
+    push $self->{_msg_inbox}->@* => $event;
 }
 
 sub tick ($self) {
-    my $event = shift $self->{_queue}->@*;
+    my $event = shift $self->{_msg_inbox}->@*;
+    # XXX
+    # should we add a trampoline here to catch
+    # the exits and turn them into signals?
     $self->{func}->( $self, $event );
 }
 

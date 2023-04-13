@@ -7,15 +7,20 @@ use Scalar::Util 'blessed';
 
 use ELO::Core::Process;
 
-use constant SIGEXIT => 'SIGEXIT';
-use constant SIGTERM => 'SIGTERM';
+our $SIGEXIT = 'SIGEXIT';
+
+our %SIG_HANDLERS = (
+    $SIGEXIT => sub ($p) { $p->exit(1) },
+);
 
 use parent 'UNIVERSAL::Object::Immutable';
 use slots (
     # ...
     _process_table  => sub { +{} },
     _process_links  => sub { +{} },
+
     _message_queue  => sub { +[] },
+    _signal_queue   => sub { +[] },
     _callback_queue => sub { +[] },
 );
 
@@ -38,7 +43,7 @@ sub destroy_process ($self, $process, $status) {
     if ( my $links = delete $self->{_process_links}->{ $process->pid } ) {
         foreach my $link (@$links) {
             # let link know we exited
-            $process->send( $link, [ SIGEXIT, $process, $status ] );
+            $process->signal( $link, $SIGEXIT, [ $process ] );
         }
     }
 
@@ -69,14 +74,46 @@ sub unlink_process ($self, $to_process, $from_process) {
     return;
 }
 
+# ...
+
+sub next_tick ($self, $f) {
+    # F = sub () -> ();
+    push $self->{_callback_queue}->@* => $f;
+    return;
+}
+
+sub enqueue_signal ($self, $sig) {
+    # Sig = [ $to_process, $signal, $event ]
+    push $self->{_signal_queue}->@* => $sig;
+    return;
+}
+
 sub enqueue_msg ($self, $msg) {
+    # Msg = [ $to_process, $event ]
     push $self->{_message_queue}->@* => $msg;
     return;
 }
 
-sub next_tick ($self, $f) {
-    push $self->{_callback_queue}->@* => $f;
-    return;
+# ...
+
+sub lookup_process ($self, $to_proc) {
+
+    # if we have a PID, then look it up
+    if (not blessed $to_proc) {
+        die "Unable to find process for PID($to_proc)"
+            unless exists $self->{_process_table}->{ $to_proc };
+
+        # we know it is active, so we can just return it
+        return $self->{_process_table}->{ $to_proc };
+    }
+
+    # otherwise we have a Process object ...
+    die "The process PID(".$to_proc->pid.") is not active"
+        # so make sure it is active
+        unless exists $self->{_process_table}->{ $to_proc->pid };
+
+    # and return it
+    return $to_proc;
 }
 
 sub tick ($self) {
@@ -94,6 +131,30 @@ sub tick ($self) {
         };
     }
 
+    my @sig_queue = $self->{_signal_queue}->@*;
+    $self->{_signal_queue}->@* = ();
+
+    while (@sig_queue) {
+        my $sig = shift @sig_queue;
+        my ($to_proc, $signal, $event) = @$sig;
+
+        # XXX - this can die ... catch it?
+        $to_proc = $self->lookup_process( $to_proc );
+        $to_proc->accept( [ $signal, @$event ] );
+
+        eval {
+
+            # this converts it to a message and runs
+            # it first before regular messages
+
+            $to_proc->tick;
+            1;
+        } or do {
+            my $e = $@;
+            die "Message to (".$to_proc->pid.") failed with sig($signal, ".(join ', ' => @{ $event // []}).") because: $e";
+        };
+    }
+
     my @msg_queue = $self->{_message_queue}->@*;
     $self->{_message_queue}->@* = ();
 
@@ -101,20 +162,11 @@ sub tick ($self) {
         my $msg = shift @msg_queue;
         my ($to_proc, $event) = @$msg;
 
-        # if we have a PID, then look it up
-        if (not blessed $to_proc) {
-            die "Unable to find process for PID($to_proc)"
-                unless exists $self->{_process_table}->{ $to_proc };
-            $to_proc = $self->{_process_table}->{ $to_proc };
-        }
-        # if we have an Object, make sure it is active1
-        else {
-            die "The process PID(".$to_proc->pid.") is not active"
-                unless exists $self->{_process_table}->{ $to_proc->pid };
-        }
+        # XXX - this can die ... catch it?
+        $to_proc = $self->lookup_process( $to_proc );
+        $to_proc->accept( $event );
 
         eval {
-            $to_proc->accept( $event );
             $to_proc->tick;
             1;
         } or do {

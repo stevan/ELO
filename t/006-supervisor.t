@@ -60,7 +60,7 @@ sub Supervisor ($this, $msg) {
 
             $active_workers{$this} = \%workers;
         },
-        SIGEXIT => sub ($from, $status) {
+        SIGEXIT => sub ($from) {
             isa_ok($from, 'ELO::Core::Process', 'SIGEXIT($from='.$from->pid.')');
             pass('... trapped SIGEXIT from '.$from->pid.' in '.$this->pid);
 
