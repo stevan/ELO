@@ -13,16 +13,14 @@ use slots (
     parent => sub { die 'A `parent` is required' },
     # ...
     _pid           => sub {},
-    _flags         => sub {},
-    _sig_handlers  => sub {},
+    _trap_signals  => sub {},
     _msg_inbox     => sub {},
     _environment   => sub {},
 );
 
 sub BUILD ($self, $params) {
     $self->{_pid}          = sprintf '%03d:%s' => ++$PIDS, $self->{name};
-    $self->{_flags}        = [];
-    $self->{_sig_handlers} = {};
+    $self->{_trap_signals} = {};
     $self->{_msg_inbox}    = [];
     $self->{_environment}  = { ($params->{env} // $params->{ENV} // {})->%* };
 }
@@ -58,6 +56,20 @@ sub exit ($self, $status=0) {
 sub signal ($self, $proc, $signal, $event) {
     $self->{loop}->enqueue_signal([ $proc, $signal, $event ]);
 }
+
+sub trap ($self, $signal) {
+    $self->{_trap_signals}->{ $signal }++;
+}
+
+sub untrap ($self, $signal) {
+    delete $self->{_trap_signals}->{ $signal };
+}
+
+sub is_trapped ($self, $signal) {
+    !! exists $self->{_trap_signals}->{ $signal };
+}
+
+# ...
 
 sub send ($self, $proc, $event) : method {
     $self->{loop}->enqueue_msg([ $proc, $event ]);

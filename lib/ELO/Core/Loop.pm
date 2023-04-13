@@ -53,9 +53,13 @@ sub destroy_process ($self, $process, $status) {
     return;
 }
 
+# FIXME:
+# links need to be bi-directional
+
 sub link_process ($self, $to_process, $from_process) {
-    my $links = $self->{_process_links}->{ $from_process->pid } //= [];
-    push @$links => $to_process;
+    my $to_links = $self->{_process_links}->{ $from_process->pid } //= [];
+    push @$to_links => $to_process;
+
     return;
 }
 
@@ -66,6 +70,7 @@ sub unlink_process ($self, $to_process, $from_process) {
         @$links = grep { $_->pid ne $to_process->pid } @$links;
         #use Data::Dump; Data::Dump::dump( { unlink => $to_process->pid, from => $from_process->pid, links => [ map { $_->pid } @$links ] });
     }
+
     return;
 }
 
@@ -128,19 +133,28 @@ sub tick ($self) {
 
         # XXX - this can die ... catch it?
         $to_proc = $self->lookup_process( $to_proc );
-        $to_proc->accept( [ $signal, @$event ] );
 
-        eval {
+        # is the signal trapped?
+        if ( $to_proc->is_trapped( $signal ) ) {
 
-            # this converts it to a message and runs
-            # it first before regular messages
+            # convert this into a message
+            $to_proc->accept( [ $signal, @$event ] );
 
-            $to_proc->tick;
-            1;
-        } or do {
-            my $e = $@;
-            die "Unhandled signal for (".$to_proc->pid.") failed with sig($signal, ".(join ', ' => @{ $event // []}).") because: $e";
-        };
+            # run the tick
+            eval {
+                $to_proc->tick;
+                1;
+            } or do {
+                my $e = $@;
+                die "Unhandled signal for (".$to_proc->pid.") failed with sig($signal, ".(join ', ' => @{ $event // []}).") because: $e";
+            };
+        }
+        else {
+            # TODO:
+            # default signal handlers??
+            die "Unhandled signal ($signal)!!!!!";
+        }
+
     }
 
     # next comes the Callback queue, these are

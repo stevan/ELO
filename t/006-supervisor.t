@@ -17,6 +17,8 @@ use ok 'ELO::Loop';
 use ok 'ELO::Actors', qw[ match ];
 use ok 'ELO::Timers', qw[ timer ];
 
+use ok 'ELO::Core::Constants', qw[ $SIGEXIT ];
+
 my $log = Test::ELO->create_logger;
 
 sub Worker ($this, $msg) {
@@ -60,7 +62,7 @@ sub Supervisor ($this, $msg) {
 
             $active_workers{$this} = \%workers;
         },
-        SIGEXIT => sub ($from) {
+        $SIGEXIT => sub ($from) {
             isa_ok($from, 'ELO::Core::Process', 'SIGEXIT($from='.$from->pid.')');
             pass('... trapped SIGEXIT from '.$from->pid.' in '.$this->pid);
 
@@ -75,10 +77,14 @@ sub Supervisor ($this, $msg) {
 sub init ($this, $msg) {
 
     # the initial message is empty or undef
+    # this kinda gross hack
     unless ($msg && @$msg) {
         # so we can use as an entry point
         my $supervisor = $this->spawn( Supervisor => \&Supervisor );
         isa_ok($supervisor, 'ELO::Core::Process', $supervisor->pid);
+
+        # trap the exit signal
+        $_->trap( $SIGEXIT ) foreach ($this, $supervisor);
 
         $this->send( $supervisor, [ eStartWorkers => 20, 10, 5, 15 ] );
         $this->link( $supervisor );
@@ -91,7 +97,7 @@ sub init ($this, $msg) {
 
     # catch the trapped exits
     match $msg, +{
-        SIGEXIT => sub ($from) {
+        $SIGEXIT => sub ($from) {
             isa_ok($from, 'ELO::Core::Process', 'SIGEXIT($from='.$from->pid.')');
             $log->info( $this, '... trapped EXIT from Supervisor' );
 
