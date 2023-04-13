@@ -3,6 +3,7 @@ use v5.24;
 use warnings;
 use experimental qw[ signatures lexical_subs postderef ];
 
+use Carp         'confess';
 use Scalar::Util 'blessed';
 
 use ELO::Core::Process;
@@ -31,43 +32,81 @@ sub create_process ($self, $name, $f, $env=undef, $parent=undef) {
     return $process;
 }
 
-sub destroy_process ($self, $process, $status) {
-    # NOTE: ignore if the PID does not exist (for now)
-
-    # handle any links that exist ...
-    if ( my $links = delete $self->{_process_links}->{ $process->pid } ) {
-        foreach my $link (@$links) {
-            # let link know we exited
-            $process->signal( $link, $SIGEXIT, [ $process ] );
-        }
-    }
-
+sub destroy_process ($self, $process) {
+    #warn "DESTROYING PROCESS ".$process->pid;
     # remove self from the process table ...
     delete $self->{_process_table}->{ $process->pid };
+
+    # remove the process links as well ..
+    delete $self->{_process_links}->{ $process->pid };
+
+    # remove any other references to
+    # the process in other links
+    foreach my $links ( values $self->{_process_links}->%* ) {
+        @$links = grep { $_->pid ne $process->pid } @$links;
+    }
 
     # XXX:
     # - what about removing messages?
     #    - if we ignore calls to unknown PIDs or unregistered processes this doesnt matter
     # - we cannot easily remove callbacks that know about this?
+    #    - we really need a better approach
+
+    # remove messages for this process currently in the queue
+    $self->{_message_queue}->@* = grep {
+        (blessed $_->[0] ?  $_->[0]->pid : $_->[0]) ne $process->pid
+    } $self->{_message_queue}->@*;
+}
+
+sub notify_links ($self, $process) {
+
+    # handle any links that exist ...
+    if ( my $links = $self->{_process_links}->{ $process->pid } ) {
+        #warn "links found for ".$process->pid;
+        #use Data::Dumper; warn Dumper { links_for_pid => $process->pid };
+        foreach my $link (@$links) {
+            #use Data::Dumper; warn Dumper { sending_SIGEXIT_to_link => $link->pid };
+            # let link know we exited
+            $process->kill( $link );
+            # is the same as
+            # $process->signal( $link, $SIGEXIT, [ $process ] );
+        }
+    }
+    else {
+       #warn "NO links found for ".$process->pid;
+    }
+
+    #use Data::Dumper; warn Dumper { links => +{ map {
+    #        $_ => [ map { $_->pid } $self->{_process_links}->{$_}->@* ]
+    #} keys $self->{_process_links}->%* } };
 
     return;
 }
 
-# FIXME:
-# links need to be bi-directional
-
 sub link_process ($self, $to_process, $from_process) {
+
     my $to_links = $self->{_process_links}->{ $from_process->pid } //= [];
     push @$to_links => $to_process;
+
+    my $from_links = $self->{_process_links}->{ $to_process->pid } //= [];
+    push @$from_links => $from_process;
 
     return;
 }
 
 sub unlink_process ($self, $to_process, $from_process) {
+
     #use Data::Dump; Data::Dump::dump( { unlink => $to_process->pid, from => $from_process->pid });
     if ( my $links = $self->{_process_links}->{ $from_process->pid } ) {
         #use Data::Dump; Data::Dump::dump( { unlink => $to_process->pid, from => $from_process->pid, links => [ map { $_->pid } @$links ] });
         @$links = grep { $_->pid ne $to_process->pid } @$links;
+        #use Data::Dump; Data::Dump::dump( { unlink => $to_process->pid, from => $from_process->pid, links => [ map { $_->pid } @$links ] });
+    }
+
+    #use Data::Dump; Data::Dump::dump( { unlink => $to_process->pid, from => $from_process->pid });
+    if ( my $links = $self->{_process_links}->{ $to_process->pid } ) {
+        #use Data::Dump; Data::Dump::dump( { unlink => $to_process->pid, from => $from_process->pid, links => [ map { $_->pid } @$links ] });
+        @$links = grep { $_->pid ne $from_process->pid } @$links;
         #use Data::Dump; Data::Dump::dump( { unlink => $to_process->pid, from => $from_process->pid, links => [ map { $_->pid } @$links ] });
     }
 
@@ -108,7 +147,7 @@ sub lookup_process ($self, $to_proc) {
     }
 
     # otherwise we have a Process object ...
-    die "The process PID(".$to_proc->pid.") is not active"
+    confess "The process PID(".$to_proc->pid.") is not active"
         # so make sure it is active
         unless exists $self->{_process_table}->{ $to_proc->pid };
 
@@ -132,7 +171,13 @@ sub tick ($self) {
         my ($to_proc, $signal, $event) = @$sig;
 
         # XXX - this can die ... catch it?
-        $to_proc = $self->lookup_process( $to_proc );
+        eval {
+            $to_proc = $self->lookup_process( $to_proc );
+            1;
+        } or do {
+            my $e = $@;
+            warn Dumper { e => $e, sig => $sig, queue => \@sig_queue };
+        };
 
         # is the signal trapped?
         if ( $to_proc->is_trapped( $signal ) ) {
@@ -182,15 +227,16 @@ sub tick ($self) {
         my $msg = shift @msg_queue;
         my ($to_proc, $event) = @$msg;
 
-        # XXX - this can die ... catch it?
-        $to_proc = $self->lookup_process( $to_proc );
-        $to_proc->accept( $event );
-
         eval {
+            $to_proc = $self->lookup_process( $to_proc );
+            $to_proc->accept( $event );
             $to_proc->tick;
             1;
         } or do {
             my $e = $@;
+
+            warn Dumper { msg => $msg, queue => \@msg_queue };
+
             die "Message to (".$to_proc->pid.") failed with msg(".(join ', ' => @{ $event // []}).") because: $e";
         };
     }
@@ -201,20 +247,18 @@ sub tick ($self) {
 sub loop ($self, $logger=undef) {
     my $tick = 0;
 
-    $logger->tick( $logger->DEBUG, $self, $tick, 'INIT' )  if $logger;
     $logger->tick( $logger->INFO,  $self, $tick, 'START' ) if $logger;
 
     while ( $self->{_signal_queue}->@*   ||
             $self->{_callback_queue}->@* ||
             $self->{_message_queue}->@*  ){
 
-        $logger->tick( $logger->INFO, $self, $tick ) if $logger;
+        $logger->tick( $logger->INFO,  $self, $tick ) if $logger;
         $self->tick;
         $tick++
     }
 
     $logger->tick( $logger->INFO,  $self, $tick, 'END'  ) if $logger;
-    $logger->tick( $logger->DEBUG, $self, $tick, 'EXIT' ) if $logger;
 
     return;
 }

@@ -5,6 +5,8 @@ use experimental qw[ signatures lexical_subs postderef ];
 
 my $PIDS = 0;
 
+use ELO::Core::Constants qw[ $SIGEXIT ];
+
 use parent 'UNIVERSAL::Object::Immutable';
 use slots (
     name   => sub { die 'A `name` is required'   },
@@ -47,8 +49,15 @@ sub spawn ($self, $name, $f, $env=undef) {
     $self->{loop}->create_process( $name, $f, $env, $self );
 }
 
+sub kill ($self, $proc) {
+    $self->signal( $proc, $SIGEXIT, [ $self ] );
+}
+
 sub exit ($self, $status=0) {
-    $self->{loop}->destroy_process( $self, $status );
+    #warn "EXITING FOR ".$self->pid;
+    $self->{loop}->notify_links( $self );
+    $self->{loop}->destroy_process( $self );
+    #warn "FINSIHED EXITING FOR ".$self->pid;
 }
 
 # ...

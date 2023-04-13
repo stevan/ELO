@@ -79,14 +79,14 @@ my sub dump_msg ($msg) {
 
             return +{
                 object  => bless {
-                    type             => 'ELO::Core::Loop',
+                    #type             => 'ELO::Core::Loop',
                     active_processes => [ sort keys $obj->{_process_table}->%* ],
                 } => 'ELO::DEBUG::Loop'
             } if $ctx->object_isa('ELO::Core::Loop');
 
             return +{
                 object  => bless {
-                    type => 'ELO::Core::Process',
+                    #type => 'ELO::Core::Process',
                     pid  => $obj->pid,
                     name => $obj->name,
                     func => Sub::Util::subname( $obj->func ),
@@ -95,7 +95,7 @@ my sub dump_msg ($msg) {
 
             return +{
                 object  => bless {
-                    type   => 'ELO::Core::Promise',
+                    #type   => 'ELO::Core::Promise',
                     status => $obj->status,
                     result => $obj->result,
                     error  => $obj->error,
@@ -136,7 +136,7 @@ sub tick ($self, $level, $loop, $tick, $msg=undef) {
 
     $self->{filehandle}->print(
         colored( $out, 'grey15' ),
-        ($level == DEBUG ? ("\n".colored( lpad(dump_msg($loop)), 'italic grey15' )) : ()),
+        ($self->{min_level} == DEBUG ? ("\n".colored( lpad(dump_msg($loop)), 'italic grey15' )) : ()),
         "\n"
     );
 }
@@ -209,9 +209,9 @@ sub fatal ($self, $process, $msg) {
 
     $self->{filehandle}->print(
         join '' => (
-            colored( level(FATAL), 'red on_white' ),
+            colored( level(FATAL), 'white on_magenta' ),
             colored_pid( $process ),
-            colored( lpad(dump_msg($msg)), 'italic red on_white' )
+            colored( lpad(dump_msg($msg)), 'italic white on_magenta' )
         ), "\n"
     );
 }

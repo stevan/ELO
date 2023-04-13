@@ -68,7 +68,6 @@ sub Supervisor ($this, $msg) {
 
             delete $active_workers{$this}->{ $from->pid };
 
-            $this->unlink( $from ); # <- technically redundant, the exiting process already clear them
             $this->exit(0) if not scalar keys $active_workers{$this}->%*;
         }
     };
@@ -88,6 +87,8 @@ sub init ($this, $msg) {
 
         $this->send( $supervisor, [ eStartWorkers => 20, 10, 5, 15 ] );
         $this->link( $supervisor );
+        # is equvalent to this ...
+        # $supervisor->link( $this );
 
         # just besure to return here
         # so that we don't try to match
@@ -102,8 +103,6 @@ sub init ($this, $msg) {
             $log->info( $this, '... trapped EXIT from Supervisor' );
 
             pass('... trapped SIGEXIT from '.$from->pid.' in '.$this->pid);
-
-            $this->unlink( $from );
         }
     };
 }

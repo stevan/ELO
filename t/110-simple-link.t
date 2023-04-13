@@ -21,6 +21,15 @@ use ok 'ELO::Core::Constants', qw[ $SIGEXIT ];
 
 my $log = Test::ELO->create_logger;
 
+# NOTE:
+# the Cat is a linked process, we try to kill it
+# many times, and when it actually does die, it
+# will send the SIGEXIT to our init process, where
+# we handle it and stop the Cat Killing Interval.
+
+# this shows uni-directional link signals, here
+# the Cat gets triggered and sends to init.
+
 sub Cat ($this, $msg) {
 
     fieldhash state %lives;
@@ -32,15 +41,23 @@ sub Cat ($this, $msg) {
         $SIGEXIT => sub ($from) {
             $lives{$this}++;
             if ( $lives{$this} < 9 ) {
-                $log->info( $this, '... you cannot kill me ('.$lives{$this}.')');
+                $log->error( $this, '... you cannot kill me ('.$lives{$this}.')');
             }
             else {
-                $log->info( $this, 'Oh no! you got me ('.$lives{$this}.')');
+                $log->fatal( $this, 'Oh no! you got me ('.$lives{$this}.')');
                 $this->exit(0);
             }
         }
     }
 }
+
+#
+# $init -> link -> $cat   : link the fate of $init to $cat
+# $init -> kill -> $cat   : try to kill the cat
+# exit($cat)              : eventually it dies and exits
+# $init <- EXIT <- $cat   : this triggers $cat link to send EXIT back to $init
+# exit($init)             : $init exits after getting signal from $cat
+#
 
 sub init ($this, $msg) {
 
@@ -58,7 +75,8 @@ sub init ($this, $msg) {
 
         # keep trying to kill the cat
         $interval = interval( $this, 2, sub {
-            $this->signal( $cat, $SIGEXIT, [ $this ] );
+            $log->warn( $this, '... take this you darn cat!');
+            $this->kill( $cat );
         });
 
         return;
@@ -66,8 +84,9 @@ sub init ($this, $msg) {
 
     match $msg, +{
         $SIGEXIT => sub ($from) {
-            $log->info( $this, '... our kitty died! ('.$from->pid.')');
+            $log->error( $this, '... our kitty died! ('.$from->pid.')');
             cancel_interval( $interval );
+            $this->exit(0);
         }
     }
 }
