@@ -52,6 +52,11 @@ sub destroy_process ($self, $process) {
     # - we cannot easily remove callbacks that know about this?
     #    - we really need a better approach
 
+    # remove signals for this process currently in the queue
+    $self->{_signal_queue}->@* = grep {
+        (blessed $_->[0] ?  $_->[0]->pid : $_->[0]) ne $process->pid
+    } $self->{_signal_queue}->@*;
+
     # remove messages for this process currently in the queue
     $self->{_message_queue}->@* = grep {
         (blessed $_->[0] ?  $_->[0]->pid : $_->[0]) ne $process->pid
@@ -176,7 +181,9 @@ sub tick ($self) {
             1;
         } or do {
             my $e = $@;
+            use Data::Dumper;
             warn Dumper { e => $e, sig => $sig, queue => \@sig_queue };
+            die $e;
         };
 
         # is the signal trapped?
@@ -195,9 +202,13 @@ sub tick ($self) {
             };
         }
         else {
-            # TODO:
-            # default signal handlers??
-            die "Unhandled signal ($signal)!!!!!";
+            if ( $signal eq $SIGEXIT ) {
+                # exit is a terminal signal,
+                $to_proc->exit(1);
+            }
+            else {
+                # everything else would be ignore
+            }
         }
 
     }
@@ -235,6 +246,7 @@ sub tick ($self) {
         } or do {
             my $e = $@;
 
+            use Data::Dumper;
             warn Dumper { msg => $msg, queue => \@msg_queue };
 
             die "Message to (".$to_proc->pid.") failed with msg(".(join ', ' => @{ $event // []}).") because: $e";
