@@ -6,28 +6,10 @@
 
 ### To Do
 
-- we need to add something akin to ???
-    - waitpid()
-    - kill()
-    - signal()
-
-- links & monitors
-    - links are bi-directional, and signals can be sent from either side
+- monitors
     - monitors are uni-directional, and only the monitor receieves from the watched items
 
-- signals
-
-    SIGEXIT      Child has stopped or terminated
-    SIGTERM      Termination signal
-
-    - should untrapped signals be interpretted as the signal itself being sent?
-        - parent creates & links child
-        - child dies and sendts SIGEXIT
-        - parent either:
-            - catches SIGEXIT and handles it
-            - or doesn't catch it and treats it as a SIGEXIT sent to itself
-    - basically should we propogate signals from child to parent?
-
+- trampoline needs building!
 
 - review code to
     - make sure we catch/handle all exceptions
@@ -133,10 +115,6 @@
 
 ### TODO
 
-- add despawn
-    - Whenever an actor is stopped ...
-        - all of its children are recursively stopped too.
-
 - should we support blocking behavior at all?
     - this will almost be needed for Futures
 
@@ -165,4 +143,13 @@ to the distributed part anyway.
             - and when it found it
                 - call the callbacks
         - this could happen within `accept` perhaps??
+
+
+
+https://www.erlang.org/doc/reference_manual/processes.html#signals
+https://www.erlang.org/doc/man/erlang.html#is_process_alive-1
+https://www.erlang.org/doc/reference_manual/processes.html#receiving_exit_signals
+https://www.erlang.org/doc/man/erlang.html#process_flag_trap_exit
+
+
 

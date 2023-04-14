@@ -33,7 +33,6 @@ sub create_process ($self, $name, $f, $env=undef, $parent=undef) {
 }
 
 sub destroy_process ($self, $process) {
-    #warn "DESTROYING PROCESS ".$process->pid;
     # remove self from the process table ...
     delete $self->{_process_table}->{ $process->pid };
 
@@ -45,12 +44,6 @@ sub destroy_process ($self, $process) {
     foreach my $links ( values $self->{_process_links}->%* ) {
         @$links = grep { $_->pid ne $process->pid } @$links;
     }
-
-    # XXX:
-    # - what about removing messages?
-    #    - if we ignore calls to unknown PIDs or unregistered processes this doesnt matter
-    # - we cannot easily remove callbacks that know about this?
-    #    - we really need a better approach
 
     # remove signals for this process currently in the queue
     $self->{_signal_queue}->@* = grep {
