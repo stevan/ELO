@@ -21,12 +21,16 @@ my $log = Test::ELO->create_logger;
 
 sub Cat ($this, $msg) {
 
+    state $expected = [ 1, 0 ];
+
     match $msg, +{
         meow => sub () {
             $log->info( $this, 'meow');
             $this->send_to_self([ 'meow' ]);
         },
         $SIGEXIT => sub ($from) {
+            my $e = shift(@$expected);
+            is($this->loop->is_process_alive( $from ), $e, '... this('.$this->pid.') got SIGTERM the process('.$from->pid.') and worked as expected('.$e.')');
             $log->fatal( $this, 'Oh no, you ('.$from->pid.') got me!');
             $this->exit(0);
         }
@@ -71,6 +75,7 @@ sub init ($this, $msg) {
 
     match $msg, +{
         $SIGEXIT => sub ($from) {
+            ok(!$this->loop->is_process_alive( $from ), '... this('.$this->pid.') got SIGTERM from process('.$from->pid.') as expected');
             $log->error( $this, '... one of our kitty died! ('.$from->pid.')');
             $log->fatal( $this, 'Goodbye cruel world!');
             $this->exit(0);

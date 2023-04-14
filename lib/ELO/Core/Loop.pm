@@ -140,6 +140,25 @@ sub enqueue_msg ($self, $msg) {
 
 # ...
 
+sub is_process_alive ($self, $proc) {
+    # FIXME:
+    # this is gross, do better ...
+
+    my $is_alive = 0;
+    eval {
+        # this will lookup the process
+        $proc = $self->lookup_process( $proc );
+        # and mark success for it
+        $is_alive = 1;
+    } or do {
+        my $e = $@;
+        # do nothing here ...
+    };
+    # it either worked and got set
+    # or it did not so is false
+    return $is_alive;
+}
+
 sub lookup_process ($self, $to_proc) {
 
     # if we have a PID, then look it up

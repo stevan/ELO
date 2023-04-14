@@ -82,6 +82,7 @@ sub init ($this, $msg) {
 
     match $msg, +{
         $SIGEXIT => sub ($from) {
+            ok(!$this->loop->is_process_alive( $from ), '... the process has died as expected');
             $log->error( $this, '... our kitty died! ('.$from->pid.')');
             cancel_interval( $interval );
             $this->exit(0);
