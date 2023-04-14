@@ -55,7 +55,6 @@ sub kill ($self, $proc) {
 
 sub exit ($self, $status=0) {
     #warn "EXITING FOR ".$self->pid;
-    $self->{loop}->notify_links( $self );
     $self->{loop}->destroy_process( $self );
     #warn "FINSIHED EXITING FOR ".$self->pid;
 }

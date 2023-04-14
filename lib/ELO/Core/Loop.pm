@@ -34,6 +34,9 @@ sub create_process ($self, $name, $f, $env=undef, $parent=undef) {
 }
 
 sub destroy_process ($self, $process) {
+    # let everyone know we are going away
+    $self->notify_links( $self );
+
     # remove self from the process table ...
     delete $self->{_process_table}->{ $process->pid };
 

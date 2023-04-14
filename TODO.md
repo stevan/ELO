@@ -6,13 +6,22 @@
 
 ### To Do
 
-- monitors
-    - monitors are uni-directional, and only the monitor receieves from the watched items
-
 - trampoline needs building!
 
 - review code to
     - make sure we catch/handle all exceptions
+
+- monitors
+    - monitors are uni-directional, and only the monitor receieves from the watched items
+
+- make SIGNALS into bitmask
+    - use dualvar to make string/int combos
+
+- make FLAGS for the process, also with bitmask style
+    - TRAP_EXIT
+
+- store process flags in an array
+    -
 
 -----------------------------------------------------------
 ## Messages
@@ -115,6 +124,9 @@
 
 ### TODO
 
+- consider a spawn_link() that will
+    - immediately link to the new process
+
 - should we support blocking behavior at all?
     - this will almost be needed for Futures
 
@@ -144,8 +156,13 @@ to the distributed part anyway.
                 - call the callbacks
         - this could happen within `accept` perhaps??
 
+-----------------------------------------------------------
+## Links
+-----------------------------------------------------------
 
+https://man7.org/linux/man-pages/man7/signal.7.html
 
+https://www.erlang.org/doc/reference_manual/processes.html#delivery-of-signals
 https://www.erlang.org/doc/reference_manual/processes.html#signals
 https://www.erlang.org/doc/man/erlang.html#is_process_alive-1
 https://www.erlang.org/doc/reference_manual/processes.html#receiving_exit_signals
