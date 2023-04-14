@@ -36,6 +36,44 @@ sub Ping ($this, $msg) {
 
     fieldhash state %count;
 
+    # NOTE:
+    # The fieldhash function will be
+    # called for each message, but since
+    # %count will already be registered
+    # it will do nothing more.
+
+    # An alternate approach, if you want
+    # to avoid that call is to do something
+    # like this:
+    #
+    # `state $ready = fieldhashes( \state %count );`
+    #
+    # In this scendario, `fieldhashes` will only
+    # be called once, to initialize `$ready`, and
+    # when it does that will register %count.
+    #
+    # The value of $ready in this case should be
+    # treated as a boolean, but it will actually
+    # be an integer representing the number of
+    # hashes thay were registered as fieldhashes.
+    # If this number were to be 0 (false) that would
+    # mean that it was unable to convert the hashes
+    # and so we should die because something has
+    # gone wrong. Something like this:
+    #
+    # `die "Actor Initialization Failed" unless $ready;`
+    #
+    # but I will be honest, it would be overkill
+    # the extra call to `fieldhash` is minimal and
+    # we are already paying the price of `match`
+    # being called at runtime, as well as the
+    # creation of the HASHref for `match` and all
+    # the subroutines in them.
+    #
+    # So if this kind of "delicate" slot management
+    # is not to your liking, the OO approach would
+    # be better (once I actually write it).
+
     match $msg, +{
         eStartPing => sub ( $pong ) {
             isa_ok($pong, 'ELO::Core::Process');
