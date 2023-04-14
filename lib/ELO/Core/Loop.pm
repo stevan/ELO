@@ -5,6 +5,7 @@ use experimental qw[ signatures lexical_subs postderef ];
 
 use Carp         'confess';
 use Scalar::Util 'blessed';
+use List::Util   'uniq';
 
 use ELO::Core::Process;
 use ELO::Constants qw[ $SIGEXIT ];
@@ -70,9 +71,9 @@ sub notify_links ($self, $process) {
             # $process->signal( $link, $SIGEXIT, [ $process ] );
         }
     }
-    else {
+    #else {
        #warn "NO links found for ".$process->pid;
-    }
+    #}
 
     #use Data::Dumper; warn Dumper { links => +{ map {
     #        $_ => [ map { $_->pid } $self->{_process_links}->{$_}->@* ]
@@ -84,10 +85,16 @@ sub notify_links ($self, $process) {
 sub link_process ($self, $to_process, $from_process) {
 
     my $to_links = $self->{_process_links}->{ $from_process->pid } //= [];
-    push @$to_links => $to_process;
+    # make sure the list is uniq ...
+    $to_links->@* = uniq( $to_process, $to_links->@* );
 
+    # make sure the list is uniq ...
     my $from_links = $self->{_process_links}->{ $to_process->pid } //= [];
-    push @$from_links => $from_process;
+    $from_links->@* = uniq( $from_process, $from_links->@* );
+
+    #use Data::Dumper; warn Dumper { links => +{ map {
+    #        $_ => [ map { $_->pid } $self->{_process_links}->{$_}->@* ]
+    #} keys $self->{_process_links}->%* } };
 
     return;
 }
