@@ -49,6 +49,10 @@ sub spawn ($self, $name, $f, $env=undef) {
     $self->{loop}->create_process( $name, $f, $env, $self );
 }
 
+sub spawn_actor ($self, $actor_class, $actor_args={}, $env=undef) {
+    $self->{loop}->create_actor( $actor_class, $actor_args, $env, $self );
+}
+
 sub kill ($self, $proc) {
     $self->signal( $proc, $SIGEXIT, [ $self ] );
 }

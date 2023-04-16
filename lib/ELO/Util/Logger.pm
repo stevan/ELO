@@ -115,7 +115,7 @@ my sub dump_msg ($msg) {
 my sub colored_pid ($pid) {
     state %pid_colors_cache;
 
-    $pid = $pid->pid if $pid->isa('ELO::Core::Process');
+    $pid = $pid->pid if $pid->isa('ELO::Core::Process') or $pid->isa('ELO::Core::ActorRef');
 
     $pid_colors_cache{$pid} //= 'on_ansi'.int($pid =~ s/^(\d+)\:.*$/$1/r);
 

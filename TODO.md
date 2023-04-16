@@ -160,6 +160,12 @@ to the distributed part anyway.
 ## Links
 -----------------------------------------------------------
 
+### Actors
+
+https://doc.akka.io/docs/akka/2.5/actors.html#dependency
+
+### Signals
+
 https://man7.org/linux/man-pages/man7/signal.7.html
 
 https://www.erlang.org/doc/reference_manual/processes.html#delivery-of-signals
