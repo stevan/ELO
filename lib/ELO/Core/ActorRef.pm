@@ -65,6 +65,10 @@ sub _add_child ($self, $child) {
 
 sub loop ($self) { $self->{loop} }
 
+sub spawn ($self, $name, $f, $env=undef) {
+    $self->{loop}->create_process( $name, $f, $env, $self );
+}
+
 sub spawn_actor ($self, $actor_class, $actor_args={}, $env=undef) {
     my $child = $self->{loop}->create_actor( $actor_class, $actor_args, $env, $self );
     $self->_add_child( $child );
@@ -129,35 +133,9 @@ sub accept ($self, $event) {
     push $self->{_msg_inbox}->@* => $event;
 }
 
-sub apply ($self, $actor, $event) {
-
-    eval {
-        die 'event must be an ARRAY ref'
-            unless ref $event eq 'ARRAY';
-
-        my ($e, @body) = @$event;
-
-        my $receive = $actor->receive( $self );
-
-        die 'receive did not return a HASH ref'
-            unless ref $receive eq 'HASH';
-
-        my $receiver = $receive->{ $e };
-        die 'could not find receiver for event('.$e.')'
-            unless defined $receiver
-                    && ref $receiver eq 'CODE';
-
-        $receiver->( @body );
-        1;
-    } or do {
-        my $e = $@;
-        die 'Receive failed because: '.$e;
-    };
-}
-
 sub tick ($self) {
     my $event = shift $self->{_msg_inbox}->@*;
-    $self->apply( $self->{_actor}, $event );
+    $self->{_actor}->apply( $self, $event );
 }
 
 1;
