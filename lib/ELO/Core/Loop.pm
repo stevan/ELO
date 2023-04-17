@@ -321,6 +321,12 @@ sub run ($self, $f, $args=[], $logger=undef, $env=undef) {
     return;
 }
 
+sub run_actor ($self, $actor_class, $actor_args={}, $logger=undef, $env=undef) {
+    my $root = $self->create_actor( $actor_class, $actor_args, $env );
+    $self->loop( $logger );
+    return;
+}
+
 1;
 
 __END__

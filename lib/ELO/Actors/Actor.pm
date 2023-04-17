@@ -3,7 +3,8 @@ use v5.24;
 use warnings;
 use experimental qw[ signatures lexical_subs postderef ];
 
-use Hash::Util qw[ fieldhash ];
+use Hash::Util     qw[ fieldhash ];
+use ELO::Constants qw[ $SIGEXIT ];
 
 # we specifically use inside-out
 # objects here because this is
@@ -18,8 +19,16 @@ use Hash::Util qw[ fieldhash ];
 # on the consumer :)
 fieldhash my %receivers;
 
-sub receive; # ($self, ActorRef $this) -> %{ eventType => sub (@eventArgs) :Unit { ... } }
+# ($self, ActorRef $this) -> %{ eventType => sub (@eventArgs) -> () }
+sub receive ($self, $this) { +{} }
 
+# ($self, ActorRef $this) -> ()
+sub on_start ($self, $this) { () }
+
+# ($self, ActorRef $this, ActorRef $from) -> ()
+sub on_exit ($self, $this, $from) { $this->exit(0) }
+
+# ($self, ActorRef $this, $event) -> ()
 sub apply ($self, $this, $event) {
     eval {
         die 'event must be an ARRAY ref'
@@ -27,30 +36,38 @@ sub apply ($self, $this, $event) {
 
         my ($e, @body) = @$event;
 
-        # cache the receivers to
-        # avoid having to re-create
-        # the subs, and since they
-        # are object scoped, they
-        # match the lifetime of the
-        # actor itself
-        my $receivers = $receivers{$self} //= do {
-            my $receivers = $self->receive( $this );
-            die 'receive did not return a HASH ref'
-                unless ref $receivers eq 'HASH';
-            $receivers;
-        };
+        if ( $e eq $SIGEXIT ) {
+            $self->on_exit( $this, @body );
+        }
+        else {
+            # cache the receivers to
+            # avoid having to re-create
+            # the subs, and since they
+            # are object scoped, they
+            # match the lifetime of the
+            # actor and process they are
+            # closing over
+            my $receivers = $receivers{$self} //= do {
+                my $receivers = $self->receive( $this );
+                die 'receive did not return a HASH ref'
+                    unless ref $receivers eq 'HASH';
+                $receivers;
+            };
 
-        my $receiver = $receivers->{ $e };
-        die 'could not find receiver for event('.$e.')'
-            unless defined $receiver
-                    && ref $receiver eq 'CODE';
+            my $receiver = $receivers->{ $e };
+            die 'could not find receiver for event('.$e.')'
+                unless defined $receiver
+                        && ref $receiver eq 'CODE';
 
-        $receiver->( @body );
+            $receiver->( @body );
+        }
         1;
     } or do {
         my $e = $@;
         die 'Receive failed because: '.$e;
     };
+
+    return;
 }
 
 1;

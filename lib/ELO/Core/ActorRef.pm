@@ -39,12 +39,21 @@ sub BUILD ($self, $params) {
     $self->{_environment}  = { ($params->{env} // $params->{ENV} // {})->%* };
 
     eval {
-        $self->{_actor} = $self->{actor_class}->new( $self->{actor_args}->%* );
+        $self->{_actor} = $self->{actor_class}->new( +{ $self->{actor_args}->%* } );
         1;
     } or do {
         my $e = $@;
-        confess 'Could not build actor('.$self->{actor_class}.') because: '.$e;
+        confess 'Could not instantiate actor('.$self->{actor_class}.') because: '.$e;
     };
+
+    # we want to call the on-start event, but we want
+    # it to be sure to take place in next available
+    # tick of the loop. This is expecially important
+    # in the root Actor, which will get created very
+    # early in the lifetime of the system
+    $self->{loop}->next_tick(sub {
+        $self->{_actor}->on_start( $self )
+    });
 }
 
 sub pid ($self) { $self->{_pid} }
@@ -59,7 +68,7 @@ sub env ($self, $key) {
 
 # ...
 
-sub name   ($self) { $self->{name}   }
+sub name   ($self) { $self->{actor_class}   }
 sub parent ($self) { $self->{parent} }
 
 sub _add_child ($self, $child) {
