@@ -24,7 +24,7 @@ package Greeter {
     use warnings;
     use experimental 'signatures';
 
-    use parent 'UNIVERSAL::Object';
+    use parent 'UNIVERSAL::Object::Immutable';
     use roles  'ELO::Actors::Actor';
     use slots (
         greeting => sub { 'Hello' }
