@@ -31,6 +31,11 @@ package Greeter {
     );
 
     sub receive ($self, $this) {
+        $log->warn( $this, '... receive has been called' );
+        # all the handlers close over $self and $this
+
+        # XXX:
+        # do we need to weaken these references?
         return +{
             Greet => sub ($name) {
                 $log->info( $this, join ' ' => $self->{greeting}, $name );
@@ -46,13 +51,16 @@ sub init ($this, $msg=[]) {
     my $nl = $this->spawn_actor( 'Greeter', { greeting => 'Hallo'   } );
     my $fr = $this->spawn_actor( 'Greeter', { greeting => 'Bonjour' } );
 
-    $this->send( $en, [ Greet => 'World' ] );
-    $this->send( $nl, [ Greet => 'Werld' ] );
-    $this->send( $fr, [ Greet => 'Monde' ] );
+    my $i = interval( $this, 2, sub {
+        $this->send( $en, [ Greet => 'World' ] );
+        $this->send( $nl, [ Greet => 'Werld' ] );
+        $this->send( $fr, [ Greet => 'Monde' ] );
+    });
 
     $log->warn( $this, '... starting' );
 
-    timer( $this, 1, sub {
+    timer( $this, 10, sub {
+        cancel_interval( $i );
         $_->exit foreach $en, $nl, $fr, $this
     });
 }

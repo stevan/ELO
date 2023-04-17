@@ -6,11 +6,17 @@ use experimental qw[ signatures lexical_subs postderef ];
 use Scalar::Util 'blessed';
 use Carp         'confess';
 
+# NOTE:
+# There is a TON of duplication between
+# this class and `Process` and that should
+# be rectified, either by sharing code
+# via subclassing or roles.
+
 our $ACTOR_ID = 0;
 
 use ELO::Constants qw[ $SIGEXIT ];
 
-use parent 'UNIVERSAL::Object';
+use parent 'UNIVERSAL::Object::Immutable';
 use slots (
     actor_class => sub { die 'An `actor_class` is required' },
     actor_args  => sub { die 'An `actor_args` is required'  },
