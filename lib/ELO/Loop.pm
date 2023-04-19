@@ -10,8 +10,8 @@ use ELO::Core::Promise;
 
 my sub build_loop (%options) {
     my $loop = ELO::Core::Loop->new(
-        (exists $options{tick_delay}
-            ? (tick_delay => $options{tick_delay})
+        (exists $options{tick_delay} || $ENV{ELO_TICK_DELAY}
+            ? (tick_delay => $options{tick_delay} // $ENV{ELO_TICK_DELAY})
             : ())
     );
 

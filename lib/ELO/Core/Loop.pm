@@ -16,6 +16,7 @@ use parent 'UNIVERSAL::Object::Immutable';
 use slots (
     tick_delay => sub {},
     # ...
+    _time           => sub { +[] },
     _process_table  => sub { +{} },
     _process_links  => sub { +{} },
 
@@ -201,7 +202,9 @@ sub lookup_process ($self, $to_proc) {
     return $to_proc;
 }
 
-sub tick ($self) {
+# ...
+
+sub TICK ($self) {
 
     # Signals are handled first, as they
     # are meant to be async interrupts
@@ -304,54 +307,70 @@ sub tick ($self) {
 # but since we currently cannot get outside input, that really is
 # not a concern at the moment.
 
-sub loop ($self, $logger=undef) {
-    my $tick = 0;
+sub _init_time ($self) {
+    $self->{_time}->[0] = 0;
+    $self->{_time}->[1] = 0;
+}
 
-    my $now;
-    my sub update_clock { $now = Time::HiRes::clock_gettime( Time::HiRes::CLOCK_MONOTONIC() ) }
+sub _update_tick  ($self) { ++$self->{_time}->[0] }
+sub _update_clock ($self) {
+    $self->{_time}->[1] = Time::HiRes::clock_gettime( Time::HiRes::CLOCK_MONOTONIC() )
+}
 
-    my $start_loop = update_clock();
+sub tick ($self) { $self->{_time}->[0]  }
+sub now  ($self) { $self->_update_clock } # always stay up to date ...
 
-    $logger->tick( $logger->INFO, $self, $tick, 'START' ) if $logger;
+sub sleep ($self, $wait) { Time::HiRes::sleep( $wait ) }
+
+sub _poll ($self) {
+    $self->{_signal_queue}->@*   ||
+    $self->{_callback_queue}->@* ||
+    $self->{_message_queue}->@*
+}
+
+sub LOOP ($self, $logger=undef) {
+    $self->_init_time;
+
+    my $tick       = $self->tick;
+    my $start_loop = $self->now;
+
+    $logger->log_tick( $logger->INFO, $self, $tick, 'START' ) if $logger;
 
     my $tick_delay    = $self->{tick_delay};
     my $total_elapsed = 0;
     my $total_slept   = 0;
 
-    # XXX - move this while condition into a poll() method
-    while ( $self->{_signal_queue}->@*   ||
-            $self->{_callback_queue}->@* ||
-            $self->{_message_queue}->@*  ){
+    while ( $self->_poll ){
+        $tick = $self->_update_tick;
 
-        my $start_tick = update_clock();
-        $logger->tick( $logger->INFO, $self, $tick ) if $logger;
+        my $start_tick = $self->now;
+        $logger->log_tick( $logger->INFO, $self, $tick ) if $logger;
 
-        $self->tick;
+        $self->TICK;
 
-        update_clock();
-        my $elapsed = $now - $start_tick;
+        my $elapsed = $self->now - $start_tick;
+        $logger->log_tick_stat( $logger->DEBUG, $self, sprintf 'elapsed  = %f' => $elapsed ) if $logger;
 
-        $logger->tick( $logger->INFO, $self, $tick, sprintf 'elapsed/ %f /' => $elapsed ) if $logger;
-
+        # support tick_delay parameter
         if ( defined $tick_delay && $elapsed < $tick_delay ) {
             my $wait = $tick_delay - $elapsed;
-            $logger->tick( $logger->INFO, $self, $tick, sprintf 'sleeping/ %f /' => $wait ) if $logger;
-            Time::HiRes::sleep( $wait );
+            $logger->log_tick_stat( $logger->DEBUG, $self, sprintf 'sleeping = %f' => $wait ) if $logger;
+            $self->sleep( $wait );
             $total_slept += $wait;
         }
 
         $total_elapsed += $elapsed;
 
-        $tick++;
+        $logger->log_tick_loop_stat( $logger->DEBUG, $self, 'running  =' ) if $logger;
     }
 
-    update_clock();
-    my $elapsed      = $now - $start_loop;
+    $self->_update_tick;
+    my $elapsed      = $self->now - $start_loop;
     my $total_system = ($elapsed - ($total_elapsed + $total_slept));
 
-    $logger->tick( $logger->INFO, $self, $tick, 'END' ) if $logger;
-    $logger->tick( $logger->INFO, $self, $tick,
-        sprintf 'TIME total=(%f) [ %.02f%% system=(%f), %.02f%% user=(%f), %.02f%% waiting=(%f) ]' => (
+    $logger->log_tick( $logger->INFO, $self, $tick, 'END' ) if $logger;
+    $logger->log_tick_stat( $logger->DEBUG, $self,
+        sprintf 'TIMINGS: total=(%f) [ %.02f%% system=(%f), %.02f%% user=(%f), %.02f%% waiting=(%f) ]' => (
             $elapsed,
             (($total_system  / $elapsed) * 100), $total_system,
             (($total_elapsed / $elapsed) * 100), $total_elapsed,
@@ -365,13 +384,13 @@ sub loop ($self, $logger=undef) {
 sub run ($self, $f, $args=[], $logger=undef, $env=undef) {
     my $main = $self->create_process( main => $f, $env );
     $self->enqueue_msg([ $main, $args ]);
-    $self->loop( $logger );
+    $self->LOOP( $logger );
     return;
 }
 
 sub run_actor ($self, $actor_class, $actor_args={}, $logger=undef, $env=undef) {
     my $root = $self->create_actor( $actor_class, $actor_args, $env );
-    $self->loop( $logger );
+    $self->LOOP( $logger );
     return;
 }
 

@@ -78,10 +78,7 @@ my sub dump_msg ($msg) {
             # the system.
 
             return +{
-                object  => bless {
-                    #type             => 'ELO::Core::Loop',
-                    active_processes => [ sort keys $obj->{_process_table}->%* ],
-                } => 'ELO::DEBUG::Loop'
+                object  => [ sort keys $obj->{_process_table}->%* ],
             } if $ctx->object_isa('ELO::Core::Loop');
 
             return +{
@@ -124,7 +121,7 @@ my sub colored_pid ($pid) {
 
 # ...
 
-sub tick ($self, $level, $loop, $tick, $msg=undef) {
+sub log_tick ($self, $level, $loop, $tick, $msg=undef) {
 
     return if $self->{min_level} > $level
            || $self->{max_level} < $level;
@@ -136,7 +133,32 @@ sub tick ($self, $level, $loop, $tick, $msg=undef) {
 
     $self->{filehandle}->print(
         colored( $out, 'grey15' ),
-        ($self->{min_level} == DEBUG ? ("\n".colored( lpad(dump_msg($loop)), 'italic grey15' )) : ()),
+        "\n"
+    );
+}
+
+sub log_tick_loop_stat ($self, $level, $loop, $msg) {
+
+    return if $self->{min_level} > $level
+           || $self->{max_level} < $level;
+
+    my $out = '-- '.$msg;
+
+    $self->{filehandle}->print(
+        colored( $out . lpad(dump_msg($loop)), 'grey10' ),
+        "\n"
+    );
+}
+
+sub log_tick_stat ($self, $level, $loop, $msg) {
+
+    return if $self->{min_level} > $level
+           || $self->{max_level} < $level;
+
+    my $out = '-- '.$msg;
+
+    $self->{filehandle}->print(
+        colored( $out, 'grey10' ),
         "\n"
     );
 }
