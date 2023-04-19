@@ -6,6 +6,7 @@ use experimental qw[ signatures lexical_subs postderef ];
 use Carp         'confess';
 use Scalar::Util 'blessed';
 use List::Util   'uniq';
+use Time::HiRes  ();
 
 use ELO::Core::Process;
 use ELO::Core::ActorRef;
@@ -13,6 +14,7 @@ use ELO::Constants qw[ $SIGEXIT ];
 
 use parent 'UNIVERSAL::Object::Immutable';
 use slots (
+    tick_delay => sub {},
     # ...
     _process_table  => sub { +{} },
     _process_links  => sub { +{} },
@@ -295,21 +297,67 @@ sub tick ($self) {
     return;
 }
 
+# NOTE:
+# currently this is basically loop-once, or loop-to-completion since
+# we will stop once we have nothing in the queue. In a loop-forever
+# scenario, we would simply sleep the loop until we got something
+# but since we currently cannot get outside input, that really is
+# not a concern at the moment.
+
 sub loop ($self, $logger=undef) {
     my $tick = 0;
 
-    $logger->tick( $logger->INFO,  $self, $tick, 'START' ) if $logger;
+    my $now;
+    my sub update_clock { $now = Time::HiRes::clock_gettime( Time::HiRes::CLOCK_MONOTONIC() ) }
 
+    my $start_loop = update_clock();
+
+    $logger->tick( $logger->INFO, $self, $tick, 'START' ) if $logger;
+
+    my $tick_delay    = $self->{tick_delay};
+    my $total_elapsed = 0;
+    my $total_slept   = 0;
+
+    # XXX - move this while condition into a poll() method
     while ( $self->{_signal_queue}->@*   ||
             $self->{_callback_queue}->@* ||
             $self->{_message_queue}->@*  ){
 
-        $logger->tick( $logger->INFO,  $self, $tick ) if $logger;
+        my $start_tick = update_clock();
+        $logger->tick( $logger->INFO, $self, $tick ) if $logger;
+
         $self->tick;
-        $tick++
+
+        update_clock();
+        my $elapsed = $now - $start_tick;
+
+        $logger->tick( $logger->INFO, $self, $tick, sprintf 'elapsed/ %f /' => $elapsed ) if $logger;
+
+        if ( defined $tick_delay && $elapsed < $tick_delay ) {
+            my $wait = $tick_delay - $elapsed;
+            $logger->tick( $logger->INFO, $self, $tick, sprintf 'sleeping/ %f /' => $wait ) if $logger;
+            Time::HiRes::sleep( $wait );
+            $total_slept += $wait;
+        }
+
+        $total_elapsed += $elapsed;
+
+        $tick++;
     }
 
-    $logger->tick( $logger->INFO,  $self, $tick, 'END'  ) if $logger;
+    update_clock();
+    my $elapsed      = $now - $start_loop;
+    my $total_system = ($elapsed - ($total_elapsed + $total_slept));
+
+    $logger->tick( $logger->INFO, $self, $tick, 'END' ) if $logger;
+    $logger->tick( $logger->INFO, $self, $tick,
+        sprintf 'TIME total=(%f) [ %.02f%% system=(%f), %.02f%% user=(%f), %.02f%% waiting=(%f) ]' => (
+            $elapsed,
+            (($total_system  / $elapsed) * 100), $total_system,
+            (($total_elapsed / $elapsed) * 100), $total_elapsed,
+            (($total_slept   / $elapsed) * 100), $total_slept,
+        )
+    ) if $logger;
 
     return;
 }

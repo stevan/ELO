@@ -6,6 +6,17 @@ use experimental qw[ signatures lexical_subs postderef ];
 use Hash::Util     qw[ fieldhash ];
 use ELO::Constants qw[ $SIGEXIT ];
 
+# ($self, ActorRef $this) -> %{ eventType => sub (@eventArgs) -> () }
+sub receive ($self, $this) { +{} }
+
+# ($self, ActorRef $this) -> ()
+sub on_start ($self, $this) { () }
+
+# ($self, ActorRef $this, ActorRef $from) -> ()
+sub on_exit ($self, $this, $from) { $this->exit(0) }
+
+## ...
+
 # we specifically use inside-out
 # objects here because this is
 # really private data for the
@@ -18,15 +29,6 @@ use ELO::Constants qw[ $SIGEXIT ];
 # force our implementation choice
 # on the consumer :)
 fieldhash my %receivers;
-
-# ($self, ActorRef $this) -> %{ eventType => sub (@eventArgs) -> () }
-sub receive ($self, $this) { +{} }
-
-# ($self, ActorRef $this) -> ()
-sub on_start ($self, $this) { () }
-
-# ($self, ActorRef $this, ActorRef $from) -> ()
-sub on_exit ($self, $this, $from) { $this->exit(0) }
 
 # ($self, ActorRef $this, $event) -> ()
 sub apply ($self, $this, $event) {

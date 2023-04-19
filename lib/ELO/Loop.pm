@@ -4,8 +4,23 @@ use warnings;
 use experimental qw[ signatures lexical_subs postderef ];
 
 use ELO::Core::Loop;
+use ELO::Core::Promise;
 
 # static method/functions ...
+
+my sub build_loop (%options) {
+    my $loop = ELO::Core::Loop->new(
+        (exists $options{tick_delay}
+            ? (tick_delay => $options{tick_delay})
+            : ())
+    );
+
+    if ( $options{with_promises} ) {
+        $ELO::Core::Promise::LOOP = $loop;
+    }
+
+    return $loop;
+}
 
 sub run ($class, $f, %options) {
 
@@ -13,21 +28,14 @@ sub run ($class, $f, %options) {
     my $logger;
     my $env;
 
-    my $loop = ELO::Core::Loop->new;
+    my $loop = build_loop( %options );
 
     # process options ...
-
-    if ( $options{with_promises} ) {
-        require ELO::Core::Promise;
-        $ELO::Core::Promise::LOOP = $loop;
-    }
-
     $args   = $options{args}   if $options{args};
     $logger = $options{logger} if $options{logger};
     $env    = $options{env}    if $options{env};
 
     # run the loop
-
     $loop->run( $f, $args // +[], $logger, $env );
 
     return;
@@ -39,21 +47,14 @@ sub run_actor ($class, $actor_class, %options) {
     my $logger;
     my $env;
 
-    my $loop = ELO::Core::Loop->new;
+    my $loop = build_loop( %options );
 
     # process options ...
-
-    if ( $options{with_promises} ) {
-        require ELO::Core::Promise;
-        $ELO::Core::Promise::LOOP = $loop;
-    }
-
     $actor_args  = $options{actor_args}  if $options{actor_args};
     $logger      = $options{logger}      if $options{logger};
     $env         = $options{env}         if $options{env};
 
     # run the loop
-
     $loop->run_actor( $actor_class, $actor_args // +{}, $logger, $env );
 
     return;
