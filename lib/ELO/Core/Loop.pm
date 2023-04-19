@@ -368,15 +368,18 @@ sub LOOP ($self, $logger=undef) {
     my $elapsed      = $self->now - $start_loop;
     my $total_system = ($elapsed - ($total_elapsed + $total_slept));
 
-    $logger->log_tick( $logger->INFO, $self, $tick, 'END' ) if $logger;
-    $logger->log_tick_stat( $logger->DEBUG, $self,
-        sprintf 'TIMINGS: total=(%f) [ %.02f%% system=(%f), %.02f%% user=(%f), %.02f%% waiting=(%f) ]' => (
-            $elapsed,
-            (($total_system  / $elapsed) * 100), $total_system,
-            (($total_elapsed / $elapsed) * 100), $total_elapsed,
-            (($total_slept   / $elapsed) * 100), $total_slept,
-        )
-    ) if $logger;
+    if ($logger) {
+        $logger->log_tick( $logger->INFO, $self, $tick, 'END' );
+        $logger->log_tick_stat( $logger->DEBUG, $self,
+            sprintf 'TIMINGS: total=(%f) [ %.02f%% system=(%f), %.02f%% user=(%f), %.02f%% waiting=(%f) ]' => (
+                $elapsed,
+                (($total_system  / $elapsed) * 100), $total_system,
+                (($total_elapsed / $elapsed) * 100), $total_elapsed,
+                (($total_slept   / $elapsed) * 100), $total_slept,
+            )
+        );
+        $logger->log_tick_loop_stat( $logger->DEBUG, $self, 'RUNNING:' );
+    }
 
     return;
 }

@@ -78,25 +78,22 @@ my sub dump_msg ($msg) {
             # the system.
 
             return +{
-                object  => [ sort keys $obj->{_process_table}->%* ],
+                object  => [ sort keys $obj->{_process_table}->%* ]
             } if $ctx->object_isa('ELO::Core::Loop');
 
             return +{
-                object  => bless {
-                    #type => 'ELO::Core::Process',
+                object  => {
                     pid  => $obj->pid,
-                    name => $obj->name,
-                    func => Sub::Util::subname( $obj->func ),
-                } => 'ELO::DEBUG::Process'
+                    f    => Sub::Util::subname( $obj->func ),
+                }
             } if $ctx->object_isa('ELO::Core::Process');
 
             return +{
-                object  => bless {
-                    #type   => 'ELO::Core::Promise',
+                object  => {
                     status => $obj->status,
                     result => $obj->result,
                     error  => $obj->error,
-                } => 'ELO::DEBUG::Promise'
+                }
             } if $ctx->object_isa('ELO::Core::Promise');
 
             return;
