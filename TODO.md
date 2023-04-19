@@ -1,5 +1,31 @@
 # ELO TODO
 
+
+## Time based Timers
+
+- rename the other timers to tickers
+
+- MAXWAIT (max wait time) - 3600
+- MNOW (monotonic time) - use Time::HiRes::clock_gettime( Time::HiRes::CLOCK_MONOTONIC() )
+- TIMERS sorted list of timers (Time, Callback)
+- WAITTIME - possible time to wait if no events exist
+
+if TIMERS && the first time is less than or equal to MNOW
+    run timer callbacks
+
+if TIMERS
+    find the next wait time
+        if less than MAXWAIT
+            WAITTIME = next timer value + roundup a millisecond (??? see AnyEvent, not sure why)
+        else
+            WAITTIME is MAXWAIT
+
+process for events from msg/sig/cb queues
+
+if no more events
+    sleep for WAITTIME
+
+
 -----------------------------------------------------------
 ## General
 -----------------------------------------------------------
