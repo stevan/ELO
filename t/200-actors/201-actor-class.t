@@ -14,7 +14,7 @@ use Hash::Util qw[fieldhash];
 
 use ok 'ELO::Loop';
 use ok 'ELO::Actors', qw[ match ];
-use ok 'ELO::Timers', qw[ timer interval cancel_interval ];
+use ok 'ELO::Timers', qw[ ticker interval_ticker cancel_ticker ];
 
 my $log = Test::ELO->create_logger;
 
@@ -78,14 +78,14 @@ sub init ($this, $msg=[]) {
 
     $this->link( $_ ) foreach $a1, $a2;
 
-    my $i = interval( $this, 2, sub {
+    my $i = interval_ticker( $this, 2, sub {
         $this->send( $a1, [ eHello => 'World' ] );
         $this->send( $a2, [ eHello => 'Monde' ] );
     });
 
-    timer( $this, 10, sub {
+    ticker( $this, 10, sub {
         $log->warn( $this, '... exiting' );
-        cancel_interval( $i );
+        cancel_ticker( $i );
         $this->exit(0);
     });
 

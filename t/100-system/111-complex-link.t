@@ -14,7 +14,7 @@ use Hash::Util qw[fieldhash];
 
 use ok 'ELO::Loop';
 use ok 'ELO::Actors',    qw[ match ];
-use ok 'ELO::Timers',    qw[ timer ];
+use ok 'ELO::Timers',    qw[ ticker ];
 use ok 'ELO::Constants', qw[ $SIGEXIT ];
 
 my $log = Test::ELO->create_logger;
@@ -65,7 +65,7 @@ sub init ($this, $msg) {
         $this->send( $cat1, [ 'meow' ] );
         $this->send( $cat2, [ 'meow' ] );
 
-        timer( $this, 10, sub {
+        ticker( $this, 10, sub {
             $log->warn( $this, 'I can not take it anymore!');
             $this->kill( $cat2 );
         });

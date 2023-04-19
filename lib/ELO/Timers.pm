@@ -9,17 +9,36 @@ use Exporter 'import';
 
 our @EXPORT_OK = qw[
     timer
-    cancel_timer
     interval
-    cancel_interval
+    cancel_timer
+
+    ticker
+    interval_ticker
+    cancel_ticker
 ];
 
-sub cancel_interval ($tid) {
-    warn "<< Cancelling Interval: $tid\n" if DEBUG;
-    ${$tid}++
+# Timers - TODO
+
+sub timer ($this, $timeout, $callback) {
+    ...
 }
 
 sub interval ($this, $duration, $callback) {
+    ...
+}
+
+sub cancel_timer ($tid) {
+    ...
+}
+
+# Tickers
+
+sub cancel_ticker ($tid) {
+    warn "<< Cancelling Ticker: $tid\n" if DEBUG;
+    ${$tid}++
+}
+
+sub interval_ticker ($this, $duration, $callback) {
 
     my $cb = ref $callback eq 'CODE'
         ? $callback
@@ -31,15 +50,15 @@ sub interval ($this, $duration, $callback) {
 
     my $interval;
     $interval = sub {
-        warn "!!! Checking Interval($interval) : tid($tid)[".$$tid."]\n" if DEBUG > 2;
+        warn "!!! Checking TickerInterval($interval) : tid($tid)[".$$tid."]\n" if DEBUG > 2;
         if ($$tid) {
-            warn ">> Interval($interval) cancelled!" if DEBUG;
+            warn ">> TickerInterval($interval) cancelled!" if DEBUG;
             return;
         }
 
-        warn "!!! Interval($interval) tick ... interval($timeout)\n" if DEBUG > 2;
+        warn "!!! TickerInterval($interval) tick ... interval($timeout)\n" if DEBUG > 2;
         if ($timeout <= 1) {
-            warn "<< Interval($interval) call!\n" if DEBUG;
+            warn "<< TickerInterval($interval) call!\n" if DEBUG;
             $this->loop->next_tick(sub {
                 # just to be sure, check the tid
                 $$tid or $cb->()
@@ -48,25 +67,20 @@ sub interval ($this, $duration, $callback) {
             $this->loop->next_tick($interval);
         }
         else {
-            warn ">> Interval($interval) still waiting ...\n" if DEBUG > 2;
+            warn ">> TickerInterval($interval) still waiting ...\n" if DEBUG > 2;
             $timeout--;
             $this->loop->next_tick($interval);
         }
     };
 
-    warn ">> Create Interval($interval) with duration($duration) tid($tid)\n" if DEBUG;
+    warn ">> Create TickerInterval($interval) with duration($duration) tid($tid)\n" if DEBUG;
 
     $interval->();
 
     return $tid;
 }
 
-sub cancel_timer ($tid) {
-    warn "<< Cancelling Timer: $tid\n" if DEBUG;
-    ${$tid}++
-}
-
-sub timer ($this, $timeout, $callback) {
+sub ticker ($this, $timeout, $callback) {
 
     my $cb = ref $callback eq 'CODE'
         ? $callback
@@ -76,28 +90,28 @@ sub timer ($this, $timeout, $callback) {
 
     my $timer;
     $timer = sub {
-        warn "!!! Checking Timer($timer) : tid($tid)[".$$tid."]\n" if DEBUG > 2;
+        warn "!!! Checking Ticker($timer) : tid($tid)[".$$tid."]\n" if DEBUG > 2;
         if ($$tid) {
-            warn ">> Timer($timer) cancelled!" if DEBUG;
+            warn ">> Ticker($timer) cancelled!" if DEBUG;
             return;
         }
 
-        warn "!!! Timer($timer) tick ... timeout($timeout)\n" if DEBUG > 2;
+        warn "!!! Ticker($timer) tick ... timeout($timeout)\n" if DEBUG > 2;
         if ($timeout <= 0) {
-            warn "<< Timer($timer) done!\n" if DEBUG;
+            warn "<< Ticker($timer) done!\n" if DEBUG;
             $this->loop->next_tick(sub {
                 # just to be sure, check the tid
                 $$tid or $cb->()
             });
         }
         else {
-            warn ">> Timer($timer) still waiting ...\n" if DEBUG > 2;
+            warn ">> Ticker($timer) still waiting ...\n" if DEBUG > 2;
             $timeout--;
             $this->loop->next_tick($timer)
         }
     };
 
-    warn ">> Create Timer($timer) with timeout($timeout) tid($tid)\n" if DEBUG;
+    warn ">> Create Ticker($timer) with timeout($timeout) tid($tid)\n" if DEBUG;
 
     $timer->();
 

@@ -11,7 +11,7 @@ use Test::ELO;
 use Data::Dump;
 
 use ok 'ELO::Loop';
-use ok 'ELO::Timers', qw[ timer ];
+use ok 'ELO::Timers', qw[ ticker ];
 
 my $log = Test::ELO->create_logger;
 
@@ -19,10 +19,10 @@ sub init ($this, $msg) {
 
     my $x = 0;
 
-    timer( $this, 0, sub { is($x, 0, '... x should be equal to 0') });
-    timer( $this, 1, sub { is($x, 1, '... x should be equal to 1 by now') });
-    timer( $this, 2, sub { is($x, 2, '... x should be equal to 2 by now') });
-    timer( $this, 3, sub { is($x, 2, '... x should still be 2 by now') });
+    ticker( $this, 0, sub { is($x, 0, '... x should be equal to 0') });
+    ticker( $this, 1, sub { is($x, 1, '... x should be equal to 1 by now') });
+    ticker( $this, 2, sub { is($x, 2, '... x should be equal to 2 by now') });
+    ticker( $this, 3, sub { is($x, 2, '... x should still be 2 by now') });
 
     $log->info( $this, "Hello World" );
     $this->loop->next_tick(sub {
@@ -34,7 +34,7 @@ sub init ($this, $msg) {
         });
     });
 
-    timer( $this, 0, sub { is($x, 1, '... x should be equal to 1 because it runs after the x++ ticks') });
+    ticker( $this, 0, sub { is($x, 1, '... x should be equal to 1 because it runs after the x++ ticks') });
 }
 
 ELO::Loop->run( \&init, logger => $log );

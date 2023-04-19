@@ -14,7 +14,7 @@ use Hash::Util qw[fieldhash];
 
 use ok 'ELO::Loop';
 use ok 'ELO::Actors',    qw[ match ];
-use ok 'ELO::Timers',    qw[ timer interval cancel_interval ];
+use ok 'ELO::Timers',    qw[ interval_ticker cancel_ticker ];
 use ok 'ELO::Constants', qw[ $SIGEXIT ];
 
 my $log = Test::ELO->create_logger;
@@ -72,7 +72,7 @@ sub init ($this, $msg) {
         $this->send( $cat, [ 'meow' ] );
 
         # keep trying to kill the cat
-        $interval = interval( $this, 2, sub {
+        $interval = interval_ticker( $this, 2, sub {
             $log->warn( $this, '... take this you darn cat!');
             $this->kill( $cat );
         });
@@ -84,7 +84,7 @@ sub init ($this, $msg) {
         $SIGEXIT => sub ($from) {
             ok(!$this->loop->is_process_alive( $from ), '... the process has died as expected');
             $log->error( $this, '... our kitty died! ('.$from->pid.')');
-            cancel_interval( $interval );
+            cancel_ticker( $interval );
             $this->exit(0);
         }
     }

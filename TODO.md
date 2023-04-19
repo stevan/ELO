@@ -3,8 +3,6 @@
 
 ## Time based Timers
 
-- rename the other timers to tickers
-
 - MAXWAIT (max wait time) - 3600
 - MNOW (monotonic time) - use Time::HiRes::clock_gettime( Time::HiRes::CLOCK_MONOTONIC() )
 - TIMERS sorted list of timers (Time, Callback)

@@ -14,7 +14,7 @@ use Hash::Util qw[fieldhash];
 
 use ok 'ELO::Loop';
 use ok 'ELO::Actors',    qw[ match ];
-use ok 'ELO::Timers',    qw[ timer ];
+use ok 'ELO::Timers',    qw[ ticker ];
 use ok 'ELO::Constants', qw[ $SIGEXIT ];
 
 my $log = Test::ELO->create_logger;
@@ -29,7 +29,7 @@ sub Worker ($this, $msg) {
 
             pass('... got eStartWork message in '.$this->pid);
 
-            timer( $this, $timeout, sub {
+            ticker( $this, $timeout, sub {
                 $log->info( $this, "... finished work ($timeout)" );
                 $this->exit;
             })

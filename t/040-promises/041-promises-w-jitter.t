@@ -13,7 +13,7 @@ use Data::Dump;
 use ok 'ELO::Loop';
 use ok 'ELO::Actors',   qw[ match ];
 use ok 'ELO::Promises', qw[ promise collect ];
-use ok 'ELO::Timers',   qw[ timer ];
+use ok 'ELO::Timers',   qw[ ticker ];
 
 my $log = Test::ELO->create_logger;
 
@@ -34,7 +34,7 @@ sub Service ($this, $msg) {
             isa_ok($promise, 'ELO::Core::Promise');
 
             my $timeout = jitter();
-            timer(
+            ticker(
                 $this,
                 $timeout,
                 sub {
@@ -73,7 +73,7 @@ sub init ($this, $msg=[]) {
         isa_ok($promise, 'ELO::Core::Promise');
 
         my $timeout = jitter();
-        timer(
+        ticker(
             $this,
             $timeout,
             sub {

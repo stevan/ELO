@@ -12,10 +12,9 @@ use Data::Dump;
 
 use ok 'ELO::Loop';
 use ok 'ELO::Timers', qw[
-    timer
-    cancel_timer
-    interval
-    cancel_interval
+    ticker
+    interval_ticker
+    cancel_ticker
 ];
 
 my $log = Test::ELO->create_logger;
@@ -34,15 +33,15 @@ sub init ($this, $msg) {
     my $r = $this->spawn( Responder => \&Responder );
     isa_ok($r, 'ELO::Core::Process');
 
-    my $t0 = timer( $this, 0, [ $r, ['Hello ... timeout(0)'] ] );
-    my $t1 = timer( $this, 1, [ $r, ['Hello ... timeout(1)'] ] );
-    my $t2 = timer( $this, 2, [ $r, ['Hello ... timeout(2)'] ] );
+    my $t0 = ticker( $this, 0, [ $r, ['Hello ... timeout(0)'] ] );
+    my $t1 = ticker( $this, 1, [ $r, ['Hello ... timeout(1)'] ] );
+    my $t2 = ticker( $this, 2, [ $r, ['Hello ... timeout(2)'] ] );
 
-    my $t5 = timer( $this, 5, [ $r, ['Hello ... timeout(5)'] ] );
-    my $t3 = timer( $this, 3, sub { cancel_timer( $t5 ) } );
+    my $t5 = ticker( $this, 5, [ $r, ['Hello ... timeout(5)'] ] );
+    my $t3 = ticker( $this, 3, sub { cancel_ticker( $t5 ) } );
 
-    my $i0 = interval( $this, 3, [ $r, ['Hello ... interval(3)'] ] );
-    my $i2 = timer( $this, 10, sub { cancel_interval( $i0 ) } );
+    my $i0 = interval_ticker( $this, 3, [ $r, ['Hello ... interval(3)'] ] );
+    my $i2 = ticker( $this, 10, sub { cancel_ticker( $i0 ) } );
 
 }
 

@@ -13,7 +13,7 @@ use Data::Dumper;
 use Hash::Util qw[fieldhash];
 
 use ok 'ELO::Loop';
-use ok 'ELO::Timers', qw[ timer interval cancel_interval ];
+use ok 'ELO::Timers', qw[ ticker interval_ticker cancel_ticker ];
 use ok 'ELO::Actors';
 use ok 'ELO::Actors::Actor';
 
@@ -51,7 +51,7 @@ sub init ($this, $msg=[]) {
     my $nl = $this->spawn_actor( 'Greeter', { greeting => 'Hallo'   } );
     my $fr = $this->spawn_actor( 'Greeter', { greeting => 'Bonjour' } );
 
-    my $i = interval( $this, 2, sub {
+    my $i = interval_ticker( $this, 2, sub {
         $this->send( $en, [ Greet => 'World' ] );
         $this->send( $nl, [ Greet => 'Werld' ] );
         $this->send( $fr, [ Greet => 'Monde' ] );
@@ -59,8 +59,8 @@ sub init ($this, $msg=[]) {
 
     $log->warn( $this, '... starting' );
 
-    timer( $this, 10, sub {
-        cancel_interval( $i );
+    ticker( $this, 10, sub {
+        cancel_ticker( $i );
         $_->exit foreach $en, $nl, $fr, $this
     });
 }
