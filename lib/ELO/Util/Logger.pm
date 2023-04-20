@@ -134,6 +134,36 @@ sub log_tick ($self, $level, $loop, $tick, $msg=undef) {
     );
 }
 
+sub log_tick_wait ($self, $level, $loop, $msg) {
+
+    return if $self->{min_level} > $level
+           || $self->{max_level} < $level;
+
+    my $out = '-- '.$msg;
+    $out .= ' ';
+    $out .= ('-' x ($MAX_LINE_WIDTH - length($out)));
+
+    $self->{filehandle}->print(
+        colored( $out, 'black on_green' ),
+        "\n"
+    );
+}
+
+sub log_tick_pause ($self, $level, $loop, $msg) {
+
+    return if $self->{min_level} > $level
+           || $self->{max_level} < $level;
+
+    my $out = '-- '.$msg;
+    $out .= ' ';
+    $out .= ('-' x ($MAX_LINE_WIDTH - length($out)));
+
+    $self->{filehandle}->print(
+        colored( $out, 'black on_magenta' ),
+        "\n"
+    );
+}
+
 sub log_tick_loop_stat ($self, $level, $loop, $msg) {
 
     return if $self->{min_level} > $level

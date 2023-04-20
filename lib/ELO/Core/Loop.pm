@@ -20,6 +20,7 @@ use slots (
     _process_table  => sub { +{} },
     _process_links  => sub { +{} },
 
+    _timers         => sub { +[] },
     _message_queue  => sub { +[] },
     _signal_queue   => sub { +[] },
     _callback_queue => sub { +[] },
@@ -149,6 +150,14 @@ sub next_tick ($self, $f) {
     return;
 }
 
+sub add_timer ($self, $timeout, $f) {
+    # Timer = [ $time, $f ]
+    push $self->{_timers}->@* => [ $self->now + $timeout, $f ];
+    # ... always keep them sorted
+    $self->{_timers}->@* = sort { $a->[0] <=> $b->[0] } $self->{_timers}->@*;
+    return;
+}
+
 sub enqueue_signal ($self, $sig) {
     # Sig = [ $to_process, $signal, $event ]
     push $self->{_signal_queue}->@* => $sig;
@@ -205,6 +214,21 @@ sub lookup_process ($self, $to_proc) {
 # ...
 
 sub TICK ($self) {
+
+    my $now = $self->now;
+
+    my $timers = $self->{_timers};
+    if ( @$timers && $timers->[0]->[0] <= $now ) {
+        do {
+            my $timer = shift @$timers;
+            eval {
+                $timer->[1]->(); 1;
+            } or do {
+                my $e = $@;
+                die "Timer callback failed ($timer) because: $e";
+            };
+        } while @$timers && $timers->[0]->[0] <= $now;
+    }
 
     # Signals are handled first, as they
     # are meant to be async interrupts
@@ -323,6 +347,10 @@ sub now  ($self) { $self->_update_clock } # always stay up to date ...
 sub sleep ($self, $wait) { Time::HiRes::sleep( $wait ) }
 
 sub _poll ($self) {
+    $self->{_timers}->@* || $self->_poll_queues
+}
+
+sub _poll_queues ($self) {
     $self->{_signal_queue}->@*   ||
     $self->{_callback_queue}->@* ||
     $self->{_message_queue}->@*
@@ -339,6 +367,7 @@ sub LOOP ($self, $logger=undef) {
     my $tick_delay    = $self->{tick_delay};
     my $total_elapsed = 0;
     my $total_slept   = 0;
+    my $total_waited  = 0;
 
     while ( $self->_poll ){
         $tick = $self->_update_tick;
@@ -351,10 +380,21 @@ sub LOOP ($self, $logger=undef) {
         my $elapsed = $self->now - $start_tick;
         $logger->log_tick_stat( $logger->DEBUG, $self, sprintf 'elapsed  = %f' => $elapsed ) if $logger;
 
+        my $waited = 0;
+        # if we have timers, but nothing in the queues ...
+        if ( $self->{_timers}->@* && !$self->_poll_queues ) {
+            my $wait = $self->{_timers}->[0]->[0] - $self->now;
+            # XXX - should have some kind of max-timeout here
+            $logger->log_tick_wait( $logger->INFO, $self, sprintf 'WAITING(%f)' => $wait ) if $logger;
+            $self->sleep( $wait );
+            $total_waited += $wait;
+            $waited = $wait;
+        }
+
         # support tick_delay parameter
-        if ( defined $tick_delay && $elapsed < $tick_delay ) {
-            my $wait = $tick_delay - $elapsed;
-            $logger->log_tick_stat( $logger->DEBUG, $self, sprintf 'sleeping = %f' => $wait ) if $logger;
+        if ( defined $tick_delay && ($elapsed + $waited) < $tick_delay ) {
+            my $wait = $tick_delay - ($elapsed + $waited);
+            $logger->log_tick_pause( $logger->DEBUG, $self, sprintf 'PAUSING(%f)' => $wait ) if $logger;
             $self->sleep( $wait );
             $total_slept += $wait;
         }
@@ -366,19 +406,29 @@ sub LOOP ($self, $logger=undef) {
 
     $self->_update_tick;
     my $elapsed      = $self->now - $start_loop;
-    my $total_system = ($elapsed - ($total_elapsed + $total_slept));
+    my $total_system = ($elapsed - ($total_elapsed + $total_slept + $total_waited));
 
     if ($logger) {
         $logger->log_tick( $logger->INFO, $self, $tick, 'END' );
+        $logger->log_tick_loop_stat( $logger->DEBUG, $self, 'ZOMBIES:' );
+        my $format = join "\n   " =>
+                        'TIMINGS:',
+                            '%6s = (%f)',
+                            '%6s = (%f) %5.2f%%',
+                            '%6s = (%f) %5.2f%%',
+                            '%6s = (%f) %5.2f%%',
+                            '%6s = (%f) %5.2f%%';
         $logger->log_tick_stat( $logger->DEBUG, $self,
-            sprintf 'TIMINGS: total=(%f) [ %.02f%% system=(%f), %.02f%% user=(%f), %.02f%% waiting=(%f) ]' => (
-                $elapsed,
-                (($total_system  / $elapsed) * 100), $total_system,
-                (($total_elapsed / $elapsed) * 100), $total_elapsed,
-                (($total_slept   / $elapsed) * 100), $total_slept,
+            sprintf $format => (
+                total => $elapsed,
+                map  { $_->@* }
+                sort { $b->[-1] <=> $a->[-1] }
+                [ system => $total_system,  (($total_system  / $elapsed) * 100) ],
+                [ user   => $total_elapsed, (($total_elapsed / $elapsed) * 100) ],
+                [ slept  => $total_slept,   (($total_slept   / $elapsed) * 100) ],
+                [ waited => $total_waited,  (($total_waited  / $elapsed) * 100) ],
             )
         );
-        $logger->log_tick_loop_stat( $logger->DEBUG, $self, 'RUNNING:' );
     }
 
     return;
