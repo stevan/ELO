@@ -217,25 +217,29 @@ sub TICK ($self) {
 
     my $now = $self->now;
 
+    # first thing we do is process the timers
+    # since they are time sensitive and we
+    # cannot guarentee that they will fire
+    # at the exact time, only that they will
+    # fire /after/ the time specified
     my $timers = $self->{_timers};
-    if ( @$timers && $timers->[0]->[0] <= $now ) {
-        do {
-            my $timer = shift @$timers;
-            eval {
-                $timer->[1]->(); 1;
-            } or do {
-                my $e = $@;
-                die "Timer callback failed ($timer) because: $e";
-            };
-        } while @$timers && $timers->[0]->[0] <= $now;
+    while (@$timers && $timers->[0]->[0] <= $now) {
+        my $timer = shift @$timers;
+        eval {
+            $timer->[1]->(); 1;
+        } or do {
+            my $e = $@;
+            die "Timer callback failed ($timer) because: $e";
+        };
     }
 
-    # Signals are handled first, as they
+    # Signals are handled next, as they
     # are meant to be async interrupts
     # (ala unix signals) but we wont
     # interrupt any other code, so we
     # do the next best-ish thing by
-    # handling the signals first
+    # handling the signals second after
+    # timers, since they are time sensitive
     my @sig_queue = $self->{_signal_queue}->@*;
     $self->{_signal_queue}->@* = ();
 
