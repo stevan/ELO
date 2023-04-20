@@ -268,13 +268,12 @@ sub TICK ($self) {
 
     }
 
-    my $now = $self->now;
-
     # next thing we do is process the timers
     # since they are time sensitive and we
     # cannot guarentee that they will fire
     # at the exact time, only that they will
     # fire /after/ the time specified
+    my $now    = $self->now;
     my $timers = $self->{_timers};
     while (@$timers && $timers->[0]->[0] <= $now) {
         my $timer = shift @$timers;
