@@ -6,14 +6,9 @@
 
 ### To Do
 
-- implement interval timer
-
 - implement waking from sleep via signal
     - $SIGWAKE
     - add on_wake, on_sleep to Actors::Actor
-
-- ActorRef & Actors::Actor are not calling the on_exit event handler
-    - why? and fix it
 
 - trampoline needs building!
     - in loop? in process?
