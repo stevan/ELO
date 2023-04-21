@@ -38,10 +38,6 @@ sub create_actor ($self, $actor_class, $actor_args, $env=undef, $parent=undef) {
     return $actor_ref;
 }
 
-sub destroy_actor ($self, $actor) {
-    $self->destroy_process( $actor );
-}
-
 sub create_process ($self, $name, $f, $env=undef, $parent=undef) {
     my $process = ELO::Core::Process->new(
         name   => $name,
