@@ -3,11 +3,20 @@ use v5.24;
 use warnings;
 use experimental qw[ signatures lexical_subs postderef ];
 
+use Sub::Util 'set_subname';
+
 use Exporter 'import';
 
 our @EXPORT_OK = qw[
     match
+    build_actor
 ];
+
+sub build_actor ($name, $f) {
+    state %counters;
+    set_subname sprintf('%s[%d]' => $name, $counters{$name}++), $f;
+    $f;
+}
 
 sub match ($msg, $table) {
     my ($event, @args) = @$msg;

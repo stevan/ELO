@@ -13,7 +13,7 @@ use Data::Dumper;
 use Hash::Util qw[fieldhash];
 
 use ok 'ELO::Loop';
-use ok 'ELO::Actors', qw[ match ];
+use ok 'ELO::Actors', qw[ match build_actor ];
 use ok 'ELO::Timers', qw[ ticker interval_ticker cancel_ticker ];
 
 my $log = Test::ELO->create_logger;
@@ -32,13 +32,12 @@ sub ActorFactory (%args) {
     # just the simple `sub` approach is just
     # fine.
 
-    $args{greeting} //= 'Hello'; # set a default
+    my $greeting = $args{greeting} // 'Hello'; # set a default
 
-    return sub ($this, $msg) {
+    return build_actor SimpleActor => sub ($this, $msg) {
 
         # `state` variables allow you to track state between calls
-        state $counter  = 0;
-        state $greeting = $args{greeting};
+        state $counter = 0;
 
         # it is also possible to make the handlers into a `state`
         # variable and prevent the re-complilation of the
