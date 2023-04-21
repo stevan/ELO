@@ -29,6 +29,9 @@ sub SigExitCatcher ($this, $msg) {
 }
 
 sub SigExitIgnore ($this, $msg) {
+    # this will not trap exits so it
+    # will simply be killed and not
+    # get any SIGEXIT messages
 
     $log->error( $this, '... got message in SigExitIgnore, this should not happen');
     fail('... we should never get a message here');

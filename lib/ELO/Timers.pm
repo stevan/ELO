@@ -29,16 +29,39 @@ sub timer ($this, $timeout, $callback) {
 
     warn ">> Create Timer($cb) with timeout($timeout) tid($tid)\n" if DEBUG;
 
-    return $tid;
+    return \$tid;
 }
 
 sub interval ($this, $duration, $callback) {
-    ...
+    my $cb = ref $callback eq 'CODE'
+        ? $callback
+        : sub { $this->send( @$callback ) };
+
+    my $iid = \(my $x = 0);
+    my $interval;
+
+    $interval = sub {
+        $cb->();
+        my $tid = $this->loop->add_timer( $duration, $interval );
+        #warn "t_ID: $tid (refresh) ".$$tid;
+        ${$iid} = $tid;
+        #warn "i_ID: $iid (refresh) ".$$iid;
+        warn ">> Refreshing Inverval($cb) with duration($duration) and iid($iid) -> tid($tid)\n" if DEBUG;
+    };
+
+    my $tid = $this->loop->add_timer( $duration, $interval );
+    #warn "t_ID: $tid ".$$tid;
+    $iid = \$tid;
+    #warn "i_ID: $iid ".$$iid;
+
+    warn ">> Create Inverval($cb) with duration($duration) iid($iid) -> tid($iid)\n" if DEBUG;
+
+    return $iid;
 }
 
 sub cancel_timer ($this, $tid) {
-    warn "<< Cancelling Timer: $tid\n" if DEBUG;
-    $this->loop->cancel_timer( $tid );
+    warn "<< Cancelling Timer: $tid for $$tid\n" if DEBUG;
+    $this->loop->cancel_timer( $$tid );
 }
 
 # Tickers
