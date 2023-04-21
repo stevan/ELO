@@ -19,6 +19,9 @@
     - in loop? in process?
     - Abstract::Process::tick is the best place probably
 
+- add dead-letter-queue to the loop
+    - allow it be configured as a black-hole
+
 - review code to
     - make sure we catch/handle all exceptions properly
     - some should be handleable via user code
