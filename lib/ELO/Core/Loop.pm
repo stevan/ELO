@@ -420,6 +420,7 @@ sub LOOP ($self, $logger=undef) {
 
         $total_elapsed += $elapsed;
 
+        $logger->log_tick_stat( $logger->DEBUG, $self, sprintf 'uptime   = %f' => ($total_elapsed + $total_slept + $total_waited) ) if $logger;
         $logger->log_tick_loop_stat( $logger->DEBUG, $self, 'running  =' ) if $logger;
     }
 
