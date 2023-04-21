@@ -59,8 +59,7 @@ sub spawn_actor ($self, $actor_class, $actor_args={}, $env=undef) {
 
 sub name ($self) { $self->{actor_class} }
 
-sub tick ($self) {
-    my $event = shift $self->{_msg_inbox}->@*;
+sub apply ($self, $event) {
     $self->{_actor}->apply( $self, $event );
 }
 

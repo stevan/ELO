@@ -15,20 +15,26 @@ use slots (
     parent => sub {},
     # ...
     _pid           => sub {},
-    _trap_signals  => sub {},
+    _flags         => sub {},
     _msg_inbox     => sub {},
     _environment   => sub {},
 );
 
 sub BUILD ($self, $params) {
-    $self->{_pid}          = sprintf '%03d:%s' => ++$PIDS, $self->name;
-    $self->{_trap_signals} = {};
-    $self->{_msg_inbox}    = [];
-    $self->{_environment}  = { ($params->{env} // $params->{ENV} // {})->%* };
+    $self->{_pid}         = sprintf '%03d:%s' => ++$PIDS, $self->name;
+    $self->{_flags}       = { trap_signals => {} };
+    $self->{_msg_inbox}   = [];
+    $self->{_environment} = { ($params->{env} // $params->{ENV} // {})->%* };
 }
 
 sub tick ($self) {
-    confess 'The method `tick` must be overriden for ('.$self->{_pid}.')';
+    my $event = shift $self->{_msg_inbox}->@*;
+    # XXX - add trampoline here
+    $self->apply( $event );
+}
+
+sub apply ($self) {
+    confess 'The method `apply` must be overriden for ('.$self->{_pid}.')';
 }
 
 sub name ($self) {
@@ -80,11 +86,11 @@ sub signal ($self, $proc, $signal, $event) {
 }
 
 sub trap ($self, $signal) {
-    $self->{_trap_signals}->{ $signal }++;
+    $self->{_flags}->{trap_signals}->{ $signal }++;
 }
 
 sub is_trapping ($self, $signal) {
-    !! exists $self->{_trap_signals}->{ $signal };
+    !! exists $self->{_flags}->{trap_signals}->{ $signal };
 }
 
 # ...

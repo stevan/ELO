@@ -12,11 +12,7 @@ use slots (
 sub name ($self) { $self->{name} }
 sub func ($self) { $self->{func} }
 
-sub tick ($self) {
-    my $event = shift $self->{_msg_inbox}->@*;
-    # XXX
-    # should we add a trampoline here to catch
-    # the exits and turn them into signals?
+sub apply ($self, $event) {
     $self->{func}->( $self, $event );
 }
 
