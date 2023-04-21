@@ -7,11 +7,13 @@ use Exporter 'import';
 
 our @EXPORT_OK = qw[
     $SIGEXIT
+    $SIGWAKE
 ];
 
 # signals ...
 
 our $SIGEXIT = 'SIGEXIT';
+our $SIGWAKE = 'SIGWAKE';
 
 1;
 

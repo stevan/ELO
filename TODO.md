@@ -8,26 +8,27 @@
 
 - implement interval timer
 
-- implement Process/Actor sleep
-    - changes the state of the process
-        - buffers all incoming requests
-    - wakes from signal?
+- implement waking from sleep via signal
+    - $SIGWAKE
+    - add on_wake, on_sleep to Actors::Actor
+
+- ActorRef & Actors::Actor are not calling the on_exit event handler
+    - why? and fix it
 
 - trampoline needs building!
+    - in loop? in process?
+    - Abstract::Process::tick is the best place probably
 
 - review code to
-    - make sure we catch/handle all exceptions
-
-- monitors
-    - monitors are uni-directional, and only the monitor receieves from the watched items
-
-- make SIGNALS into bitmask
-    - use dualvar to make string/int combos
-
-- make FLAGS for the process, also with bitmask style
-    - TRAP_EXIT
+    - make sure we catch/handle all exceptions properly
+    - some should be handleable via user code
+        - come up with a mechanism
+    - others should terminate the process gracefully
 
 ### Questions
+
+- should we add monitors?
+    - monitors are uni-directional, and only the monitor receieves from the watched items
 
 - ponder idle callbacks
     - they could be done instead of/in addition to waiting when there is nothing to do
@@ -35,8 +36,6 @@
 -----------------------------------------------------------
 ## Messages
 -----------------------------------------------------------
-
-### TODO
 
 - make a Message class
 
@@ -58,8 +57,6 @@
 ## Events
 -----------------------------------------------------------
 
-### TODO
-
 - make Event class
 - make syntactic sugar
     - to define events    ... `state $eFoo = event( eFoo => Str, Int);`
@@ -75,8 +72,6 @@
 -----------------------------------------------------------
 ## Promises
 -----------------------------------------------------------
-
-### To Do
 
 - improve the loop/promises integration
     - the ELO::Promise::LOOP is not great since it is global
@@ -96,8 +91,6 @@
 -----------------------------------------------------------
 ## Actors
 -----------------------------------------------------------
-
-### ToDo
 
 - actor state is complex, the sub versions have limits
     - ideally it is stateless
@@ -131,13 +124,8 @@
 ## Process
 -----------------------------------------------------------
 
-### TODO
-
 - consider a spawn_link() that will
     - immediately link to the new process
-
-- should we support blocking behavior at all?
-    - this will almost be needed for Futures
 
 -----------------------------------------------------------
 ## Futures
