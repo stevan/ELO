@@ -20,15 +20,25 @@ our @EXPORT_OK = qw[
 # Timers - TODO
 
 sub timer ($this, $timeout, $callback) {
-    ...
+
+    my $cb = ref $callback eq 'CODE'
+        ? $callback
+        : sub { $this->send( @$callback ) };
+
+    my $tid = $this->loop->add_timer( $timeout, $cb );
+
+    warn ">> Create Timer($cb) with timeout($timeout) tid($tid)\n" if DEBUG;
+
+    return $tid;
 }
 
 sub interval ($this, $duration, $callback) {
     ...
 }
 
-sub cancel_timer ($tid) {
-    ...
+sub cancel_timer ($this, $tid) {
+    warn "<< Cancelling Timer: $tid\n" if DEBUG;
+    $this->loop->cancel_timer( $tid );
 }
 
 # Tickers

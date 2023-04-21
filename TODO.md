@@ -1,34 +1,17 @@
 # ELO TODO
 
-
-## Time based Timers
-
-- MAXWAIT (max wait time) - 3600
-- MNOW (monotonic time) - use Time::HiRes::clock_gettime( Time::HiRes::CLOCK_MONOTONIC() )
-- TIMERS sorted list of timers (Time, Callback)
-- WAITTIME - possible time to wait if no events exist
-
-if TIMERS && the first time is less than or equal to MNOW
-    run timer callbacks
-
-if TIMERS
-    find the next wait time
-        if less than MAXWAIT
-            WAITTIME = next timer value + roundup a millisecond (??? see AnyEvent, not sure why)
-        else
-            WAITTIME is MAXWAIT
-
-process for events from msg/sig/cb queues
-
-if no more events
-    sleep for WAITTIME
-
-
 -----------------------------------------------------------
 ## General
 -----------------------------------------------------------
 
 ### To Do
+
+- implement interval timer
+
+- implement Process/Actor sleep
+    - changes the state of the process
+        - buffers all incoming requests
+    - wakes from signal?
 
 - trampoline needs building!
 
@@ -44,8 +27,10 @@ if no more events
 - make FLAGS for the process, also with bitmask style
     - TRAP_EXIT
 
-- store process flags in an array
-    -
+### Questions
+
+- ponder idle callbacks
+    - they could be done instead of/in addition to waiting when there is nothing to do
 
 -----------------------------------------------------------
 ## Messages

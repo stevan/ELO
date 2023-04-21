@@ -151,10 +151,20 @@ sub next_tick ($self, $f) {
 }
 
 sub add_timer ($self, $timeout, $f) {
+    # XXX - should we optimize timeout of 0 and
+    # just translate it into next_tick?
+
+    my $tid = \(my $x = 0);
+
     # Timer = [ $time, $f ]
-    push $self->{_timers}->@* => [ $self->now + $timeout, $f ];
+    push $self->{_timers}->@* => [ $self->now + $timeout, $f, $tid ];
     # ... always keep them sorted
     $self->{_timers}->@* = sort { $a->[0] <=> $b->[0] } $self->{_timers}->@*;
+    return $tid;
+}
+
+sub cancel_timer ($self, $tid) {
+    ${$tid}++;
     return;
 }
 
@@ -173,42 +183,11 @@ sub enqueue_msg ($self, $msg) {
 # ...
 
 sub is_process_alive ($self, $proc) {
-    # FIXME:
-    # this is gross, do better ...
-
-    my $is_alive = 0;
-    eval {
-        # this will lookup the process
-        $proc = $self->lookup_process( $proc );
-        # and mark success for it
-        $is_alive = 1;
-    } or do {
-        my $e = $@;
-        # do nothing here ...
-    };
-    # it either worked and got set
-    # or it did not so is false
-    return $is_alive;
+    $self->lookup_active_process( $proc ) ? 1 : 0;
 }
 
-sub lookup_process ($self, $to_proc) {
-
-    # if we have a PID, then look it up
-    if (not blessed $to_proc) {
-        die "Unable to find process for PID($to_proc)"
-            unless exists $self->{_process_table}->{ $to_proc };
-
-        # we know it is active, so we can just return it
-        return $self->{_process_table}->{ $to_proc };
-    }
-
-    # otherwise we have a Process object ...
-    confess "The process PID(".$to_proc->pid.") is not active"
-        # so make sure it is active
-        unless exists $self->{_process_table}->{ $to_proc->pid };
-
-    # and return it
-    return $to_proc;
+sub lookup_active_process ($self, $to_proc) {
+    $self->{_process_table}->{ blessed $to_proc ? $to_proc->pid : $to_proc };
 }
 
 # ...
@@ -222,7 +201,12 @@ sub TICK ($self) {
     # do the next best-ish thing by
     # handling the signals first, even before
     # the timers, even though they are
-    # time sensitive ...
+    # time sensitive. It should be noted
+    # that this will only run the internal
+    # handlers now, if the signal is trapped
+    # then the message is enqueued and
+    # will be handled as a normal message
+    # during this tick
     my @sig_queue = $self->{_signal_queue}->@*;
     $self->{_signal_queue}->@* = ();
 
@@ -230,33 +214,20 @@ sub TICK ($self) {
         my $sig = shift @sig_queue;
         my ($to_proc, $signal, $event) = @$sig;
 
-        # XXX - this can die ... catch it?
-        eval {
-            $to_proc = $self->lookup_process( $to_proc );
-            1;
-        } or do {
-            my $e = $@;
-            use Data::Dumper;
-            warn Dumper { e => $e, sig => $sig, queue => \@sig_queue };
-            die $e;
-        };
+        $to_proc = $self->lookup_active_process( $to_proc );
+
+        # if the process is not active, ignore all signals
+        # XXX - maybe add a dead signal queue here
+        next unless $to_proc;
 
         # is the signal trapped?
         if ( $to_proc->is_trapping( $signal ) ) {
-
-            # convert this into a message
-            $to_proc->accept( [ $signal, @$event ] );
-
-            # run the tick
-            eval {
-                $to_proc->tick;
-                1;
-            } or do {
-                my $e = $@;
-                die "Unhandled signal for (".$to_proc->pid.") failed with sig($signal, ".(join ', ' => @{ $event // []}).") because: $e";
-            };
+            # then convert this into a message
+            $self->enqueue_msg( [ $to_proc, [ $signal, @$event ]] );
         }
         else {
+            # run the immediate handlers
+            # XXX - this should be done better, but works for now
             if ( $signal eq $SIGEXIT ) {
                 # exit is a terminal signal,
                 $to_proc->exit(1);
@@ -277,6 +248,7 @@ sub TICK ($self) {
     my $timers = $self->{_timers};
     while (@$timers && $timers->[0]->[0] <= $now) {
         my $timer = shift @$timers;
+        next if ${$timer->[2]}; # skip if the timer has been cancelled
         eval {
             $timer->[1]->(); 1;
         } or do {
@@ -303,6 +275,13 @@ sub TICK ($self) {
         };
     }
 
+    # last is the message queue, which will process
+    # all messages recieved in previous ticks and
+    # followed by any messages enqueued during the
+    # previous phases of this tick. The prime example
+    # being signals, which can be turned into
+    # messages that are executed in this same tick.
+
     my @msg_queue = $self->{_message_queue}->@*;
     $self->{_message_queue}->@* = ();
 
@@ -310,8 +289,13 @@ sub TICK ($self) {
         my $msg = shift @msg_queue;
         my ($to_proc, $event) = @$msg;
 
+        $to_proc = $self->lookup_active_process( $to_proc );
+
+        # if the process is not active, ignore all messages
+        # XXX - maybe add a dead letter queue here
+        next unless $to_proc;
+
         eval {
-            $to_proc = $self->lookup_process( $to_proc );
             $to_proc->accept( $event );
             $to_proc->tick;
             1;
@@ -368,6 +352,9 @@ sub LOOP ($self, $logger=undef) {
 
     $logger->log_tick( $logger->INFO, $self, $tick, 'START' ) if $logger;
 
+    my $round = 0.001;          # 1ms is enough for us
+       $round -= $round * 1e-2; # 0.1 => 0.099
+
     my $tick_delay    = $self->{tick_delay};
     my $total_elapsed = 0;
     my $total_slept   = 0;
@@ -387,12 +374,44 @@ sub LOOP ($self, $logger=undef) {
         my $waited = 0;
         # if we have timers, but nothing in the queues ...
         if ( $self->{_timers}->@* && !$self->_poll_queues ) {
-            my $wait = $self->{_timers}->[0]->[0] - $self->now;
-            # XXX - should have some kind of max-timeout here
-            $logger->log_tick_wait( $logger->INFO, $self, sprintf 'WAITING(%f)' => $wait ) if $logger;
-            $self->sleep( $wait );
-            $total_waited += $wait;
-            $waited = $wait;
+
+            my $timers     = $self->{_timers};
+            my $next_timer = $timers->[0];
+            # if the timer is no active ...
+            while ( $next_timer && ${$next_timer->[2]} ) {
+                shift @$timers; # get rid of it
+                # and try the next one
+                $next_timer = $timers->[0];
+            }
+
+            if ( $next_timer ) {
+                my $now        = $self->now;
+                my $wait       = $next_timer->[0] - $now;
+                # do not wait for negative values ...
+                # typically this is timeouts of 0 being
+                # set in the previous tick, which means
+                # that the timer is essentially already
+                # late.
+                if ($wait > 0) {
+                    # XXX - should have some kind of max-timeout here
+                    $logger->log_tick_wait( $logger->INFO, $self, sprintf 'WAITING(%f)' => $wait ) if $logger;
+                    $self->sleep( $wait );
+                    $total_waited += $wait;
+                    $waited = $wait;
+                }
+                else {
+                    # XXX - should we fire the timers if we
+                    # find they're late? or let the next loop
+                    # handle it? I am inclinded towards the
+                    # next loop as it should at least be in
+                    # the next tick if it is a timeout of 0
+                    # but if it was just a long running tick
+                    # then maybe we should run them. Hmmm??
+                    #warn "next-timer: $next_timer now: $now wait: $wait\n";
+                    #use Data::Dumper;
+                    #warn $self->{_timers}->[0]->[1];
+                }
+            }
         }
 
         # support tick_delay parameter
