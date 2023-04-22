@@ -18,9 +18,7 @@ use ok 'ELO::Actors::Actor';
 my $log = Test::ELO->create_logger;
 
 package Greeter {
-    use v5.24;
-    use warnings;
-    use experimental 'signatures';
+    use v5.36;
 
     use parent 'UNIVERSAL::Object::Immutable';
     use roles  'ELO::Actors::Actor';

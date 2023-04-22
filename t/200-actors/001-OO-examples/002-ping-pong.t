@@ -20,9 +20,7 @@ my $log = Test::ELO->create_logger;
 # https://alvinalexander.com/scala/scala-akka-actors-ping-pong-simple-example/
 
 package Ping {
-    use v5.24;
-    use warnings;
-    use experimental 'signatures';
+    use v5.36;
 
     use Test::More;
 
@@ -66,9 +64,7 @@ package Ping {
 }
 
 package Pong {
-    use v5.24;
-    use warnings;
-    use experimental 'signatures';
+    use v5.36;
 
     use Test::More;
 
@@ -115,9 +111,7 @@ into a &recieve block
 }
 
 package Init {
-    use v5.24;
-    use warnings;
-    use experimental 'signatures';
+    use v5.36;
 
     use Test::More;
 

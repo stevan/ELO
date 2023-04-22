@@ -18,8 +18,7 @@ sub main ($this, $msg) {
     $this->send( $hello, ['World']);
 }
 
-ELO::Loop->new->run( \&main );
-
+ELO::Loop->run( \&init );
 ```
 
 With an Actor system implemented on top.
@@ -76,15 +75,15 @@ sub init ($this, $msg=[]) {
 
 }
 
-ELO::Loop->new->run( \&init );
+ELO::Loop->run( \&init );
 ```
 
 And a Promise mechanism to coordinate between Actors.
 
 ```perl
 use ELO::Loop;
-use ELO::Actors qw[ match ];
-use ELO::Promise;
+use ELO::Actors   qw[ match ];
+use ELO::Promises qw[ promise ];
 
 sub Service ($this, $msg) {
 
@@ -115,7 +114,7 @@ sub Service ($this, $msg) {
 sub init ($this, $msg=[]) {
     my $service = $this->spawn( Service  => \&Service );
 
-    my $promise = ELO::Promise->new;
+    my $promise = promise;
 
     $this->send( $service,
         [ eServiceRequest => ( add => [ 2, 2 ], $promise ) ]
@@ -129,5 +128,5 @@ sub init ($this, $msg=[]) {
     );
 }
 
-($ELO::Promise::LOOP = ELO::Loop->new)->run( \&init );
+ELO::Loop->run( \&init, with_promises => 1 );
 ```
