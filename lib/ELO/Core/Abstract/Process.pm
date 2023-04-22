@@ -1,7 +1,5 @@
 package ELO::Core::Abstract::Process;
-use v5.24;
-use warnings;
-use experimental qw[ signatures lexical_subs postderef ];
+use v5.36;
 
 use Carp 'confess';
 
@@ -145,7 +143,7 @@ sub is_trapping ($self, $signal) {
 
 # ...
 
-sub send ($self, $proc, $event) : method {
+sub send ($self, $proc, $event) {
     $self->{loop}->enqueue_msg([ $proc, $event ]);
 }
 

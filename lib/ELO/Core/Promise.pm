@@ -1,9 +1,5 @@
 package ELO::Core::Promise;
-use v5.24;
-use warnings;
-use experimental qw[ signatures lexical_subs postderef ];
-
-use Scalar::Util 'blessed';
+use v5.36;
 
 # FIXME: do better than this ...
 our $LOOP;
@@ -102,7 +98,7 @@ sub _wrap ($self, $p, $then) {
         if ($error) {
             $p->reject( $error );
         }
-        if ( blessed $result && $result->isa(__PACKAGE__) ) {
+        if ( $result isa __PACKAGE__ ) {
             $result->then(
                 sub { $p->resolve(@_); () },
                 sub { $p->reject(@_);  () },

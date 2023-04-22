@@ -1,7 +1,5 @@
 package ELO::Loop;
-use v5.24;
-use warnings;
-use experimental qw[ signatures lexical_subs postderef ];
+use v5.36;
 
 use ELO::Core::Loop;
 use ELO::Core::Promise;

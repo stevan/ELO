@@ -1,8 +1,6 @@
 #!perl
 
-use v5.24;
-use warnings;
-use experimental qw[ signatures lexical_subs postderef ];
+use v5.36;
 
 use Test::More;
 use Test::Differences;
@@ -92,6 +90,28 @@ package Pong {
             },
         };
     }
+
+=pod
+    sub ePing ( $this, $ping ) : handler {
+        isa_ok($ping, 'ELO::Core::ActorRef');
+
+        $log->info( $this, " ... Ping" );
+        $this->send( $ping, [ ePong => $this ]);
+    }
+
+    sub eStop ( $this ) : handler {
+        $log->info( $this, " ... Stopping Pong" );
+
+        pass('... '.$this->name.' finished');
+    }
+
+    sub recieve : Behavior[HandlerDispatch];
+
+This could loop over all the methods and find
+the ones with a :handler tag and collect them
+into a &recieve block
+=cut
+
 }
 
 package Init {

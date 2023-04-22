@@ -1,10 +1,7 @@
 package ELO::Core::ActorRef;
-use v5.24;
-use warnings;
-use experimental qw[ signatures lexical_subs postderef ];
+use v5.36;
 
-use Scalar::Util 'blessed';
-use Carp         'confess';
+use Carp 'confess';
 
 use ELO::Constants qw[ $SIGEXIT ];
 

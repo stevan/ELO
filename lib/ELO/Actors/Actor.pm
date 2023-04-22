@@ -1,7 +1,5 @@
 package ELO::Actors::Actor;
-use v5.24;
-use warnings;
-use experimental qw[ signatures lexical_subs postderef ];
+use v5.36;
 
 use Hash::Util     qw[ fieldhash ];
 use ELO::Constants qw[ $SIGEXIT ];

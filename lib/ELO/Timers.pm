@@ -1,7 +1,5 @@
 package ELO::Timers;
-use v5.24;
-use warnings;
-use experimental qw[ signatures lexical_subs postderef ];
+use v5.36;
 
 use constant DEBUG => $ENV{TIMER_DEBUG} || 0;
 
@@ -38,11 +36,10 @@ sub interval ($this, $duration, $callback) {
         : sub { $this->send( @$callback ) };
 
     my $iid = \(my $x = 0);
-    my $interval;
 
-    $interval = sub {
+    my $interval = sub {
         $cb->();
-        my $tid = $this->loop->add_timer( $duration, $interval );
+        my $tid = $this->loop->add_timer( $duration, __SUB__ );
         #warn "t_ID: $tid (refresh) ".$$tid;
         ${$iid} = $tid;
         #warn "i_ID: $iid (refresh) ".$$iid;
@@ -79,34 +76,32 @@ sub interval_ticker ($this, $duration, $callback) {
 
     my $tid = \(my $x = 0);
 
-    my $timeout = $duration;
-
-    my $interval;
-    $interval = sub {
-        warn "!!! Checking TickerInterval($interval) : tid($tid)[".$$tid."]\n" if DEBUG > 2;
+    my $timeout  = $duration;
+    my $interval = sub {
+        warn "!!! Checking TickerInterval($cb) : tid($tid)[".$$tid."]\n" if DEBUG > 2;
         if ($$tid) {
-            warn ">> TickerInterval($interval) cancelled!" if DEBUG;
+            warn ">> TickerInterval($cb) cancelled!" if DEBUG;
             return;
         }
 
-        warn "!!! TickerInterval($interval) tick ... interval($timeout)\n" if DEBUG > 2;
+        warn "!!! TickerInterval($cb) tick ... interval($timeout)\n" if DEBUG > 2;
         if ($timeout <= 1) {
-            warn "<< TickerInterval($interval) call!\n" if DEBUG;
+            warn "<< TickerInterval($cb) call!\n" if DEBUG;
             $this->loop->next_tick(sub {
                 # just to be sure, check the tid
                 $$tid or $cb->()
             });
             $timeout = $duration;
-            $this->loop->next_tick($interval);
+            $this->loop->next_tick(__SUB__);
         }
         else {
-            warn ">> TickerInterval($interval) still waiting ...\n" if DEBUG > 2;
+            warn ">> TickerInterval($cb) still waiting ...\n" if DEBUG > 2;
             $timeout--;
-            $this->loop->next_tick($interval);
+            $this->loop->next_tick(__SUB__);
         }
     };
 
-    warn ">> Create TickerInterval($interval) with duration($duration) tid($tid)\n" if DEBUG;
+    warn ">> Create TickerInterval($cb) with duration($duration) tid($tid)\n" if DEBUG;
 
     $interval->();
 
@@ -121,30 +116,29 @@ sub ticker ($this, $timeout, $callback) {
 
     my $tid = \(my $x = 0);
 
-    my $timer;
-    $timer = sub {
-        warn "!!! Checking Ticker($timer) : tid($tid)[".$$tid."]\n" if DEBUG > 2;
+    my $timer = sub {
+        warn "!!! Checking Ticker($cb) : tid($tid)[".$$tid."]\n" if DEBUG > 2;
         if ($$tid) {
-            warn ">> Ticker($timer) cancelled!" if DEBUG;
+            warn ">> Ticker($cb) cancelled!" if DEBUG;
             return;
         }
 
-        warn "!!! Ticker($timer) tick ... timeout($timeout)\n" if DEBUG > 2;
+        warn "!!! Ticker($cb) tick ... timeout($timeout)\n" if DEBUG > 2;
         if ($timeout <= 0) {
-            warn "<< Ticker($timer) done!\n" if DEBUG;
+            warn "<< Ticker($cb) done!\n" if DEBUG;
             $this->loop->next_tick(sub {
                 # just to be sure, check the tid
                 $$tid or $cb->()
             });
         }
         else {
-            warn ">> Ticker($timer) still waiting ...\n" if DEBUG > 2;
+            warn ">> Ticker($cb) still waiting ...\n" if DEBUG > 2;
             $timeout--;
-            $this->loop->next_tick($timer)
+            $this->loop->next_tick(__SUB__)
         }
     };
 
-    warn ">> Create Ticker($timer) with timeout($timeout) tid($tid)\n" if DEBUG;
+    warn ">> Create Ticker($cb) with timeout($timeout) tid($tid)\n" if DEBUG;
 
     $timer->();
 
