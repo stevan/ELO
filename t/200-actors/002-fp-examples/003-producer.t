@@ -101,7 +101,7 @@ sub ProducerFactory (%args) {
                 eContinue         => sub ($sender) { die "Cannot call eContinue on an empty producer" },
                 eShutdownProducer => sub ($sender) {
                     $log->warn( $this, '... eShutdownProducer => got shutdown from sender('.$sender->pid.')');
-                    $this->send( $debugger, [ eCollectData => $this, { eShutdownProducer => \@state_history } ] );
+                    $this->send( $debugger, [ eCollectShutdownData => $this, { eShutdownProducer => \@state_history } ] );
                     $this->exit(0);
                 }
             }
@@ -137,7 +137,7 @@ sub RouterFactory (%args) {
                 $this->send( $producer, [ eShutdownProducer => ($this) ] );
                 $log->warn( $this, '... eShutdownWorker => sending shutdown to workers('.(join ', ' => map { $_->pid } @downstream_queue).')');
                 $this->send( $_, [ eShutdownWorker => ($this) ] ) foreach  @downstream_queue;
-                $this->send( $debugger, [ eCollectData => $this, {
+                $this->send( $debugger, [ eCollectShutdownData => $this, {
                     eShutdownRouter => {
                         upstream_queue   => \@upstream_queue,
                         downstream_queue => [ map { $_->pid } @downstream_queue ],
@@ -202,10 +202,6 @@ sub WorkerFactory (%args) {
 
     my $debugger = $args{debugger};
 
-    state $IDS = 0;
-
-    my $worker_id = $IDS++;
-
     return build_actor Worker => sub ($this, $msg) {
 
         state $router;
@@ -225,8 +221,7 @@ sub WorkerFactory (%args) {
             },
             eShutdownWorker => sub ($sender) {
                 $log->warn( $this, '... eShutdownWorker => got shutdown from sender('.$sender->pid.')');
-                $this->send( $debugger, [ eCollectData => $this, {
-                    id         => $worker_id,
+                $this->send( $debugger, [ eCollectShutdownData => $this, {
                     processing => \@processing,
                     processed  => \@processed,
                     timers     => \@timers
@@ -243,7 +238,7 @@ sub WorkerFactory (%args) {
                     $this->send( $router, [ eContinue => ($this) ] );
                     push @processed => pop @processing;
 
-                    $log->info( $this, { id => $worker_id, processing => \@processing, processed => \@processed, } );
+                    $log->info( $this, { pid => $this->pid, processing => \@processing, processed => \@processed, } );
                 });
             }
         }
@@ -256,13 +251,25 @@ sub Debugger ($this, $msg) {
     state %data;
 
     match $msg, state $handler //= +{
-        eCollectData => sub ($sender, $data) {
+        eCollectShutdownData => sub ($sender, $data) {
             my $dataset = $data{ $sender->pid } //= [];
             push @$dataset => $data;
             $counter++;
             if ( $counter == $NUM_WORKERS + 2 ) {
-                warn "GOT EVERYTHGIN!";
-                warn Dumper \%data;
+                warn "GOT EVERYTHING!";
+                my @stats;
+                foreach my $worker ( grep /\d\d\d\:Worker/, keys %data ) {
+                    my $stats = $data{ $worker };
+                    foreach my $i ( 0 .. scalar $stats->{processed}->@* ) {
+                        push @stats => [
+                            $stats->{processed}->[$i],
+                            $worker,
+                            $stats->{timers}->[$i],
+                        ]
+                    }
+                }
+
+                warn Dumper \@stats;
             }
         }
     }
