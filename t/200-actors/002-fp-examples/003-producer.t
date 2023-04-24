@@ -16,11 +16,17 @@ use ok 'ELO::Timers', qw[ timer cancel_timer interval ];
 
 my $log = Test::ELO->create_logger;
 
-our $POLL_TICK_INTERVAL = 0.1;
+sub jitter ($max, $multipler=1) { rand($max) * $multipler }
+
+our $POLL_TICK_INTERVAL           = 2;
+our $POLL_TICK_INTERVAL_MULTIPLER = 2;
+
+our $MAX_WORK_TIME           = 3;
+our $MAX_WORK_TIME_MULTIPLER = 1.5;
 
 our $NUM_WORKERS = 5;
-our @DATASOURCE  = map { $_, (map { undef } 0 .. rand(4)) } (0 .. 50);
 
+our @DATASOURCE = 0 .. 15;
 #die Dumper \@DATASOURCE;
 
 sub ProducerFactory (%args) {
@@ -32,6 +38,7 @@ sub ProducerFactory (%args) {
 
         state $router;
         state $interval_id;
+        state @intervals;
 
         state $active_state = 'init';
         state @state_history = ($active_state);
@@ -44,9 +51,12 @@ sub ProducerFactory (%args) {
                     push @state_history => $active_state = 'standby';
 
                     # this is just to pump the datasource for non-null values
-                    $interval_id = interval( $this, $POLL_TICK_INTERVAL, sub {
+                    push @intervals => jitter($POLL_TICK_INTERVAL, $POLL_TICK_INTERVAL_MULTIPLER);
+                    $interval_id = timer( $this, $intervals[-1], sub {
                         $log->warn( $this, '... sending ePollTick to self' );
                         $this->send_to_self([ ePollTick => () ]);
+                        push @intervals => jitter($POLL_TICK_INTERVAL, $POLL_TICK_INTERVAL_MULTIPLER);
+                        $interval_id = timer( $this, $intervals[-1], __SUB__ );
                     });
                 }
             },
@@ -90,6 +100,9 @@ sub ProducerFactory (%args) {
                         cancel_timer( $this, $interval_id );
                         push @state_history => $active_state = 'empty';
                     }
+                    else {
+                        $log->info( $this, '... Producer.polling[ePollTick] got undefined item from Datasoure' );
+                    }
                 },
                 eContinue => sub ($sender) {
                     $log->info( $this, '... Producer.polling got eContinue from sender('.$sender->pid.')' );
@@ -97,11 +110,14 @@ sub ProducerFactory (%args) {
             },
 
             empty => {
-                ePollTick         => sub ()        { die "Cannot call ePollTick on an empty producer" },
+                ePollTick         => sub ()        { die Dumper [ "Cannot call ePollTick on an empty producer", $datasource, @intervals ] },
                 eContinue         => sub ($sender) { die "Cannot call eContinue on an empty producer" },
                 eShutdownProducer => sub ($sender) {
                     $log->warn( $this, '... eShutdownProducer => got shutdown from sender('.$sender->pid.')');
-                    $this->send( $debugger, [ eCollectShutdownData => $this, { eShutdownProducer => \@state_history } ] );
+                    $this->send( $debugger, [ eCollectShutdownData => $this, { eShutdownProducer => {
+                        state_transitions => \@state_history,
+                        intervals         => \@intervals,
+                    } } ] );
                     $this->exit(0);
                 }
             }
@@ -232,7 +248,7 @@ sub WorkerFactory (%args) {
                 $log->info( $this, '... eItem : starting job with item('.$item.') from sender('.$sender->pid.')' );
                 $log->warn( $this, '... eItem : sleeping instead of working ;)' );
                 push @processing => $item;
-                push @timers => rand();
+                push @timers => jitter($MAX_WORK_TIME, $MAX_WORK_TIME_MULTIPLER);
                 timer( $this, $timers[-1], sub {
                     $log->warn( $this, '... eItem : waking up and sending eContinue to router('.$router->pid.')' );
                     $this->send( $router, [ eContinue => ($this) ] );
@@ -253,23 +269,63 @@ sub Debugger ($this, $msg) {
     match $msg, state $handler //= +{
         eCollectShutdownData => sub ($sender, $data) {
             my $dataset = $data{ $sender->pid } //= [];
+            $data->{pid} = $sender->pid;
             push @$dataset => $data;
             $counter++;
             if ( $counter == $NUM_WORKERS + 2 ) {
-                warn "GOT EVERYTHING!";
+
+                my ($producer) = grep /\d\d\d\:Producer/, keys %data;
+                $producer = $data{$producer};
+
+                say 'Poll Intervals:';
+                say foreach $producer->[0]->{eShutdownProducer}->{intervals}->@*;
+                say '';
+
+                my @workers;
                 my @stats;
                 foreach my $worker ( grep /\d\d\d\:Worker/, keys %data ) {
                     my $stats = $data{ $worker };
-                    foreach my $i ( 0 .. scalar $stats->{processed}->@* ) {
-                        push @stats => [
-                            $stats->{processed}->[$i],
-                            $worker,
-                            $stats->{timers}->[$i],
-                        ]
+
+                    push @workers => @$stats;
+                    #warn Dumper $stats;
+                    foreach my $stat ( @$stats ) {
+                        foreach my $i ( 0 .. $stat->{processed}->$#* ) {
+                            push @stats => [
+                                $stat->{processed}->[$i],
+                                $stat->{timers}->[$i],
+                                $worker,
+                            ]
+                        }
                     }
                 }
 
-                warn Dumper \@stats;
+                #foreach my $sort (0, 1) {
+                #    # sort them ...
+                #    @stats = sort { $a->[$sort] <=> $b->[$sort] } @stats;
+                #    {
+                #        my $divider = '+------+-------+------------+';
+                #        say $divider;
+                #        say '|  id  | timer | pid        |';
+                #        say $divider;
+                #        foreach my $stat (@stats) {
+                #            say sprintf '| %4d | %.03f | %s |' => @$stat;
+                #        }
+                #        say $divider;
+                #    }
+                #}
+
+                @workers = sort { $a->{pid} cmp $b->{pid} } @workers;
+
+                {
+                    say '+------------+';
+                    say '| pid->items |';
+                    say '+------------+';
+                    foreach my $worker (@workers) {
+                        say sprintf '| %s | (%s) ' => $worker->{pid}, (join ', ' => $worker->{processed}->@*);
+                    }
+                    say '+------------+';
+                }
+
             }
         }
     }

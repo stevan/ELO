@@ -346,9 +346,6 @@ sub LOOP ($self, $logger=undef) {
 
     $logger->log_tick( $logger->INFO, $self, $tick, 'START' ) if $logger;
 
-    my $round = 0.001;          # 1ms is enough for us
-       $round -= $round * 1e-2; # 0.1 => 0.099
-
     my $tick_delay    = $self->{tick_delay};
     my $total_elapsed = 0;
     my $total_slept   = 0;
