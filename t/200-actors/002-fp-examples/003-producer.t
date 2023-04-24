@@ -278,53 +278,17 @@ sub Debugger ($this, $msg) {
                 $producer = $data{$producer};
 
                 say 'Poll Intervals:';
-                say foreach $producer->[0]->{eShutdownProducer}->{intervals}->@*;
+                say sprintf ' %.05f' => $_ foreach $producer->[0]->{eShutdownProducer}->{intervals}->@*;
                 say '';
 
-                my @workers;
-                my @stats;
-                foreach my $worker ( grep /\d\d\d\:Worker/, keys %data ) {
-                    my $stats = $data{ $worker };
+                my @workers = map $data{$_}, grep /\d\d\d\:Worker/, keys %data
+                   @workers = sort { $a->{pid} cmp $b->{pid} } @workers;
 
-                    push @workers => @$stats;
-                    #warn Dumper $stats;
-                    foreach my $stat ( @$stats ) {
-                        foreach my $i ( 0 .. $stat->{processed}->$#* ) {
-                            push @stats => [
-                                $stat->{processed}->[$i],
-                                $stat->{timers}->[$i],
-                                $worker,
-                            ]
-                        }
-                    }
+                say '+------------+';
+                foreach my $worker (@workers) {
+                    say sprintf '| %s | (%s) ' => $worker->{pid}, (join ', ' => $worker->{processed}->@*);
                 }
-
-                #foreach my $sort (0, 1) {
-                #    # sort them ...
-                #    @stats = sort { $a->[$sort] <=> $b->[$sort] } @stats;
-                #    {
-                #        my $divider = '+------+-------+------------+';
-                #        say $divider;
-                #        say '|  id  | timer | pid        |';
-                #        say $divider;
-                #        foreach my $stat (@stats) {
-                #            say sprintf '| %4d | %.03f | %s |' => @$stat;
-                #        }
-                #        say $divider;
-                #    }
-                #}
-
-                @workers = sort { $a->{pid} cmp $b->{pid} } @workers;
-
-                {
-                    say '+------------+';
-                    say '| pid->items |';
-                    say '+------------+';
-                    foreach my $worker (@workers) {
-                        say sprintf '| %s | (%s) ' => $worker->{pid}, (join ', ' => $worker->{processed}->@*);
-                    }
-                    say '+------------+';
-                }
+                say '+------------+';
 
             }
         }
