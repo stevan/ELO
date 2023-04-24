@@ -8,7 +8,7 @@ use Test::ELO;
 
 use Data::Dumper;
 
-use Hash::Util qw[fieldhash];
+use List::Util qw[ max min ];
 
 use ok 'ELO::Loop';
 use ok 'ELO::Actors', qw[ match build_actor ];
@@ -16,17 +16,17 @@ use ok 'ELO::Timers', qw[ timer cancel_timer interval ];
 
 my $log = Test::ELO->create_logger;
 
-sub jitter ($max, $multipler=1) { rand($max) * $multipler }
+sub jitter ($max, $multipler=1) { rand($max) * rand($multipler) }
 
 our $POLL_TICK_INTERVAL           = 2;
-our $POLL_TICK_INTERVAL_MULTIPLER = 2;
+our $POLL_TICK_INTERVAL_MULTIPLER = 1.05;
 
-our $MAX_WORK_TIME           = 3;
-our $MAX_WORK_TIME_MULTIPLER = 1.5;
+our $MAX_WORK_TIME           = 5;
+our $MAX_WORK_TIME_MULTIPLER = 2.2;
 
-our $NUM_WORKERS = 5;
+our $NUM_WORKERS = 12;
 
-our @DATASOURCE = 0 .. 15;
+our @DATASOURCE = 0 .. 86;
 #die Dumper \@DATASOURCE;
 
 sub ProducerFactory (%args) {
@@ -266,6 +266,12 @@ sub Debugger ($this, $msg) {
 
     state %data;
 
+    state sub average (@numbers) {
+      my $total;
+      $total += $_ for @numbers;
+      return $total / scalar @numbers;
+    }
+
     match $msg, state $handler //= +{
         eCollectShutdownData => sub ($sender, $data) {
             my $dataset = $data{ $sender->pid } //= [];
@@ -277,18 +283,31 @@ sub Debugger ($this, $msg) {
                 my ($producer) = grep /\d\d\d\:Producer/, keys %data;
                 $producer = $data{$producer};
 
-                say 'Poll Intervals:';
-                say sprintf ' %.05f' => $_ foreach $producer->[0]->{eShutdownProducer}->{intervals}->@*;
-                say '';
+                #say 'Poll Intervals:';
+                #say sprintf ' %.05f' => $_ foreach $producer->[0]->{eShutdownProducer}->{intervals}->@*;
+                #say '';
 
-                my @workers = map $data{$_}, grep /\d\d\d\:Worker/, keys %data
+                my @workers = map $data{$_}->@*, grep /\d\d\d\:Worker/, keys %data;
                    @workers = sort { $a->{pid} cmp $b->{pid} } @workers;
 
-                say '+------------+';
+                my @by_time;
                 foreach my $worker (@workers) {
-                    say sprintf '| %s | (%s) ' => $worker->{pid}, (join ', ' => $worker->{processed}->@*);
+                    push @by_time => [
+                        $worker->{pid},
+                        (sprintf '%.06f' => max($worker->{timers}->@*)),
+                        (sprintf '%.06f' => min($worker->{timers}->@*)),
+                        (sprintf '%.06f' => average($worker->{timers}->@*)),
+                        (join ', ' => $worker->{processed}->@*)
+                    ];
                 }
-                say '+------------+';
+
+                @by_time = sort { $a->[3] <=> $b->[3] } @by_time;
+
+                say '+------------+-----------+-----------+-----------+';
+                say '|        pid | max(time) | min(time) | avg(time) |';
+                say '+------------+-----------+-----------+-----------+';
+                say sprintf '| %s | %9s | %9s | %9s | (%s) ' => @$_ foreach @by_time;
+                say '+------------+-----------+-----------+-----------+';
 
             }
         }
