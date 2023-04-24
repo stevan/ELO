@@ -19,14 +19,14 @@ my $log = Test::ELO->create_logger;
 sub jitter ($max, $multipler=1) { rand($max) * rand($multipler) }
 
 our $POLL_TICK_INTERVAL           = 2;
-our $POLL_TICK_INTERVAL_MULTIPLER = 1.05;
+our $POLL_TICK_INTERVAL_MULTIPLER = 1;
 
-our $MAX_WORK_TIME           = 5;
-our $MAX_WORK_TIME_MULTIPLER = 2.2;
+our $MAX_WORK_TIME           = 2;
+our $MAX_WORK_TIME_MULTIPLER = 2.5;
 
-our $NUM_WORKERS = 12;
+our $NUM_WORKERS = 25;
 
-our @DATASOURCE = 0 .. 86;
+our @DATASOURCE = 0 .. 200;
 #die Dumper \@DATASOURCE;
 
 sub ProducerFactory (%args) {
