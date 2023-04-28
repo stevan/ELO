@@ -187,21 +187,29 @@ Given this, it makes sense to base our type system on JSON and start out with
 the following simple scalar types.
 
 ```perl
-type *Bool;
-type *Int;
-type *Float;
-type *Str;
+type *Bool;  # map to Perl's ideal of a boolean (?)
+type *Int;   # map to IV (and PVIV)
+type *Float; # map to NV (and PVNV)
+type *Str;   # map to PV, and PV** varients
 ```
+
+> NOTE: these are not intended to be stricter than Perl is itself, so using
+> internal SV type should work in the expected way, which is to say it matches
+> Perl's expectations.
+
 We can add the basic JSON reference scalar types as well.
 
 ```perl
-type *ArrayRef;
-type *HashRef;
+type *ArrayRef; # just checks reftype
+type *HashRef;  # just checks reftype
 ```
 
 > NOTE: we do not check the contents of the reference scalar types
 > so something like `*ArrayRef[*Int]` is not supported by these types
 > but more on that later.
+
+> NOTE: Consider adding `*RegExpRef` as well since they can be serialized as
+> a string and would work just fine locally as well.
 
 > NOTE: We do not support things like `*ScalarRef` or `*CodeRef` as they
 > are not possible to serialize, but in theory they should be included so
@@ -245,16 +253,15 @@ event *eSlurpyHash    => [ *Str, *Hash ];     # [ "foo", ( one => 1, two => 2, .
 event *eNonSlurpyHash => [ *Str, *HashRef ]; # [ "foo", { one => 1, two => 2, ... } ]
 ```
 
-<!-------------------------------------------------------->
-## ELO Core types
-<!-------------------------------------------------------->
+### ELO Core types
 
 Along with the above types we have some core types within ELO that need to be
 represented.
 
-### Process Types
-
-There are a couple of process types that need to be represented
+It is often that we need to pass some kind of process information in an event.
+For example, to provide a return "address" where the reciever can send a response.
+So we need some kind of way to represent a Process or an Actor instance, or possibly
+just their PID.
 
 ```perl
 type *Process; # a Process instance
@@ -262,19 +269,81 @@ type *Actor;   # an Actor instance
 type *PID;     # a PID value (Str) of a Process/Actor instance
 ```
 
+In some ways the above three types are interchangable since the loop will know how
+to handle the Process/Actor instances, and will know how to lookup the PID and get
+a Process/Actor instance.
+
+> NOTE: In a distributed setup all Process/Actor instances would be serialized as PIDs
+> so they could be easily transported.
+
+In addition to the processes we might need to pass other ELO entities such as
+promises and timer IDs.
+
 ```perl
 type *Promise; # a Promise instance
 type *TimerID; # a Timer ID (which is a ScalarRef)
 ```
 
+> NOTE: The above are both restricted to local actors only since they cannot
+> reasonably be serialized.
 
-- SV
-    - IV = int
-    - UV = unsigned int
-    - NV = double
-    - PV = string
-- RV = ref to SV
-- AV = list of SVs
-- HV = list of pairs of Str to SV
-- GV = glob (filehandle, etc)
-- CV = subroutine
+<!-------------------------------------------------------->
+## Misc.
+<!-------------------------------------------------------->
+
+Should we support some kind of generics in the type system?
+
+```perl
+sub Ref      ($T) { bless [ *Ref,      $T->[0] ] => 'type::generic' }
+sub ArrayRef ($T) { bless [ *ArrayRef, $T->[0] ] => 'type::generic' }
+sub HashRef  ($T) { bless [ *HashRef,  $T->[0] ] => 'type::generic' }
+
+
+event *eFoo => [ ArrayRef[ *Int ], ... ];
+```
+
+It opens up a whole can of worms, but it could be helpful.
+
+-----------------------------------------------------------
+
+Just a sketch I did of something, I want to keep it here.
+
+Simple version:
+```
+type *Method  => [ *GET, *POST ];
+type *URL     => *Str;
+
+type *Header  => [ *ContentType, *Accept ];
+type *Headers => { *Header => *Str };
+
+type *Request  => [ *Method, *URL,  *Headers ];
+type *Response => [ *Status, *Headers, *Body ];
+```
+
+Less Simple version:
+```
+enum *Method  => (*GET, *POST);
+
+type *URL => *Str;
+
+enum *Header => (
+    *ContentType,
+    *Accept
+);
+
+type *Headers => List[ Pair[ *Header => *Str ] ];
+
+struct *Request => {
+    method  => *Method,
+    url     => *URL,
+    headers => *Headers,
+};
+
+struct *Response => {
+    status  => *Status,
+    headers => *Headers,
+    body    => *Body
+};
+
+
+```
