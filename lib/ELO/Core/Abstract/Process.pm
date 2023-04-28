@@ -7,6 +7,19 @@ my $PIDS = 0;
 
 use ELO::Constants qw[ $SIGEXIT ];
 
+use overload (
+    fallback => 1,
+    # some operators to make things interesting ;)
+    '<<=' => sub ($self, $event, @) {
+        $self->send_to_self( $event );
+        $self;
+    },
+    '>>=' => sub ($self, $msg, @) {
+        $self->send( @$msg );
+        $self;
+    }
+);
+
 use parent 'UNIVERSAL::Object::Immutable';
 use slots (
     loop   => sub {},

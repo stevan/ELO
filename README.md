@@ -15,7 +15,10 @@ sub HelloWorld ($this, $msg) {
 
 sub main ($this, $msg) {
     my $hello = $this->spawn('HelloWorld' => \&HelloWorld);
+
     $this->send( $hello, ['World']);
+    # or use the operator syntax
+    $this >>= [ $hello, ['World']];
 }
 
 ELO::Loop->run( \&init );

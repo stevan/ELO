@@ -30,7 +30,7 @@ sub PingFactory (%args) {
 
                 $count++;
                 $log->info( $this, " Starting with ($count) and max-pings($max_pings)" );
-                $this->send( $pong, [ ePing => $this ]);
+                $this >>= [ $pong, [ ePing => $this ]];
 
                 pass('... '.$this->name.' started with '.$max_pings.' max pings');
             },
@@ -41,13 +41,13 @@ sub PingFactory (%args) {
                 $log->info( $this, " Pong with ($count)" );
                 if ( $count >= $max_pings ) {
                     $log->info( $this, " ... Stopping Ping" );
-                    $this->send( $pong, [ 'eStop' ]);
+                    $this >>= [ $pong, [ 'eStop' ]];
 
                     pass('... '.$this->name.' finished with '.$count.' pings');
                     $this->exit(0);
                 }
                 else {
-                    $this->send( $pong, [ ePing => $this ]);
+                    $this >>= [ $pong, [ ePing => $this ]];
                 }
             },
         }
@@ -73,7 +73,7 @@ sub PongFactory () {
                 isa_ok($ping, 'ELO::Core::Process');
 
                 $log->info( $this, " ... Ping" );
-                $this->send( $ping, [ ePong => $this ]);
+                $this >>= [ $ping, [ ePong => $this ]];
             },
             eStop => sub () {
                 $log->info( $this, " ... Stopping Pong" );
@@ -106,8 +106,8 @@ sub init ($this, $msg=[]) {
         $ping->link( $pong );
         $pong2->link( $ping2 );
 
-        $this->send( $ping,  [ eStartPing => $pong  ]);
-        $this->send( $ping2, [ eStartPing => $pong2 ]);
+        $this >>= [ $ping,  [ eStartPing => $pong  ]];
+        $this >>= [ $ping2, [ eStartPing => $pong2 ]];
 
         # set our process up to link to all
         # these processes, so we can see when
