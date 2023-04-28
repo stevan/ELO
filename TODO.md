@@ -31,6 +31,7 @@
 - ponder idle callbacks
     - they could be done instead of/in addition to waiting when there is nothing to do
 
+
 -----------------------------------------------------------
 ## Messages
 -----------------------------------------------------------
@@ -50,22 +51,6 @@
 - should we add a "stack" of some kind?
     - this could remove the need for `from`
     - and would allow for "stack" traces
-
------------------------------------------------------------
-## Events
------------------------------------------------------------
-
-- make Event class
-- make syntactic sugar
-    - to define events    ... `state $eFoo = event( eFoo => Str, Int);`
-    - to create instances ... `Event[ $eFoo, "bar", 10 ]`
-
-- should we make an Error class as well?
-    - this would help with Error handling
-
-- should we support both typed and untyped?
-    - [ 10 ]             # untyped
-    - [ eRequest => 10 ] # typed
 
 -----------------------------------------------------------
 ## Promises
