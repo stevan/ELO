@@ -10,10 +10,7 @@ use List::Util 'uniq';
 use Data::Dumper;
 
 use ok 'ELO::Loop';
-use ok 'ELO::Timers', qw[
-    timer
-    cancel_timer
-];
+use ok 'ELO::Timers', ':timers';
 
 my $log = Test::ELO->create_logger;
 

@@ -11,7 +11,7 @@ use Data::Dumper;
 use Hash::Util qw[fieldhash];
 
 use ok 'ELO::Loop';
-use ok 'ELO::Timers', qw[ ticker interval_ticker cancel_ticker ];
+use ok 'ELO::Timers', ':tickers';
 use ok 'ELO::Actors';
 use ok 'ELO::Actors::Actor';
 

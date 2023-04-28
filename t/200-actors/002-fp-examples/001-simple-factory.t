@@ -12,7 +12,7 @@ use Hash::Util qw[fieldhash];
 
 use ok 'ELO::Loop';
 use ok 'ELO::Actors', qw[ match build_actor ];
-use ok 'ELO::Timers', qw[ ticker interval_ticker cancel_ticker ];
+use ok 'ELO::Timers', qw[ :tickers ];
 
 my $log = Test::ELO->create_logger;
 

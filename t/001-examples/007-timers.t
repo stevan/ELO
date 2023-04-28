@@ -9,11 +9,7 @@ use Test::ELO;
 use Data::Dump;
 
 use ok 'ELO::Loop';
-use ok 'ELO::Timers', qw[
-    timer
-    interval
-    cancel_timer
-];
+use ok 'ELO::Timers', ':timers';
 
 my $log = Test::ELO->create_logger;
 

@@ -12,7 +12,7 @@ use List::Util qw[ max min ];
 
 use ok 'ELO::Loop';
 use ok 'ELO::Actors', qw[ match build_actor ];
-use ok 'ELO::Timers', qw[ timer cancel_timer interval ];
+use ok 'ELO::Timers', qw[ :timers ];
 
 my $log = Test::ELO->create_logger;
 
