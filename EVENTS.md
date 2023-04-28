@@ -84,11 +84,11 @@ signature type checking on the handler/reciever callbacks.
 
 Inside  the `match` keyword the following should happen:
 
-1) look at the `$msg` and determine the event type
-2) lookup the event type
+1. look at the `$msg` and determine the event type
+2. lookup the event type
     - fail loudly if we cannot find it
     - or return the found evemt declaration
-3) Type check the `$msg` body against the event declaration
+3. Type check the `$msg` body against the event declaration
     - throw errors appropriately
         - this will be much better than the sig errors
 

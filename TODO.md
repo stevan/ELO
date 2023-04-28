@@ -1,40 +1,51 @@
 # ELO TODO
 
------------------------------------------------------------
+<!-------------------------------------------------------->
 ## General
------------------------------------------------------------
+<!-------------------------------------------------------->
 
-### To Do
+- [ ] See `EVENTS.md`
 
-- implement waking from sleep via signal
-    - $SIGWAKE
+<!-------------------------------------------------------->
+## Loop
+<!-------------------------------------------------------->
+
+- [ ] implement waking from sleep via signal
+    - `$SIGWAKE`
     - add on_wake, on_sleep to Actors::Actor
 
-- trampoline needs building!
-    - in loop? in process?
-    - Abstract::Process::tick is the best place probably
-
-- add dead-letter-queue to the loop
+- [ ] add dead-letter-queue to the loop
     - allow it be configured as a black-hole
 
-- review code to
-    - make sure we catch/handle all exceptions properly
-    - some should be handleable via user code
-        - come up with a mechanism
-    - others should terminate the process gracefully
+- should we add `monitors`?
+    - basically something that can observe the system at runtime
+    - what about system probes?
+        - things that can sample actor state, etc.
+        - are they also a `monitor` responsibility?
 
-### Questions
-
-- should we add monitors?
-    - monitors are uni-directional, and only the monitor receieves from the watched items
-
-- ponder idle callbacks
+- should we add `idle` callbacks?
     - they could be done instead of/in addition to waiting when there is nothing to do
+    - use the AnyEvent approach and try to consumer no more than 50% of wait time
 
+<!-------------------------------------------------------->
+## Process
+<!-------------------------------------------------------->
 
------------------------------------------------------------
+- consider a `spawn_link()` that will
+    - immediately link to the new process
+
+- [ ] trampoline needs building!
+    - in loop? in process?
+    - Abstract::Process::tick is the best place probably
+    - also review code and ...
+        - make sure we catch/handle all exceptions properly
+        - some should be handleable via user code
+            - come up with a mechanism
+        - others should terminate the process gracefully
+
+<!-------------------------------------------------------->
 ## Messages
------------------------------------------------------------
+<!-------------------------------------------------------->
 
 - make a Message class
 
@@ -52,9 +63,9 @@
     - this could remove the need for `from`
     - and would allow for "stack" traces
 
------------------------------------------------------------
+<!-------------------------------------------------------->
 ## Promises
------------------------------------------------------------
+<!-------------------------------------------------------->
 
 - improve the loop/promises integration
     - the ELO::Promise::LOOP is not great since it is global
@@ -67,21 +78,9 @@
         - ELO::Process?
         - ELO::Promise?
 
-- alternately we could use a `Promise[]` constructor
-    - that works similar to `Event[]` described above
-    - it will create a Promise and pass it along as well
-
------------------------------------------------------------
+<!-------------------------------------------------------->
 ## Actors
------------------------------------------------------------
-
-- actor state is complex, the sub versions have limits
-    - ideally it is stateless
-        - or passes state via messages & self calls
-    - shared state works with `state` variables
-    - instance state works with inside-out object on the `$this` value
-    - a proper class based Actor would give the most flexibility
-        - and be more comfortable to users
+<!-------------------------------------------------------->
 
 - make a way to mark a given Actor as accepting Promises
     - `sub SomeActor ($this, $msg) : Promise { ... }`
@@ -89,12 +88,7 @@
         - `ask` could create and return the promise
             - but throw an exception of the recieving Actor doesn't do `Promise` trait
 
-- currently there is no way to pass constructor arguments to Actors
-    - this maybe needs a Factory?
-    - or maybe make a proper OO Actor to support this style
-        - and let the functional style stay as is
-
-- does it make sense to try and type the actors?
+- Hmm, does it make sense to try and type the various actors patterns?
     - `sub SomeActor ($this, $msg) : Promise(eResponse, eError) { ... }`
         - this tells the system, that actor wants promises
         - it can also say the events is expects to get back
@@ -103,42 +97,9 @@
     - `sub SomeActor ($this, $msg) : SessionId { ... }`
         - this tells that a session ID is expected
 
------------------------------------------------------------
-## Process
------------------------------------------------------------
-
-- consider a spawn_link() that will
-    - immediately link to the new process
-
------------------------------------------------------------
-## Futures
------------------------------------------------------------
-
-Futures can be thought of as the read-side of Promises,
-and in most systems can be used in a blocking manner.
-However, we don't want to allow blocking, so this really
-is not what we want. It is better if we stick with
-promises only.
-
-It causes issues with distributed Actors, since Promises
-don't serialize, but we can deal with this when we get
-to the distributed part anyway.
-
-- should we add them?
-    - if so, would they block?
-        - do we want that?
-
-- think about Futures
-    - they could be typed to the event type
-    - if there was an active future for a process
-        - it would watch for that event
-            - and when it found it
-                - call the callbacks
-        - this could happen within `accept` perhaps??
-
------------------------------------------------------------
+<!-------------------------------------------------------->
 ## Links
------------------------------------------------------------
+<!-------------------------------------------------------->
 
 ### Actors
 
