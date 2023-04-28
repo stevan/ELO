@@ -15,6 +15,11 @@ our @EXPORT_OK = qw[
     cancel_ticker
 ];
 
+our %EXPORT_TAGS = (
+    timers  => [qw[ timer interval cancel_timer ]],
+    tickers => [qw[ ticker interval_ticker cancel_ticker ]],
+);
+
 # Timers - TODO
 
 sub timer ($this, $timeout, $callback) {

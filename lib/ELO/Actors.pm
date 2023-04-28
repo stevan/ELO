@@ -12,7 +12,8 @@ our @EXPORT_OK = qw[
 
 sub build_actor ($name, $f) {
     state %counters;
-    set_subname sprintf('%s[%d]' => $name, $counters{$name}++), $f;
+    my $caller = (caller(1))[3];
+    set_subname sprintf('%s::%s[%d]' => $caller, $name, $counters{$name}++), $f;
     $f;
 }
 
