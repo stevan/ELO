@@ -1,4 +1,61 @@
-# A proposal for formal Events
+<!-------------------------------------------------------->
+# Proposal for Formal Events
+<!-------------------------------------------------------->
+
+An event is the data structure used for communication between two
+processes/actors. An event can be thought of consisting of two
+parts, the "event-type" and a "payload". An event does not know to
+whom it is being sent to or any other meta-info, this will be
+handled elsewhere. The event is only concerned with conveying
+the payload through the "actor-space".
+
+> NOTE: It is important that events be serializable as much as
+> possible, this is to enable cleanly upgradeing to distributed actors.
+
+### Declaring an event
+
+An event declaration incldues the event-type and payload type definiton,
+like so:
+
+```perl
+event *Foo => [ *Str, ... ];
+```
+
+> NOTE: More details about the payload type definiton is below.
+
+### Sending an event
+
+An event instance is what is created and sent to another process. In
+the example below `$actor1` is sending the `*eFoo` event to `$actor2`
+with the payload shown.
+
+```perl
+$actor1->send( $actor2, [ *Foo => "hello world", ... ] );
+````
+
+This payload should be able to pass the payload type-constraint found
+in the event declaration.
+
+### Recieve an event
+
+In order to recieve an event, an actor can either manually unpack the
+`$msg`, or use the supplied `match` function, like so:
+
+```perl
+match $msg, +{
+    *eFoo => sub ($string, @other_stuff) {
+        ...;
+    }
+}
+```
+
+The `match` function is "event-aware" in that it will take the event
+into account in what it is doing.
+
+
+<!-------------------------------------------------------->
+## How Actors and Events are implemented/integrated
+<!-------------------------------------------------------->
 
 Events can be defined as TYPELGLOBs, this will make it easier to scope
 them as they are essentially global.
@@ -39,10 +96,10 @@ sub ActorFactory (%args) {
 }
 ```
 
-NOTE: It might be possible to play some tricks with `local` to get some
-level of TYPEGLOB privacy, but the usefulness of that in this context
-is highly suspect. The "types" are better as globals then as something
-whose scope we need to manage.
+> NOTE: It might be possible to play some tricks with `local` to get some
+> level of TYPEGLOB privacy, but the usefulness of that in this context
+> is highly suspect. The "event-types" are better as globals then as
+> something whose scope we need to manage.
 
 The best (and only) way to manage TYPEGLOBs is to use packages, which
 are the natural storage for them. And since TYPEGLOBs can be imported
@@ -65,7 +122,8 @@ package My::App::Events {
     event *Baz => [ *Str ];
 }
 ```
-It is possible both to fully qualify your types/events, as well as
+
+It is possible both to fully qualify your event-types, as well as
 import them locally. And the best part is that the stringified version
 will always refer to the fully qualified name, so it becomes very
 easy to find the original TYPEGLOB and any meta info stored there.
@@ -79,18 +137,17 @@ use My::App::Events qw[ Foo ];
 
 ```
 
-The type definitions, or type bodies basically give us a level of
+The payload type definitions basically give us a level of
 signature type checking on the handler/reciever callbacks.
 
 Inside  the `match` keyword the following should happen:
 
-1. look at the `$msg` and determine the event type
-2. lookup the event type
+1. look at the `$msg` and determine the event-type
+2. lookup the event-type
     - fail loudly if we cannot find it
-    - or return the found evemt declaration
-3. Type check the `$msg` body against the event declaration
+    - or return the found event payload type-declaration
+3. Type check the `$msg` body against the event payload type-declaration
     - throw errors appropriately
-        - this will be much better than the sig errors
 
 ```perl
 event *Foo => [ *Str ];
@@ -108,7 +165,108 @@ sub Actor ($this, $msg) {
 }
 ```
 
-### Internal Types
+<!-------------------------------------------------------->
+## Perl Types
+<!-------------------------------------------------------->
+
+The event payload type declarations are best throught of as
+type-constraints in that they can only be checked at runtime and
+not at compile time. This is similar to other "type constraint"
+modules in Perl, the biggest difference being that these types
+are just symbols and the type checking is done by interpreting
+the symbols, rather than the types being active objects who
+know how to check themselves.
+
+### Perl Literal types
+
+As mentoned above, we want events to be as network-portable as possible, which
+means we really want to restrict the types to things we can serialize and then
+deserialize, possibly on a different machine.
+
+Given this, it makes sense to base our type system on JSON and start out with
+the following simple scalar types.
+
+```perl
+type *Bool;
+type *Int;
+type *Float;
+type *Str;
+```
+We can add the basic JSON reference scalar types as well.
+
+```perl
+type *ArrayRef;
+type *HashRef;
+```
+
+> NOTE: we do not check the contents of the reference scalar types
+> so something like `*ArrayRef[*Int]` is not supported by these types
+> but more on that later.
+
+> NOTE: We do not support things like `*ScalarRef` or `*CodeRef` as they
+> are not possible to serialize, but in theory they should be included so
+> that they could be used in local actor networks. Both of these would
+> need to be used very carefully to avoid sharing data references in a
+> way that would cause problems/confusion.
+
+### Perl Virtual types
+
+We also add in some "virtual" types, which are there only to model the event
+messages in a way that is meaningful to Perl.
+
+```perl
+type *Scalar;  # basically this is the Any type
+type *Ref;     # basically this is the Any Ref type
+type *List;    # this is a slurpy list ... basically "give me all that remains" in a type declaration
+type *Hash;    # same as *List, but for pairs
+```
+
+If you wanted to create an event which took any simple scalar type then you
+would use the `*Scalar` type. This can be thought of as a union of `*Bool`,
+`*Int`, `*Float` and `*Str`.
+
+If you wanted to accept a reference type, use the `*Ref` virtual type which can
+be thought of as a union of `*ArrayRef` and `*HashRef`.
+
+If you wanted to accept a variable number of values and did not want to put
+them inside of an `*ArrayRef` then you could use `*List` which replicates the
+slurpy behavior of Perl's lists. As should be expected, no other types can follow
+the `*List` type, that would be an error.
+
+```perl
+event *eSlurpy    => [ *Str, *List ];     # [ "foo", 0 .. 10 ]
+event *eNonSlurpy => [ *Str, *ArrayRef ]; # [ "foo", [ 0 .. 10 ] ]
+```
+The same style behavior can be found with `*Hash` but with regards to key-value
+pairs instead of just scalar values.
+
+```perl
+event *eSlurpyHash    => [ *Str, *Hash ];     # [ "foo", ( one => 1, two => 2, ... ) ]
+event *eNonSlurpyHash => [ *Str, *HashRef ]; # [ "foo", { one => 1, two => 2, ... } ]
+```
+
+<!-------------------------------------------------------->
+## ELO Core types
+<!-------------------------------------------------------->
+
+Along with the above types we have some core types within ELO that need to be
+represented.
+
+### Process Types
+
+There are a couple of process types that need to be represented
+
+```perl
+type *Process; # a Process instance
+type *Actor;   # an Actor instance
+type *PID;     # a PID value (Str) of a Process/Actor instance
+```
+
+```perl
+type *Promise; # a Promise instance
+type *TimerID; # a Timer ID (which is a ScalarRef)
+```
+
 
 - SV
     - IV = int
@@ -120,45 +278,3 @@ sub Actor ($this, $msg) {
 - HV = list of pairs of Str to SV
 - GV = glob (filehandle, etc)
 - CV = subroutine
-
-
-### Perl Literal types
-
-These are natural Perl data structures, and since we are going for a simple
-JSON-like type system, they are core literal types for our system.
-
-```perl
-type *Bool;
-type *Int;
-type *Float;
-type *Str;
-
-type *ArrayRef;
-type *HashRef;
-```
-
-These should map to the values in the "Internals types", though we combine
-the IV and UV for brevity and create a Bool that is not technically an SV
-form, but which we can detect via the `B` module.
-
-We also add in some "virtual" types, which are there only to model the event
-messages in a way that is meaningful to Perl.
-
-```perl
-type *Scalar;  # basically this is the Any type
-type *List;    # this is a slurpy list ... basically "give me all that remains" in a type declaration
-type *Hash;    # same as *List, but for pairs
-```
-
-### ELO Core types
-
-We have some types in ELO that we want to model as well since they are often
-sent in event bodies.
-
-```perl
-type *Process; # a Process instance
-type *Actor;   # an Actor instance
-type *PID;     # a PID value (Str) of a Process/Actor instance
-
-type *Promise; # a Promise instance
-```
