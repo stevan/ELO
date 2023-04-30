@@ -6,6 +6,28 @@
 
 - [ ] See `EVENTS.md`
 
+    - add ELO::Core::Type to model the types
+    - add ELO::Types to
+        - hold a set of core types
+        - provide functions for types
+            - creating
+            - lookup
+            - checking values against types
+
+    - add ELO::Core::EventType to model the event type
+        - this needs to model Error events as well
+    - add ELO::Events to
+        - hold a set of core event-types
+            - SIGEXIT? etc?
+        - provide functions for events
+            - creation
+            - lookup
+            - etc.
+        - `protocol` should be here as well
+            - do protocols need to be modeled as objects?
+            - do I need all the stuff from ELO2?
+
+
 <!-------------------------------------------------------->
 ## Loop
 <!-------------------------------------------------------->

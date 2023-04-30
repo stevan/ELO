@@ -18,7 +18,7 @@ An event declaration incldues the event-type and payload type definiton,
 like so:
 
 ```perl
-event *Foo => [ *Str, ... ];
+event *Foo => ( *Str, ... );
 ```
 
 > NOTE: More details about the payload type definiton is below.
@@ -63,7 +63,7 @@ them as they are essentially global.
 So a simple event definiton and an Actor definition would work like so:
 
 ```perl
-event *Foo => [ *Str ];
+event *Foo => ( *Str );
 
 sub Actor ($this, $msg) {
 
@@ -79,12 +79,12 @@ and it doesn't really make any difference.
 
 ```perl
 # this event is visible to all
-event *Foo => [ *Str ];
+event *Foo => ( *Str );
 
 sub ActorFactory (%args) {
 
     # this event is also visible to all ...
-    event *Bar => [ *Str ];
+    event *Bar => ( *Str );
 
     build_actor Actor => sub ($this, $msg) {
 
@@ -117,9 +117,9 @@ package My::App::Events {
     );
 
     # define them ...
-    event *Foo => [ *Str ];
-    event *Bar => [ *Str ];
-    event *Baz => [ *Str ];
+    event *Foo => ( *Str );
+    event *Bar => ( *Str );
+    event *Baz => ( *Str );
 }
 ```
 
@@ -137,6 +137,58 @@ use My::App::Events qw[ Foo ];
 
 ```
 
+<!-------------------------------------------------------->
+## Event Payload
+<!-------------------------------------------------------->
+
+The event payload type declarations are best throught of as
+type-constraints in that they can only be checked at runtime and
+not at compile time. This is similar to other "type constraint"
+modules in Perl, the biggest difference being that these types
+are just symbols and the type checking is done by interpreting
+the symbols, rather than the types being active objects who
+know how to check themselves.
+
+An `event` payload is basically a `Tuple` type, which is represented
+by the list of types passed.
+
+```perl
+event *eFoo => ( *Str, *Int, *Int );
+```
+
+In the above example, the event type `*eFoo` is a tuple containing
+a string followed by two ints.
+
+When constructing an event to send, you simply pass the event-type
+followed by a set of values that match the event described above.
+
+```perl
+my $e = [ *eFoo => "Foo", 1, 2 ];
+```
+
+While it is possible to use types like `*ArrayRef` and `*HashRef` to
+represent complex values beyond a simple SCALAR, sometimes that is
+more than is needed, so we also support nexted `Tuple` types. This
+is accomplished by putting types into an ARRAY ref, like so:
+
+```perl
+event *eBar => ( *Str, [ *Int, *Int ] );
+```
+
+In the above example, the event type `*eBar` is a tuple containing
+a string followed by a tuple containing two ints.
+
+When constructing an event to send, you simply pass the event-type
+followed by a set of values that match the event described above.
+
+```perl
+my $e = [ *eFoo => "add", [ 1, 2 ] ];
+```
+
+Hopefully this is fairly intuitive.
+
+### What are payloads used for?
+
 The payload type definitions basically give us a level of
 signature type checking on the handler/reciever callbacks.
 
@@ -150,8 +202,8 @@ Inside  the `match` keyword the following should happen:
     - throw errors appropriately
 
 ```perl
-event *Foo => [ *Str ];
-event *Bar => [ *Str, *Int ];
+event *Foo => ( *Str );
+event *Bar => ( *Str, *Int );
 
 sub Actor ($this, $msg) {
 
@@ -168,14 +220,6 @@ sub Actor ($this, $msg) {
 <!-------------------------------------------------------->
 ## Perl Types
 <!-------------------------------------------------------->
-
-The event payload type declarations are best throught of as
-type-constraints in that they can only be checked at runtime and
-not at compile time. This is similar to other "type constraint"
-modules in Perl, the biggest difference being that these types
-are just symbols and the type checking is done by interpreting
-the symbols, rather than the types being active objects who
-know how to check themselves.
 
 ### Perl Literal types
 
