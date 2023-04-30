@@ -22,11 +22,11 @@ our $POLL_TICK_INTERVAL           = 2;
 our $POLL_TICK_INTERVAL_MULTIPLER = 1;
 
 our $MAX_WORK_TIME           = 2;
-our $MAX_WORK_TIME_MULTIPLER = 2.5;
+our $MAX_WORK_TIME_MULTIPLER = 1.5;
 
-our $NUM_WORKERS = 25;
+our $NUM_WORKERS = 5;
 
-our @DATASOURCE = 0 .. 200;
+our @DATASOURCE = 0 .. 20;
 #die Dumper \@DATASOURCE;
 
 sub ProducerFactory (%args) {

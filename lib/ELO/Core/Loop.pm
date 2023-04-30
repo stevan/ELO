@@ -26,6 +26,7 @@ use slots (
 
 sub create_actor ($self, $actor_class, $actor_args, $env=undef, $parent=undef) {
     my $actor_ref = ELO::Core::ActorRef->new(
+        name        => $actor_class, # FIXME
         actor_class => $actor_class,
         actor_args  => $actor_args,
         loop        => $self,

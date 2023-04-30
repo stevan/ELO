@@ -22,7 +22,8 @@ use overload (
 
 use parent 'UNIVERSAL::Object::Immutable';
 use slots (
-    loop   => sub {},
+    name   => sub { die 'A `name` is required' },
+    loop   => sub { die 'A `loop` is required' },
     parent => sub {},
     # ...
     _pid           => sub {},
@@ -35,8 +36,16 @@ sub BUILD ($self, $params) {
     $self->{_msg_inbox}   = [];
     $self->{_flags}       = { trap_signals => {}, sleep_timer => undef };
     $self->{_environment} = { ($params->{env} // $params->{ENV} // {})->%* };
-    $self->{_pid}         = sprintf '%03d:%s' => ++$PIDS, $self->name;
+    $self->{_pid}         = sprintf '%03d:%s' => ++$PIDS, $self->{name};
 }
+
+# ABSTRACT method
+
+sub apply ($self) {
+    confess 'The method `apply` must be overriden for ('.$self->{_pid}.')';
+}
+
+# ...
 
 sub is_sleeping ($self) { !! $self->{_flags}->{sleep_timer} }
 
@@ -78,22 +87,17 @@ sub tick ($self) {
     #warn Dumper [ end_tick => $self->pid => $self->{_msg_inbox} ];
 }
 
-sub apply ($self) {
-    confess 'The method `apply` must be overriden for ('.$self->{_pid}.')';
-}
-
-sub name ($self) {
-    confess 'The method `name` must be overriden for ('.$self.')';
-}
-
 # ...
 
-sub pid ($self) { $self->{_pid} }
+sub pid  ($self) { $self->{_pid} }
+sub name ($self) { $self->{name} }
 
 sub env ($self, $key) {
-    $self->{_environment}->{ $key };
-    # XXX - should we check the parent
-    # if we find nothing in the local?
+    my $value = $self->{_environment}->{ $key };
+    if ( !(defined $value) && $self->parent ) {
+        $value = $self->parent->env( $key );
+    }
+    return $value;
 }
 
 # ...
