@@ -133,6 +133,48 @@ $TYPE_REGISTRY{ *HashRef } = ELO::Core::Type->new(
     }
 );
 
+# FIXME:
+# these type definitions require too much
+# knowledge of things, and so therefore
+# we end up duplicating stuff, this should
+# get fixed at some point
+
+$TYPE_REGISTRY{ *PID } = ELO::Core::Type->new(
+    symbol  => \*PID,
+    checker => sub ($pid) {
+        return defined($pid)             # it is defined ...
+            && not(ref $pid)             # ... and it is not a reference
+            && ($pid =~ /^\d\d\d\:.*$/)  # ... and is the pid format
+            # FIXME: this PID format should not be defined
+            # here as well as in Abstract::Process
+    }
+);
+
+$TYPE_REGISTRY{ *Process } = ELO::Core::Type->new(
+    symbol  => \*Process,
+    checker => sub ($process) {
+        return defined($process)                          # it is defined ...
+            && $process isa ELO::Core::Abstract::Process  # ... and is a process object
+    }
+);
+
+$TYPE_REGISTRY{ *Promise } = ELO::Core::Type->new(
+    symbol  => \*Promise,
+    checker => sub ($promise) {
+        return defined($promise)                # it is defined ...
+            && $promise isa ELO::Core::Promise  # ... and is a promise object
+    }
+);
+
+$TYPE_REGISTRY{ *TimerId } = ELO::Core::Type->new(
+    symbol  => \*TimerId,
+    checker => sub ($timer_id) {
+        return defined($timer_id)         # it is defined ...
+            && ref($timer_id) eq 'SCALAR' # and it is a SCALAR reference
+            # FIXME: we should probably bless the timed IDs
+    }
+);
+
 1;
 
 __END__

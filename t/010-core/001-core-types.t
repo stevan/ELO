@@ -100,6 +100,66 @@ subtest '... checking *HashRef' => sub {
     ok( !lookup_type(*HashRef)->check( [] ),   '... this failed the type check for HashRef with an ArrayRef' );
 };
 
+subtest '... checking *PID' => sub {
+    ok( lookup_type(*PID)->check( '000:Foo' ),   '... this type checked for PID with an PID' );
+
+    ok( !lookup_type(*PID)->check( 1.0 ),   '... this failed the type check for PID with a simple Flot' );
+    ok( !lookup_type(*PID)->check( 100 ),   '... this failed the type check for PID with with an Int' );
+    ok( !lookup_type(*PID)->check( !!1 ),  '... this failed the type check for PID with a Bool' );
+    ok( !lookup_type(*PID)->check( '3.14' ),  '... this failed the type check for PID with a Str containing a float (see also - Perl)' );
+    ok( !lookup_type(*PID)->check( 'foo' ),   '... this failed the type check for PID with a single-quoted Str' );
+    ok( !lookup_type(*PID)->check( "foo" ),   '... this failed the type check for PID with a double-quoted Str' );
+    ok( !lookup_type(*PID)->check( q[foo] ),  '... this failed the type check for PID with a q[] Str' );
+    ok( !lookup_type(*PID)->check( qq[foo] ), '... this failed the type check for PID with a qq[] Str' );
+    ok( !lookup_type(*PID)->check( [] ),   '... this failed the type check for PID with an ArrayRef' );
+    ok( !lookup_type(*PID)->check( {} ),   '... this failed the type check for PID with an HashRef' );
+};
+
+subtest '... checking *Process' => sub {
+    ok( lookup_type(*Process)->check( bless {} => 'ELO::Core::Abstract::Process' ),   '... this type checked for Process with an Process' );
+
+    ok( !lookup_type(*Process)->check( 1.0 ),   '... this failed the type check for Process with a simple Flot' );
+    ok( !lookup_type(*Process)->check( 100 ),   '... this failed the type check for Process with with an Int' );
+    ok( !lookup_type(*Process)->check( !!1 ),  '... this failed the type check for Process with a Bool' );
+    ok( !lookup_type(*Process)->check( '3.14' ),  '... this failed the type check for Process with a Str containing a float (see also - Perl)' );
+    ok( !lookup_type(*Process)->check( 'foo' ),   '... this failed the type check for Process with a single-quoted Str' );
+    ok( !lookup_type(*Process)->check( "foo" ),   '... this failed the type check for Process with a double-quoted Str' );
+    ok( !lookup_type(*Process)->check( q[foo] ),  '... this failed the type check for Process with a q[] Str' );
+    ok( !lookup_type(*Process)->check( qq[foo] ), '... this failed the type check for Process with a qq[] Str' );
+    ok( !lookup_type(*Process)->check( [] ),   '... this failed the type check for Process with an ArrayRef' );
+    ok( !lookup_type(*Process)->check( {} ),   '... this failed the type check for Process with an HashRef' );
+};
+
+subtest '... checking *Promise' => sub {
+    ok( lookup_type(*Promise)->check( bless {} => 'ELO::Core::Promise' ),   '... this type checked for Promise with an Promise' );
+
+    ok( !lookup_type(*Promise)->check( 1.0 ),   '... this failed the type check for Promise with a simple Flot' );
+    ok( !lookup_type(*Promise)->check( 100 ),   '... this failed the type check for Promise with with an Int' );
+    ok( !lookup_type(*Promise)->check( !!1 ),  '... this failed the type check for Promise with a Bool' );
+    ok( !lookup_type(*Promise)->check( '3.14' ),  '... this failed the type check for Promise with a Str containing a float (see also - Perl)' );
+    ok( !lookup_type(*Promise)->check( 'foo' ),   '... this failed the type check for Promise with a single-quoted Str' );
+    ok( !lookup_type(*Promise)->check( "foo" ),   '... this failed the type check for Promise with a double-quoted Str' );
+    ok( !lookup_type(*Promise)->check( q[foo] ),  '... this failed the type check for Promise with a q[] Str' );
+    ok( !lookup_type(*Promise)->check( qq[foo] ), '... this failed the type check for Promise with a qq[] Str' );
+    ok( !lookup_type(*Promise)->check( [] ),   '... this failed the type check for Promise with an ArrayRef' );
+    ok( !lookup_type(*Promise)->check( {} ),   '... this failed the type check for Promise with an HashRef' );
+};
+
+subtest '... checking *TimerId' => sub {
+    ok( lookup_type(*TimerId)->check( \(my $x = 0) ),   '... this type checked for TimerId with an TimerId' );
+
+    ok( !lookup_type(*TimerId)->check( 1.0 ),   '... this failed the type check for TimerId with a simple Flot' );
+    ok( !lookup_type(*TimerId)->check( 100 ),   '... this failed the type check for TimerId with with an Int' );
+    ok( !lookup_type(*TimerId)->check( !!1 ),  '... this failed the type check for TimerId with a Bool' );
+    ok( !lookup_type(*TimerId)->check( '3.14' ),  '... this failed the type check for TimerId with a Str containing a float (see also - Perl)' );
+    ok( !lookup_type(*TimerId)->check( 'foo' ),   '... this failed the type check for TimerId with a single-quoted Str' );
+    ok( !lookup_type(*TimerId)->check( "foo" ),   '... this failed the type check for TimerId with a double-quoted Str' );
+    ok( !lookup_type(*TimerId)->check( q[foo] ),  '... this failed the type check for TimerId with a q[] Str' );
+    ok( !lookup_type(*TimerId)->check( qq[foo] ), '... this failed the type check for TimerId with a qq[] Str' );
+    ok( !lookup_type(*TimerId)->check( [] ),   '... this failed the type check for TimerId with an ArrayRef' );
+    ok( !lookup_type(*TimerId)->check( {} ),   '... this failed the type check for TimerId with an HashRef' );
+};
+
 done_testing;
 
 1;
