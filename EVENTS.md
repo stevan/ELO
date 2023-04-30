@@ -288,6 +288,20 @@ type *TimerID; # a Timer ID (which is a ScalarRef)
 > reasonably be serialized.
 
 <!-------------------------------------------------------->
+## Implementation Notes
+<!-------------------------------------------------------->
+
+- it is possible to use Magic on the TYPEGLOBs we use for events
+    - and prevent other slots in the GLOB from being set, effectively locking the GLOB
+    - and to store the type definition data via the `data` slot (fetched with `getdata`)
+
+https://metacpan.org/pod/Variable::Magic#wizard
+https://metacpan.org/release/VPIT/Variable-Magic-0.63/source/t/34-glob.t
+
+- type checking should call B::svref_2object to inspect the var
+
+
+<!-------------------------------------------------------->
 ## Misc.
 <!-------------------------------------------------------->
 
