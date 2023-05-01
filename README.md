@@ -28,8 +28,14 @@ With an Actor system implemented on top.
 
 ```perl
 use ELO::Loop;
+use ELO::Types  qw[ :core ];
+use ELO::Events qw[ event ];
 use ELO::Actors qw[ match ];
 use Hash::Util  qw[ fieldhash ];
+
+event *eStartPing => ( *Process );
+event *ePing      => ( *Process );
+event *ePong      => ( *Process );
 
 sub Ping ($this, $msg) {
 
@@ -38,12 +44,12 @@ sub Ping ($this, $msg) {
     fieldhash state %count;
 
     match $msg, +{
-        eStartPing => sub ( $pong ) {
+        *eStartPing => sub ( $pong ) {
             $count{$this}++;
             say $this->pid." Starting with (".$count{$this}.")";
-            $this->send( $pong, [ ePing => $this ]);
+            $this->send( $pong, [ *ePing => $this ]);
         },
-        ePong => sub ( $pong ) {
+        *ePong => sub ( $pong ) {
             $count{$this}++;
             say $this->pid." Pong with (".$count{$this}.")";
             if ( $count{$this} >= 5 ) {
@@ -51,7 +57,7 @@ sub Ping ($this, $msg) {
                 $this->send( $pong, [ 'eStop' ]);
             }
             else {
-                $this->send( $pong, [ ePing => $this ]);
+                $this->send( $pong, [ *ePing => $this ]);
             }
         },
     };
@@ -60,11 +66,11 @@ sub Ping ($this, $msg) {
 sub Pong ($this, $msg) {
 
     match $msg, +{
-        ePing => sub ( $ping ) {
+        *ePing => sub ( $ping ) {
             say "... Ping";
-            $this->send( $ping, [ ePong => $this ]);
+            $this->send( $ping, [ *ePong => $this ]);
         },
-        eStop => sub () {
+        *eStop => sub () {
             say "... Stopping Pong";
         },
     };
@@ -74,7 +80,7 @@ sub init ($this, $msg=[]) {
     my $ping = $this->spawn( Ping  => \&Ping );
     my $pong = $this->spawn( Pong  => \&Pong );
 
-    $this->send( $ping, [ eStartPing => $pong ]);
+    $this->send( $ping, [ *eStartPing => $pong ]);
 
 }
 
@@ -85,18 +91,24 @@ And a Promise mechanism to coordinate between Actors.
 
 ```perl
 use ELO::Loop;
+use ELO::Types    qw[ :core ];
+use ELO::Events   qw[ event ];
 use ELO::Actors   qw[ match ];
 use ELO::Promises qw[ promise ];
+
+event *eServiceRequest   => ( *Str, *ArrayRef, *Promise );
+event *eServiceResponse  => ( *Int );
+event *eServiceError     => ( *Str );
 
 sub Service ($this, $msg) {
 
     match $msg, state $handlers = +{
-        eServiceRequest => sub ($action, $args, $promise) {
+        *eServiceRequest => sub ($action, $args, $promise) {
             eval {
                 my ($x, $y) = @$args;
 
                 $promise->resolve([
-                    eServiceResponse => (
+                    *eServiceResponse => (
                         ($action eq 'add') ? ($x + $y) :
                         ($action eq 'sub') ? ($x - $y) :
                         ($action eq 'mul') ? ($x * $y) :
@@ -108,7 +120,7 @@ sub Service ($this, $msg) {
             } or do {
                 my $e = $@;
                 chomp $e;
-                $promise->reject([ eServiceError => ( $e ) ]);
+                $promise->reject([ *eServiceError => ( $e ) ]);
             };
         }
     }
@@ -120,7 +132,7 @@ sub init ($this, $msg=[]) {
     my $promise = promise;
 
     $this->send( $service,
-        [ eServiceRequest => ( add => [ 2, 2 ], $promise ) ]
+        [ *eServiceRequest => ( add => [ 2, 2 ], $promise ) ]
     );
 
     $promise->then(
