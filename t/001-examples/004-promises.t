@@ -9,13 +9,21 @@ use Test::ELO;
 use Data::Dump;
 
 use ok 'ELO::Loop';
+use ok 'ELO::Types',    qw[ :core ];
+use ok 'ELO::Events',   qw[ event ];
 use ok 'ELO::Actors',   qw[ match ];
 use ok 'ELO::Promises', qw[ promise collect ];
 
 my $log = Test::ELO->create_logger;
 
-# Could we do this??
-# sub Service ($this, $msg) : Promise( eServiceResponse, eServiceError ) {
+# FIXME: this should be this ...
+# event *eServiceRequest   => ( *Str, [ *Int, *Int ], *Promise );
+
+event *eServiceRequest   => ( *Str, *ArrayRef, *Promise ); # action : Str, args : [Int, Int], promise
+event *eServiceResponse  => ( *Int );                      # Int
+event *eServiceError     => ( *Str );                      # error : Str
+
+event *eServiceClientRequest => ( *Process, *Str, *ArrayRef ); # service, action, args
 
 sub Service ($this, $msg) {
 
@@ -26,11 +34,8 @@ sub Service ($this, $msg) {
     # and uses Promises instead of the callback
     # format used in other tests.
 
-    match $msg, +{
-        # $request  = eServiceRequest  [ action : Str, args : [Int, Int], caller : PID ]
-        # $response = eServiceResponse [ Int ]
-        # $error    = eServiceError    [ error : Str ]
-        eServiceRequest => sub ($action, $args, $promise) {
+    match $msg, state $handlers //= +{
+        *eServiceRequest => sub ($action, $args, $promise) {
             $log->debug( $this, "HELLO FROM Service :: eServiceRequest" );
             $log->debug( $this, +{ action => $action, args => $args, promise => $promise });
 
@@ -40,7 +45,7 @@ sub Service ($this, $msg) {
 
             eval {
                 $promise->resolve([
-                    eServiceResponse => (
+                    *eServiceResponse => (
                         ($action eq 'add') ? ($x + $y) :
                         ($action eq 'sub') ? ($x - $y) :
                         ($action eq 'mul') ? ($x * $y) :
@@ -52,7 +57,7 @@ sub Service ($this, $msg) {
             } or do {
                 my $e = $@;
                 chomp $e;
-                $promise->reject([ eServiceError => ( $e ) ]);
+                $promise->reject([ *eServiceError => ( $e ) ]);
             };
         }
     }
@@ -64,10 +69,10 @@ sub ServiceClient ($this, $msg) {
 
     $log->debug( $this, $msg );
 
-    match $msg, +{
+    match $msg, state $handlers //= +{
 
         # Requests ...
-        eServiceClientRequest => sub ($service, $action, $args) {
+        *eServiceClientRequest => sub ($service, $action, $args) {
             isa_ok($service, 'ELO::Core::Process');
 
             $log->debug( $this, "HELLO FROM ServiceClient :: eServiceClientRequest" );
@@ -75,9 +80,9 @@ sub ServiceClient ($this, $msg) {
 
             my @promises;
             foreach my $op ( @$args ) {
-                my $p = promise;
+                my $p = promise; # [ *eServiceResponse, *eServiceError ]
                 isa_ok($p, 'ELO::Core::Promise');
-                $this->send( $service, [ eServiceRequest => ( @$op, $p ) ]);
+                $this->send( $service, [ *eServiceRequest => ( @$op, $p ) ]);
                 push @promises => $p;
             }
 
@@ -117,7 +122,7 @@ sub init ($this, $msg=[]) {
     isa_ok($client, 'ELO::Core::Process');
 
     $this->send( $client, [
-        eServiceClientRequest => (
+        *eServiceClientRequest => (
             $service,
             sum => [
                 [ add => [ 2, 2 ] ],
@@ -129,7 +134,7 @@ sub init ($this, $msg=[]) {
     ]);
 
     $this->send( $client, [
-        eServiceClientRequest => (
+        *eServiceClientRequest => (
             $service,
             sum => [
                 [ add => [ 12, 12 ] ],

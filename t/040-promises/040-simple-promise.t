@@ -9,10 +9,19 @@ use Test::ELO;
 use Data::Dump;
 
 use ok 'ELO::Loop';
+use ok 'ELO::Types',    qw[ :core ];
+use ok 'ELO::Events',   qw[ event ];
 use ok 'ELO::Actors',   qw[ match ];
 use ok 'ELO::Promises', qw[ promise ];
 
 my $log = Test::ELO->create_logger;
+
+# FIXME: this should be this ...
+# event *eServiceRequest   => ( *Str, [ *Int, *Int ], *Promise );
+
+event *eServiceRequest   => ( *Str, *ArrayRef, *Promise ); # action : Str, args : [Int, Int], promise
+event *eServiceResponse  => ( *Int );                      # Int
+event *eServiceError     => ( *Str );                      # error : Str
 
 sub Service ($this, $msg) {
 
@@ -22,7 +31,7 @@ sub Service ($this, $msg) {
         # $request  = eServiceRequest  [ action : Str, args : [Int, Int], caller : PID ]
         # $response = eServiceResponse [ Int ]
         # $error    = eServiceError    [ error : Str ]
-        eServiceRequest => sub ($action, $args, $promise) {
+        *eServiceRequest => sub ($action, $args, $promise) {
             $log->debug( $this, "HELLO FROM Service :: eServiceRequest" );
             $log->debug( $this, +{ action => $action, args => $args, promise => $promise });
 
@@ -32,7 +41,7 @@ sub Service ($this, $msg) {
 
             eval {
                 $promise->resolve([
-                    eServiceResponse => (
+                    *eServiceResponse => (
                         ($action eq 'add') ? ($x + $y) :
                         ($action eq 'sub') ? ($x - $y) :
                         ($action eq 'mul') ? ($x * $y) :
@@ -44,7 +53,7 @@ sub Service ($this, $msg) {
             } or do {
                 my $e = $@;
                 chomp $e;
-                $promise->reject([ eServiceError => ( $e ) ]);
+                $promise->reject([ *eServiceError => ( $e ) ]);
             };
         }
     }
@@ -59,7 +68,7 @@ sub init ($this, $msg=[]) {
     isa_ok($promise, 'ELO::Core::Promise');
 
     $this->send( $service,
-        [ eServiceRequest => ( add => [ 2, 2 ], $promise ) ]
+        [ *eServiceRequest => ( add => [ 2, 2 ], $promise ) ]
     );
 
     $promise->then(

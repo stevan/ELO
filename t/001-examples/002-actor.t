@@ -9,9 +9,27 @@ use Test::ELO;
 use Data::Dump;
 
 use ok 'ELO::Loop';
+use ok 'ELO::Types',  qw[ :core ];
+use ok 'ELO::Events', qw[ event ];
 use ok 'ELO::Actors', qw[ match ];
 
 my $log = Test::ELO->create_logger;
+
+event *eServiceRequest  => ( *Int, *Str, *ArrayRef, *Process ); # sid : SID, action : Str, args : <Any>, caller : PID
+event *eServiceResponse => ( *Int, *Int );                      # sid : SID, return : <Any>
+event *eServiceError    => ( *Int, *Str );                      # sid : SID, error : Str
+
+event *eServiceRegistryUpdateRequest  => ( *Int, *Str, *Process, *Process ); # sid : SID, name : Str, service : Process, caller : PID
+event *eServiceRegistryUpdateResponse => ( *Int, *Str, *Str );              # sid : SID, name : Str, service : Str
+event *eServiceRegistryUpdateError    => ( *Int, *Str );                    # sid : SID, error : Str
+
+event *eServiceRegistryLookupRequest  => ( *Int, *Str, *Process ); # sid : SID, name : Str, caller : PID
+event *eServiceRegistryLookupResponse => ( *Int, *Process );       # sid : SID, service : PID
+event *eServiceRegistryLookupError    => ( *Int, *Str );           # sid : SID, error   : Str
+
+event *eServiceClientRequest  => ( *Str, *Str, *ArrayRef ); #  url : Str, action : Str, args : <Any>
+event *eServiceClientResponse => ( *Int );                  #  <Any>
+event *eServiceClientError    => ( *Str );                  #  error : Str
 
 sub Service ($this, $msg) {
 
@@ -24,16 +42,13 @@ sub Service ($this, $msg) {
     # is actually kind of the ideal form, it keeps
     # it less complex.
 
-    match $msg, +{
-        # $request  = eServiceRequest  [ sid : SID, action : Str, args : <Any>, caller : PID ]
-        # $response = eServiceResponse [ sid : SID, return : <Any> ]
-        # $error    = eServiceError    [ sid : SID, error : Str ]
-        eServiceRequest => sub ($sid, $action, $args, $caller) {
+    match $msg, state $handlers //= +{
+        *eServiceRequest => sub ($sid, $action, $args, $caller) {
             my ($x, $y) = @$args;
 
             eval {
                 $this->send( $caller, [
-                    eServiceResponse => (
+                    *eServiceResponse => (
                         $sid,
                         ($action eq 'add') ? ($x + $y) :
                         ($action eq 'sub') ? ($x - $y) :
@@ -46,7 +61,7 @@ sub Service ($this, $msg) {
             } or do {
                 my $e = $@;
                 chomp $e;
-                $this->send( $caller, [ eServiceError => ( $sid, $e ) ] );
+                $this->send( $caller, [ *eServiceError => ( $sid, $e ) ] );
             };
         }
     }
@@ -86,24 +101,24 @@ sub ServiceRegistry ($this, $msg) {
     state sub lookup ($name)           { $services->{ $name } }
     state sub update ($name, $service) { $services->{ $name } = $service }
 
-    match $msg, +{
+    match $msg, state $handlers //= +{
 
         # Requests ...
 
-        # $request  = eServiceRegistryUpdateRequest  [ sid : SID, name : Str, service : Process, caller : PID ]]
-        # $response = eServiceRegistryUpdateResponse [ sid : SID, name : Str, service : Str ]
-        # $error    = eServiceRegistryUpdateError    [ sid : SID, error : Str ]
-        eServiceRegistryUpdateRequest => sub ($sid, $name, $service, $caller) {
-            update( $name, $service );
-            $this->send( $caller, [ eServiceRegistryUpdateResponse => $sid, $name, $service ] );
+        *eServiceRegistryUpdateRequest => sub ($sid, $name, $service, $caller) {
+            eval {
+                update( $name, $service );
+                $this->send( $caller, [ *eServiceRegistryUpdateResponse => $sid, $name, $service ] );
+                1;
+            } or do {
+                my $e = $@;
+                $this->send( $caller, [ *eServiceRegistryUpdateError => $sid, $e ] );
+            };
         },
 
-        # $request  = eServiceRegistryLookupRequest  [ sid : SID, name : Str, caller : PID ]]
-        # $response = eServiceRegistryLookupResponse [ sid : SID, service : Str ]
-        # $error    = eServiceRegistryLookupError    [ sid : SID, error   : Str ]
-        eServiceRegistryLookupRequest => sub ($sid, $name, $caller) {
+        *eServiceRegistryLookupRequest => sub ($sid, $name, $caller) {
             if ( my $service = lookup( $name ) ) {
-                $this->send( $caller, [ eServiceRegistryLookupResponse => $sid, $service ] );
+                $this->send( $caller, [ *eServiceRegistryLookupResponse => $sid, $service ] );
             }
             else {
                 $log->warn( $this, +{
@@ -111,7 +126,7 @@ sub ServiceRegistry ($this, $msg) {
                     name => $name, sid => $sid
                 });
                 $this->send( $caller, [
-                    eServiceRegistryLookupError => (
+                    *eServiceRegistryLookupError => (
                         $sid,  'Could not find service('.$name.')'
                     )
                 ]);
@@ -157,19 +172,16 @@ sub ServiceClient ($this, $msg) {
         $next_sid;
     }
 
-    match $msg, +{
+    match $msg, state $handlers //= +{
 
         # Requests ...
 
-        # $request  = eServiceClientRequest  [ url : Str, action : Str, args : <Any> ]]
-        # $response = eServiceClientResponse [ <Any> ]
-        # $error    = eServiceClientError    [ error : Str ]
-        eServiceClientRequest => sub ($url, $action, $args) {
+        *eServiceClientRequest => sub ($url, $action, $args) {
 
             my $sid = session_create([ $url, $action, $args ]);
 
             $this->send( $registry, [
-                eServiceRegistryLookupRequest => (
+                *eServiceRegistryLookupRequest => (
                     $sid,  # my session id
                     $url,  # the url of the service
                     $this  # where to send the response
@@ -188,7 +200,7 @@ sub ServiceClient ($this, $msg) {
         # It is possible to do all this with Promises
         # instead, but this is a different test :)
 
-        eServiceRegistryLookupResponse => sub ($sid, $service) {
+        *eServiceRegistryLookupResponse => sub ($sid, $service) {
             my $s = session_get( $sid );
             my ($url, $action, $args) = $s->@*;
             # update the service
@@ -203,14 +215,14 @@ sub ServiceClient ($this, $msg) {
             is($service->name, $expected{$sid}, '... got the expected lookup response');
 
             $this->send( $service, [
-                eServiceRequest => ( $sid, $action, $args, $this )
+                *eServiceRequest => ( $sid, $action, $args, $this )
             ]);
         },
 
-        eServiceResponse => sub ($sid, $return) {
+        *eServiceResponse => sub ($sid, $return) {
             my $request = session_get( $sid );
 
-            $log->info( $this, +{ eServiceResponse => $return, sid => $sid } );
+            $log->info( $this, +{ *eServiceClientResponse => $return, sid => $sid } );
 
             my %expected = (
                 1 => 4,
@@ -223,19 +235,19 @@ sub ServiceClient ($this, $msg) {
 
         # Errors ...
 
-        eServiceError => sub ($sid, $error) {
+        *eServiceError => sub ($sid, $error) {
             my $request = session_get( $sid );
 
-            $log->error( $this, +{ eServiceError => $error, sid => $sid } );
+            $log->error( $this, +{ *eServiceClientError => $error, sid => $sid } );
 
             like($error, qr/^Invalid Action\: multiply/, '... got the expected service error');
             is($sid, 4, '... got the expected session id for service error');
         },
 
-        eServiceRegistryLookupError => sub ($sid, $error) {
+        *eServiceRegistryLookupError => sub ($sid, $error) {
             my $request = session_get( $sid );
 
-            $log->error( $this, +{ eServiceRegistryLookupError => $error, sid => $sid } );
+            $log->error( $this, +{ *eServiceRegistryLookupError => $error, sid => $sid } );
 
             is($error, 'Could not find service(baz.example.com)', '... got the expected lookup error');
             is($sid, 3, '... got the expected session id for lookup error');
@@ -250,25 +262,25 @@ sub init ($this, $msg=[]) {
     isa_ok($client, 'ELO::Core::Process');
 
     $this->send( $client, [
-        eServiceClientRequest => (
+        *eServiceClientRequest => (
             'foo.example.com', add => [ 2, 2 ]
         )
     ]);
 
     $this->send( $client, [
-        eServiceClientRequest => (
+        *eServiceClientRequest => (
             'bar.example.com', mul => [ 10, 2 ]
         )
     ]);
 
     $this->send( $client, [
-        eServiceClientRequest => (
+        *eServiceClientRequest => (
             'baz.example.com', mul => [ 10, 2 ]
         )
     ]);
 
     $this->send( $client, [
-        eServiceClientRequest => (
+        *eServiceClientRequest => (
             'foo.example.com', multiply => [ 10, 2 ]
         )
     ]);

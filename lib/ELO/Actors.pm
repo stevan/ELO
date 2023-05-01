@@ -3,6 +3,10 @@ use v5.36;
 
 use Sub::Util 'set_subname';
 
+use ELO::Events 'lookup_event_type';
+
+use constant DEBUG => $ENV{ACTORS_DEBUG} || 0;
+
 use Exporter 'import';
 
 our @EXPORT_OK = qw[
@@ -32,6 +36,12 @@ sub match ($msg, $table) {
     #     && exists $table->{'_'};
 
     die "No match for $event" unless $cb;
+
+    if ( my $event_type = lookup_event_type( $event ) ) {
+        warn "Checking $event against $event_type" if DEBUG;
+        $event_type->check( @args )
+            or die "Event($event) failed to type check (".(join ', ' => @args).")";
+    }
 
     eval {
         $cb->(@args);

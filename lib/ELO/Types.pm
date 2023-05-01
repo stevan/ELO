@@ -26,9 +26,10 @@ my @ELO_CORE_TYPES = (
     *TimerId, # a Timer ID value
 );
 
-my @ALL_TYPES = ( @PERL_TYPES, @ELO_CORE_TYPES );
-
-my %ALL_TYPES = map { get_type_name($_), $_ } @ALL_TYPES;
+my @ALL_TYPES      = ( @PERL_TYPES, @ELO_CORE_TYPES );
+my @ALL_TYPE_NAMES = map   get_type_name($_),      @ALL_TYPES;
+my @ALL_TYPE_GLOBS = map   '*'.$_,                 @ALL_TYPE_NAMES;
+my %ALL_TYPES      = map { get_type_name($_), $_ } @ALL_TYPES;
 
 sub get_type_name ( $type ) {
     (split /\:\:/ => "$type")[-1]
@@ -36,29 +37,16 @@ sub get_type_name ( $type ) {
 
 # ...
 
-sub import ($pkg, @args) {
-    my $into = caller;
+use Exporter 'import';
 
-    no strict 'refs';
-    foreach my $arg (@args) {
-        if ( $arg eq ':core' ) {
-            foreach my $type (keys %ALL_TYPES) {
-                *{$into.'::'.$type} = $ALL_TYPES{ $type };
-            }
-        }
-        elsif ( $arg eq 'lookup_type' ) {
-            *{$into.'::lookup_type'} = \&lookup_type;
-        }
-        else {
-            if (exists $ALL_TYPES{ $arg }) {
-                *{$into.'::'.$arg} = $ALL_TYPES{ $arg };
-            }
-            else {
-                die 'No idea what to do with ('.$arg.')';
-            }
-        }
-    }
-}
+our @EXPORT_OK = (
+    'lookup_type',
+    @ALL_TYPE_GLOBS,
+);
+
+our %EXPORT_TAGS = (
+    core => [ @ALL_TYPE_GLOBS ]
+);
 
 # ...
 
@@ -73,7 +61,7 @@ sub lookup_type ( $type ) {
 
 # ...
 
-use B;
+#use B;
 use Scalar::Util qw[ looks_like_number ];
 
 $TYPE_REGISTRY{ *Bool } = ELO::Core::Type->new(
@@ -91,7 +79,7 @@ $TYPE_REGISTRY{ *Str } = ELO::Core::Type->new(
         return defined($str)                      # it is defined ...
             && not(ref $str)                      # ... and it is not a reference
             && ref(\$str) eq 'SCALAR'             # ... and its just a scalar
-            && B::svref_2object(\$str) isa B::PV  # ... and it is at least `isa` B::PV
+            #&& B::svref_2object(\$str) isa B::PV  # ... and it is at least `isa` B::PV
     }
 );
 
@@ -102,7 +90,7 @@ $TYPE_REGISTRY{ *Int } = ELO::Core::Type->new(
             && not(ref $int)                      # if it is not a reference
             && looks_like_number($int)            # ... if it looks like a number
             && int($int) == $int                  # and is the same value when converted to int()
-            && B::svref_2object(\$int) isa B::IV  # ... and it is at least `isa` B::IV
+            #&& B::svref_2object(\$int) isa B::IV  # ... and it is at least `isa` B::IV
     }
 );
 
@@ -113,7 +101,7 @@ $TYPE_REGISTRY{ *Float } = ELO::Core::Type->new(
             && not(ref $float)                      # if it is not a reference
             && looks_like_number($float)            # ... if it looks like a number
             && $float == ($float + 0.0)             # and is the same value when converted to float()
-            && B::svref_2object(\$float) isa B::NV  # ... and it is at least `isa` B::NV
+            #&& B::svref_2object(\$float) isa B::NV  # ... and it is at least `isa` B::NV
     }
 );
 

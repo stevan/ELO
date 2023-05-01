@@ -11,18 +11,26 @@ use Data::Dump;
 use Hash::Util qw[fieldhash];
 
 use ok 'ELO::Loop';
+use ok 'ELO::Types',     qw[ :core ];
+use ok 'ELO::Events',    qw[ event ];
 use ok 'ELO::Actors',    qw[ match ];
 use ok 'ELO::Timers',    qw[ :tickers ];
 use ok 'ELO::Constants', qw[ $SIGEXIT ];
 
 my $log = Test::ELO->create_logger;
 
+# FIXME: this should be this ...
+# event *eStartWorkers => ( *List ); # timeouts
+
+event *eStartWorkers => ( *ArrayRef ); # \@timeouts
+event *eStartWork    => ( *Int ); # timeout
+
 sub Worker ($this, $msg) {
 
     $log->debug( $this, $msg );
 
     match $msg, +{
-        eStartWork => sub ($timeout) {
+        *eStartWork => sub ($timeout) {
             $log->info( $this, "... started work ($timeout)" );
 
             pass('... got eStartWork message in '.$this->pid);
@@ -42,18 +50,18 @@ sub Supervisor ($this, $msg) {
     fieldhash state %active_workers;
 
     match $msg, +{
-        eStartWorkers => sub (@timeouts) {
+        *eStartWorkers => sub ($timeouts) {
             pass('... got eStartWorkers message in '.$this->pid);
 
             my %workers;
-            foreach my $timeout (@timeouts) {
+            foreach my $timeout (@$timeouts) {
                 my $worker = $this->spawn((sprintf 'Worker%02d' => scalar keys %workers), \&Worker);
                 isa_ok($worker, 'ELO::Core::Process', $worker->pid);
 
                 $workers{ $worker->pid } = $worker;
 
                 $this->link( $worker );
-                $this->send( $worker, [ eStartWork => $timeout ]);
+                $this->send( $worker, [ *eStartWork => $timeout ]);
             }
 
             $active_workers{$this} = \%workers;
@@ -81,7 +89,7 @@ sub init ($this, $msg) {
         # trap the exit signal
         $_->trap( $SIGEXIT ) foreach ($this, $supervisor);
 
-        $this->send( $supervisor, [ eStartWorkers => 20, 10, 5, 15 ] );
+        $this->send( $supervisor, [ *eStartWorkers => [ 20, 10, 5, 15 ] ] );
         $this->link( $supervisor );
         # is equvalent to this ...
         # $supervisor->link( $this );
