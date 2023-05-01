@@ -9,15 +9,22 @@ use Test::ELO;
 use Data::Dumper;
 
 use ok 'ELO::Loop';
-use ok 'ELO::Types',  qw[ :core event type lookup_type lookup_event_type ];
+use ok 'ELO::Types',  qw[ :core :types :events ];
 use ok 'ELO::Actors', qw[ match ];
 
 my $log = Test::ELO->create_logger;
 
 type *SID, sub ($sid) { (state $Int = lookup_type(*Int))->check( $sid ) && $sid < 255 };
 
-event *eServiceRequest  => ( *SID, *Str, *ArrayRef, *Process ); # sid : SID, action : Str, args : <Any>, caller : PID
-event *eServiceResponse => ( *SID, *Int );                      # sid : SID, return : <Any>
+enum *Ops => qw[
+    Add
+    Sub
+    Mul
+    Div
+];
+
+event *eServiceRequest  => ( *SID, *Ops, *ArrayRef, *Process ); # sid : SID, action : Str, args : <Any>, caller : PID
+event *eServiceResponse => ( *SID, *Num );                      # sid : SID, return : <Any>
 event *eServiceError    => ( *SID, *Str );                      # sid : SID, error : Str
 
 event *eServiceRegistryUpdateRequest  => ( *SID, *Str, *Process, *Process ); # sid : SID, name : Str, service : Process, caller : PID
@@ -28,8 +35,8 @@ event *eServiceRegistryLookupRequest  => ( *SID, *Str, *Process ); # sid : SID, 
 event *eServiceRegistryLookupResponse => ( *SID, *Process );       # sid : SID, service : PID
 event *eServiceRegistryLookupError    => ( *SID, *Str );           # sid : SID, error   : Str
 
-event *eServiceClientRequest  => ( *Str, *Str, *ArrayRef ); #  url : Str, action : Str, args : <Any>
-event *eServiceClientResponse => ( *Int );                  #  <Any>
+event *eServiceClientRequest  => ( *Str, *Ops, *ArrayRef ); #  url : Str, action : Str, args : <Any>
+event *eServiceClientResponse => ( *Num );                  #  <Any>
 event *eServiceClientError    => ( *Str );                  #  error : Str
 
 sub Service ($this, $msg) {
@@ -51,10 +58,10 @@ sub Service ($this, $msg) {
                 $this->send( $caller, [
                     *eServiceResponse => (
                         $sid,
-                        ($action eq 'add') ? ($x + $y) :
-                        ($action eq 'sub') ? ($x - $y) :
-                        ($action eq 'mul') ? ($x * $y) :
-                        ($action eq 'div') ? ($x / $y) :
+                        ($action eq *Ops::Add) ? ($x + $y) :
+                        ($action eq *Ops::Sub) ? ($x - $y) :
+                        ($action eq *Ops::Mul) ? ($x * $y) :
+                        ($action eq *Ops::Div) ? ($x / $y) :
                         die "Invalid Action: $action"
                     )
                 ]);
@@ -210,7 +217,8 @@ sub ServiceClient ($this, $msg) {
             my %expected = (
                 1 => 'FooService',
                 2 => 'BarService',
-                4 => 'FooService',
+                4 => 'BarService',
+                5 => 'FooService',
             );
             ok($expected{$sid}, '... got the expected session id with lookup response');
             is($service->name, $expected{$sid}, '... got the expected lookup response');
@@ -228,6 +236,8 @@ sub ServiceClient ($this, $msg) {
             my %expected = (
                 1 => 4,
                 2 => 20,
+                4 => 0.2,
+                5 => -8,
             );
 
             ok($expected{$sid}, '... got the expected session id with service response');
@@ -264,25 +274,31 @@ sub init ($this, $msg=[]) {
 
     $this->send( $client, [
         *eServiceClientRequest => (
-            'foo.example.com', add => [ 2, 2 ]
+            'foo.example.com', *Ops::Add => [ 2, 2 ]
         )
     ]);
 
     $this->send( $client, [
         *eServiceClientRequest => (
-            'bar.example.com', mul => [ 10, 2 ]
+            'bar.example.com', *Ops::Mul => [ 10, 2 ]
         )
     ]);
 
     $this->send( $client, [
         *eServiceClientRequest => (
-            'baz.example.com', mul => [ 10, 2 ]
+            'baz.example.com', *Ops::Mul => [ 10, 2 ]
         )
     ]);
 
     $this->send( $client, [
         *eServiceClientRequest => (
-            'foo.example.com', multiply => [ 10, 2 ]
+            'bar.example.com', *Ops::Div => [ 2, 10 ]
+        )
+    ]);
+
+    $this->send( $client, [
+        *eServiceClientRequest => (
+            'foo.example.com', *Ops::Sub => [ 2, 10 ]
         )
     ]);
 }

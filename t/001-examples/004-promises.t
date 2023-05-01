@@ -6,20 +6,23 @@ use Test::More;
 use Test::Differences;
 use Test::ELO;
 
-use Data::Dump;
+use Data::Dumper;
 
 use ok 'ELO::Loop';
-use ok 'ELO::Types',    qw[ :core event ];
+use ok 'ELO::Types',    qw[ :core :types :events ];
 use ok 'ELO::Actors',   qw[ match ];
 use ok 'ELO::Promises', qw[ promise collect ];
 
 my $log = Test::ELO->create_logger;
 
-event *eServiceRequest   => ( *Str, [ *Int, *Int ], *Promise ); # action : Str, args : [Int, Int], promise
-event *eServiceResponse  => ( *Int );                           # Int
-event *eServiceError     => ( *Str );                           # error : Str
+enum *ListOps   => qw[ Sum ];
+enum *ScalarOps => qw[ Add Sub Mul Div ];
 
-event *eServiceClientRequest => ( *Process, *Str, *ArrayRef ); # service, action, args
+event *eServiceRequest   => ( *ScalarOps, [ *Int, *Int ], *Promise ); # action : Str, args : [Int, Int], promise
+event *eServiceResponse  => ( *Num );                                 # Int
+event *eServiceError     => ( *Str );                                 # error : Str
+
+event *eServiceClientRequest => ( *Process, *ListOps, *ArrayRef ); # service, action, args
 
 sub Service ($this, $msg) {
 
@@ -40,12 +43,13 @@ sub Service ($this, $msg) {
             my ($x, $y) = @$args;
 
             eval {
+                no warnings 'once';
                 $promise->resolve([
                     *eServiceResponse => (
-                        ($action eq 'add') ? ($x + $y) :
-                        ($action eq 'sub') ? ($x - $y) :
-                        ($action eq 'mul') ? ($x * $y) :
-                        ($action eq 'div') ? ($x / $y) :
+                        ($action eq *ScalarOps::Add) ? ($x + $y) :
+                        ($action eq *ScalarOps::Sub) ? ($x - $y) :
+                        ($action eq *ScalarOps::Mul) ? ($x * $y) :
+                        ($action eq *ScalarOps::Div) ? ($x / $y) :
                         die "Invalid Action: $action"
                     )
                 ]);
@@ -53,6 +57,7 @@ sub Service ($this, $msg) {
             } or do {
                 my $e = $@;
                 chomp $e;
+                $log->fatal( $this, "Got error: eServiceRequest => $e" );
                 $promise->reject([ *eServiceError => ( $e ) ]);
             };
         }
@@ -91,7 +96,12 @@ sub ServiceClient ($this, $msg) {
                             $sum += $value;
                         }
                         return $sum;
-                    }
+                    },
+                    sub ($error)  {
+                        $log->error( $this, $error );
+
+                        fail('... got an unexpected error: '.$error);
+                    },
                 )
                 ->then(
                     sub ($result) {
@@ -120,11 +130,11 @@ sub init ($this, $msg=[]) {
     $this->send( $client, [
         *eServiceClientRequest => (
             $service,
-            sum => [
-                [ add => [ 2, 2 ] ],
-                [ add => [ 3, 3 ] ],
-                [ add => [ 4, 4 ] ],
-                [ add => [ 5, 5 ] ],
+            *ListOps::Sum, [
+                [ *ScalarOps::Add, [ 2, 2 ] ],
+                [ *ScalarOps::Add, [ 3, 3 ] ],
+                [ *ScalarOps::Add, [ 4, 4 ] ],
+                [ *ScalarOps::Add, [ 5, 5 ] ],
             ]
         )
     ]);
@@ -132,11 +142,11 @@ sub init ($this, $msg=[]) {
     $this->send( $client, [
         *eServiceClientRequest => (
             $service,
-            sum => [
-                [ add => [ 12, 12 ] ],
-                [ add => [ 13, 13 ] ],
-                [ add => [ 14, 14 ] ],
-                [ add => [ 15, 15 ] ],
+            *ListOps::Sum, [
+                [ *ScalarOps::Add, [ 12, 12 ] ],
+                [ *ScalarOps::Add, [ 13, 13 ] ],
+                [ *ScalarOps::Add, [ 14, 14 ] ],
+                [ *ScalarOps::Add, [ 15, 15 ] ],
             ]
         )
     ]);

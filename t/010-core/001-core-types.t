@@ -37,6 +37,26 @@ subtest '... checking *Str' => sub {
     ok( !lookup_type(*Str)->check( {} ),   '... this failed the type check for Str with an HashRef' );
 };
 
+subtest '... checking *Num' => sub {
+    ok( lookup_type(*Num)->check( 1 ),   '... this type checked for Num with a single-digit Int' );
+    ok( lookup_type(*Num)->check( 100 ),   '... this type checked for Num with a regular Int' );
+    ok( lookup_type(*Num)->check( 1_000_000 ),  '... this type checked for Num with a _ seperated Int' );
+    ok( lookup_type(*Num)->check( int("256") ),  '... this type checked for Num with a Str converted via int()' );
+
+    ok( lookup_type(*Num)->check( !!1 ),  '... this type checked for Num with a Bool (see also - Perl)' );
+    ok( lookup_type(*Num)->check( "256" ),  '... this type checked for Num with a Str containing numbers (see also - Perl)' );
+    ok( lookup_type(*Num)->check( 1.0 ),   '... this type checked for Num with a simple Float' );
+    ok( lookup_type(*Num)->check( 0.0001 ),   '... this type checked for Num with a simple Float' );
+    ok( lookup_type(*Num)->check( '3.14' ),  '... this type checked for a Num with a Str containing a float (see also - Perl)' );
+
+    ok( !lookup_type(*Num)->check( 'foo' ),   '... this failed the type check for Num with a single-quoted Str' );
+    ok( !lookup_type(*Num)->check( "foo" ),   '... this failed the type check for Num with a double-quoted Str' );
+    ok( !lookup_type(*Num)->check( q[foo] ),  '... this failed the type check for Num with a q[] Str' );
+    ok( !lookup_type(*Num)->check( qq[foo] ), '... this failed the type check for Num with a qq[] Str' );
+    ok( !lookup_type(*Num)->check( [] ),   '... this failed the type check for Num with an ArrayRef' );
+    ok( !lookup_type(*Num)->check( {} ),   '... this failed the type check for Num with an HashRef' );
+};
+
 subtest '... checking *Int' => sub {
     ok( lookup_type(*Int)->check( 1 ),   '... this type checked for Int with a single-digit Int' );
     ok( lookup_type(*Int)->check( 100 ),   '... this type checked for Int with a regular Int' );

@@ -9,6 +9,7 @@ use constant DEBUG => $ENV{TYPES_DEBUG} || 0;
 my @PERL_TYPES = (
     *Bool,     # 1, 0 or ''
     *Str,      # pretty much anything
+    *Num,      # any numeric value
     *Int,      # if it looks like a number and int($_) == $_
     *Float,    # if it looks like a number
 
@@ -41,6 +42,8 @@ sub get_type_name ( $type ) {
 use Exporter 'import';
 
 our @EXPORT_OK = (qw[
+    enum
+
     type
     event
 
@@ -51,13 +54,41 @@ our @EXPORT_OK = (qw[
 );
 
 our %EXPORT_TAGS = (
-    core => [ @ALL_TYPE_GLOBS ]
+    core   => [ @ALL_TYPE_GLOBS ],
+    types  => [qw[ enum type lookup_type ]],
+    events => [qw[ event lookup_event_type ]],
 );
 
 # ...
 
 my %EVENT_REGISTRY;
 my %TYPE_REGISTRY;
+
+sub enum ($enum, @values) {
+    warn "Creating enum $enum" if DEBUG;
+    my $i = 0;
+    my %enum_map;
+    {
+        no strict 'refs';
+        foreach my $value (@values) {
+            my $glob = *{"${enum}::${value}"}; # create the GLOB
+            *{$glob} = \(my $x = $i);          # assign it the value
+            $enum_map{ $glob } = $i;           # note in the map
+            $i++;
+        }
+    }
+    $TYPE_REGISTRY{ $enum } = ELO::Core::Type->new(
+        symbol  => $enum,
+        checker => sub ($enum_value) {
+
+            #use Data::Dumper;
+            #warn Dumper [ $enum_value, \%enum_map ];
+
+            return defined($enum_value)
+                && exists $enum_map{ $enum_value }
+        },
+    );
+}
 
 sub event ($type, @definition) {
     warn "Creating event $type" if DEBUG;
@@ -90,7 +121,6 @@ sub lookup_type ( $type ) {
 
 # ...
 
-#use B;
 use Scalar::Util qw[ looks_like_number ];
 
 type *Bool, sub ($bool) {
@@ -103,7 +133,12 @@ type *Str, sub ($str) {
     return defined($str)                      # it is defined ...
         && not(ref $str)                      # ... and it is not a reference
         && ref(\$str) eq 'SCALAR'             # ... and its just a scalar
-        #&& B::svref_2object(\$str) isa B::PV  # ... and it is at least `isa` B::PV
+};
+
+type *Num, sub ($num) {
+    return defined($num)                      # it is defined ...
+        && not(ref $num)                      # if it is not a reference
+        && looks_like_number($num)            # ... if it looks like a number
 };
 
 type *Int, sub ($int) {
@@ -111,7 +146,6 @@ type *Int, sub ($int) {
         && not(ref $int)                      # if it is not a reference
         && looks_like_number($int)            # ... if it looks like a number
         && int($int) == $int                  # and is the same value when converted to int()
-        #&& B::svref_2object(\$int) isa B::IV  # ... and it is at least `isa` B::IV
 };
 
 type *Float, sub ($float) {
@@ -119,7 +153,6 @@ type *Float, sub ($float) {
         && not(ref $float)                      # if it is not a reference
         && looks_like_number($float)            # ... if it looks like a number
         && $float == ($float + 0.0)             # and is the same value when converted to float()
-        #&& B::svref_2object(\$float) isa B::NV  # ... and it is at least `isa` B::NV
 };
 
 type *ArrayRef, sub ($array_ref) {
