@@ -6,25 +6,27 @@ use Test::More;
 use Test::Differences;
 use Test::ELO;
 
-use Data::Dump;
+use Data::Dumper;
 
 use ok 'ELO::Loop';
-use ok 'ELO::Types',  qw[ :core event ];
+use ok 'ELO::Types',  qw[ :core event type lookup_type lookup_event_type ];
 use ok 'ELO::Actors', qw[ match ];
 
 my $log = Test::ELO->create_logger;
 
-event *eServiceRequest  => ( *Int, *Str, *ArrayRef, *Process ); # sid : SID, action : Str, args : <Any>, caller : PID
-event *eServiceResponse => ( *Int, *Int );                      # sid : SID, return : <Any>
-event *eServiceError    => ( *Int, *Str );                      # sid : SID, error : Str
+type *SID, sub ($sid) { (state $Int = lookup_type(*Int))->check( $sid ) && $sid < 255 };
 
-event *eServiceRegistryUpdateRequest  => ( *Int, *Str, *Process, *Process ); # sid : SID, name : Str, service : Process, caller : PID
-event *eServiceRegistryUpdateResponse => ( *Int, *Str, *Str );              # sid : SID, name : Str, service : Str
-event *eServiceRegistryUpdateError    => ( *Int, *Str );                    # sid : SID, error : Str
+event *eServiceRequest  => ( *SID, *Str, *ArrayRef, *Process ); # sid : SID, action : Str, args : <Any>, caller : PID
+event *eServiceResponse => ( *SID, *Int );                      # sid : SID, return : <Any>
+event *eServiceError    => ( *SID, *Str );                      # sid : SID, error : Str
 
-event *eServiceRegistryLookupRequest  => ( *Int, *Str, *Process ); # sid : SID, name : Str, caller : PID
-event *eServiceRegistryLookupResponse => ( *Int, *Process );       # sid : SID, service : PID
-event *eServiceRegistryLookupError    => ( *Int, *Str );           # sid : SID, error   : Str
+event *eServiceRegistryUpdateRequest  => ( *SID, *Str, *Process, *Process ); # sid : SID, name : Str, service : Process, caller : PID
+event *eServiceRegistryUpdateResponse => ( *SID, *Str, *Str );              # sid : SID, name : Str, service : Str
+event *eServiceRegistryUpdateError    => ( *SID, *Str );                    # sid : SID, error : Str
+
+event *eServiceRegistryLookupRequest  => ( *SID, *Str, *Process ); # sid : SID, name : Str, caller : PID
+event *eServiceRegistryLookupResponse => ( *SID, *Process );       # sid : SID, service : PID
+event *eServiceRegistryLookupError    => ( *SID, *Str );           # sid : SID, error   : Str
 
 event *eServiceClientRequest  => ( *Str, *Str, *ArrayRef ); #  url : Str, action : Str, args : <Any>
 event *eServiceClientResponse => ( *Int );                  #  <Any>
