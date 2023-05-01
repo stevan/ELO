@@ -2,6 +2,7 @@ package ELO::Types;
 use v5.36;
 
 use ELO::Core::Type;
+use ELO::Core::Event;
 
 use constant DEBUG => $ENV{TYPES_DEBUG} || 0;
 
@@ -39,8 +40,13 @@ sub get_type_name ( $type ) {
 
 use Exporter 'import';
 
-our @EXPORT_OK = (
-    'lookup_type',
+our @EXPORT_OK = (qw[
+    type
+    event
+
+    lookup_event_type
+    lookup_type
+    ],
     @ALL_TYPE_GLOBS,
 );
 
@@ -50,12 +56,35 @@ our %EXPORT_TAGS = (
 
 # ...
 
+my %EVENT_REGISTRY;
 my %TYPE_REGISTRY;
 
-sub lookup_type ( $type ) {
-    #use Data::Dumper;
-    #warn Dumper [ $type, \%TYPE_REGISTRY ];
+sub event ($type, @definition) {
+    warn "Creating event $type" if DEBUG;
+    $EVENT_REGISTRY{ $type } = ELO::Core::Event->new(
+        symbol       => $type,
+        definition   => \@definition,
+        _type_lookup => \&lookup_type,
+    );
+}
 
+sub type ($type, $checker) {
+    warn "Creating type $type" if DEBUG;
+    $TYPE_REGISTRY{ $type } = ELO::Core::Type->new(
+        symbol  => $type,
+        checker => $checker,
+    );
+}
+
+# ...
+
+sub lookup_event_type ($type) {
+    warn "Looking up event($type)" if DEBUG;
+    $EVENT_REGISTRY{ $type }
+}
+
+sub lookup_type ( $type ) {
+    warn "Looking up type($type)" if DEBUG;
     $TYPE_REGISTRY{ $type }
 }
 
@@ -64,62 +93,44 @@ sub lookup_type ( $type ) {
 #use B;
 use Scalar::Util qw[ looks_like_number ];
 
-$TYPE_REGISTRY{ *Bool } = ELO::Core::Type->new(
-    symbol  => \*Bool,
-    checker => sub ($bool) {
-        return defined($bool)                      # it is defined ...
-            && not(ref $bool)                      # ... and it is not a reference
-            && ($bool =~ /^[01]$/ || $bool eq '')  # ... and is either 1,0 or an empty string
-    }
-);
+type *Bool, sub ($bool) {
+    return defined($bool)                      # it is defined ...
+        && not(ref $bool)                      # ... and it is not a reference
+        && ($bool =~ /^[01]$/ || $bool eq '')  # ... and is either 1,0 or an empty string
+};
 
-$TYPE_REGISTRY{ *Str } = ELO::Core::Type->new(
-    symbol  => \*Str,
-    checker => sub ($str) {
-        return defined($str)                      # it is defined ...
-            && not(ref $str)                      # ... and it is not a reference
-            && ref(\$str) eq 'SCALAR'             # ... and its just a scalar
-            #&& B::svref_2object(\$str) isa B::PV  # ... and it is at least `isa` B::PV
-    }
-);
+type *Str, sub ($str) {
+    return defined($str)                      # it is defined ...
+        && not(ref $str)                      # ... and it is not a reference
+        && ref(\$str) eq 'SCALAR'             # ... and its just a scalar
+        #&& B::svref_2object(\$str) isa B::PV  # ... and it is at least `isa` B::PV
+};
 
-$TYPE_REGISTRY{ *Int } = ELO::Core::Type->new(
-    symbol  => \*Int,
-    checker => sub ($int) {
-        return defined($int)                      # it is defined ...
-            && not(ref $int)                      # if it is not a reference
-            && looks_like_number($int)            # ... if it looks like a number
-            && int($int) == $int                  # and is the same value when converted to int()
-            #&& B::svref_2object(\$int) isa B::IV  # ... and it is at least `isa` B::IV
-    }
-);
+type *Int, sub ($int) {
+    return defined($int)                      # it is defined ...
+        && not(ref $int)                      # if it is not a reference
+        && looks_like_number($int)            # ... if it looks like a number
+        && int($int) == $int                  # and is the same value when converted to int()
+        #&& B::svref_2object(\$int) isa B::IV  # ... and it is at least `isa` B::IV
+};
 
-$TYPE_REGISTRY{ *Float } = ELO::Core::Type->new(
-    symbol  => \*Float,
-    checker => sub ($float) {
-        return defined($float)                      # it is defined ...
-            && not(ref $float)                      # if it is not a reference
-            && looks_like_number($float)            # ... if it looks like a number
-            && $float == ($float + 0.0)             # and is the same value when converted to float()
-            #&& B::svref_2object(\$float) isa B::NV  # ... and it is at least `isa` B::NV
-    }
-);
+type *Float, sub ($float) {
+    return defined($float)                      # it is defined ...
+        && not(ref $float)                      # if it is not a reference
+        && looks_like_number($float)            # ... if it looks like a number
+        && $float == ($float + 0.0)             # and is the same value when converted to float()
+        #&& B::svref_2object(\$float) isa B::NV  # ... and it is at least `isa` B::NV
+};
 
-$TYPE_REGISTRY{ *ArrayRef } = ELO::Core::Type->new(
-    symbol  => \*ArrayRef,
-    checker => sub ($array_ref) {
-        return defined($array_ref)        # it is defined ...
-            && ref($array_ref) eq 'ARRAY' # and it is an ARRAY reference
-    }
-);
+type *ArrayRef, sub ($array_ref) {
+    return defined($array_ref)        # it is defined ...
+        && ref($array_ref) eq 'ARRAY' # and it is an ARRAY reference
+};
 
-$TYPE_REGISTRY{ *HashRef } = ELO::Core::Type->new(
-    symbol  => \*HashRef,
-    checker => sub ($hash_ref) {
-        return defined($hash_ref)       # it is defined ...
-            && ref($hash_ref) eq 'HASH' # and it is a HASH reference
-    }
-);
+type *HashRef, sub ($hash_ref) {
+    return defined($hash_ref)       # it is defined ...
+        && ref($hash_ref) eq 'HASH' # and it is a HASH reference
+};
 
 # FIXME:
 # these type definitions require too much
@@ -127,41 +138,29 @@ $TYPE_REGISTRY{ *HashRef } = ELO::Core::Type->new(
 # we end up duplicating stuff, this should
 # get fixed at some point
 
-$TYPE_REGISTRY{ *PID } = ELO::Core::Type->new(
-    symbol  => \*PID,
-    checker => sub ($pid) {
-        return defined($pid)             # it is defined ...
-            && not(ref $pid)             # ... and it is not a reference
-            && ($pid =~ /^\d\d\d\:.*$/)  # ... and is the pid format
-            # FIXME: this PID format should not be defined
-            # here as well as in Abstract::Process
-    }
-);
+type *PID, sub ($pid) {
+    return defined($pid)             # it is defined ...
+        && not(ref $pid)             # ... and it is not a reference
+        && ($pid =~ /^\d\d\d\:.*$/)  # ... and is the pid format
+        # FIXME: this PID format should not be defined
+        # here as well as in Abstract::Process
+};
 
-$TYPE_REGISTRY{ *Process } = ELO::Core::Type->new(
-    symbol  => \*Process,
-    checker => sub ($process) {
-        return defined($process)                          # it is defined ...
-            && $process isa ELO::Core::Abstract::Process  # ... and is a process object
-    }
-);
+type *Process, sub ($process) {
+    return defined($process)                          # it is defined ...
+        && $process isa ELO::Core::Abstract::Process  # ... and is a process object
+};
 
-$TYPE_REGISTRY{ *Promise } = ELO::Core::Type->new(
-    symbol  => \*Promise,
-    checker => sub ($promise) {
-        return defined($promise)                # it is defined ...
-            && $promise isa ELO::Core::Promise  # ... and is a promise object
-    }
-);
+type *Promise, sub ($promise) {
+    return defined($promise)                # it is defined ...
+        && $promise isa ELO::Core::Promise  # ... and is a promise object
+};
 
-$TYPE_REGISTRY{ *TimerId } = ELO::Core::Type->new(
-    symbol  => \*TimerId,
-    checker => sub ($timer_id) {
-        return defined($timer_id)         # it is defined ...
-            && ref($timer_id) eq 'SCALAR' # and it is a SCALAR reference
-            # FIXME: we should probably bless the timed IDs
-    }
-);
+type *TimerId, sub ($timer_id) {
+    return defined($timer_id)         # it is defined ...
+        && ref($timer_id) eq 'SCALAR' # and it is a SCALAR reference
+        # FIXME: we should probably bless the timed IDs
+};
 
 1;
 

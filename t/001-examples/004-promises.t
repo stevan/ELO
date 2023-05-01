@@ -9,19 +9,15 @@ use Test::ELO;
 use Data::Dump;
 
 use ok 'ELO::Loop';
-use ok 'ELO::Types',    qw[ :core ];
-use ok 'ELO::Events',   qw[ event ];
+use ok 'ELO::Types',    qw[ :core event ];
 use ok 'ELO::Actors',   qw[ match ];
 use ok 'ELO::Promises', qw[ promise collect ];
 
 my $log = Test::ELO->create_logger;
 
-# FIXME: this should be this ...
-# event *eServiceRequest   => ( *Str, [ *Int, *Int ], *Promise );
-
-event *eServiceRequest   => ( *Str, *ArrayRef, *Promise ); # action : Str, args : [Int, Int], promise
-event *eServiceResponse  => ( *Int );                      # Int
-event *eServiceError     => ( *Str );                      # error : Str
+event *eServiceRequest   => ( *Str, [ *Int, *Int ], *Promise ); # action : Str, args : [Int, Int], promise
+event *eServiceResponse  => ( *Int );                           # Int
+event *eServiceError     => ( *Str );                           # error : Str
 
 event *eServiceClientRequest => ( *Process, *Str, *ArrayRef ); # service, action, args
 

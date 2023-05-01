@@ -28,8 +28,7 @@ With an Actor system implemented on top.
 
 ```perl
 use ELO::Loop;
-use ELO::Types  qw[ :core ];
-use ELO::Events qw[ event ];
+use ELO::Types  qw[ :core event ];
 use ELO::Actors qw[ match ];
 use Hash::Util  qw[ fieldhash ];
 
@@ -91,8 +90,7 @@ And a Promise mechanism to coordinate between Actors.
 
 ```perl
 use ELO::Loop;
-use ELO::Types    qw[ :core ];
-use ELO::Events   qw[ event ];
+use ELO::Types    qw[ :core event ];
 use ELO::Actors   qw[ match ];
 use ELO::Promises qw[ promise ];
 

@@ -11,8 +11,7 @@ use Data::Dump;
 use Hash::Util qw[fieldhash];
 
 use ok 'ELO::Loop';
-use ok 'ELO::Types',     qw[ :core ];
-use ok 'ELO::Events',    qw[ event ];
+use ok 'ELO::Types',     qw[ :core event ];
 use ok 'ELO::Actors',    qw[ match ];
 use ok 'ELO::Timers',    qw[ :tickers ];
 use ok 'ELO::Constants', qw[ $SIGEXIT ];

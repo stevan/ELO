@@ -6,8 +6,11 @@ no warnings 'once';
 use Test::More;
 use Test::Differences;
 
-use ok 'ELO::Types',  qw[ :core lookup_type  ];
-use ok 'ELO::Events', qw[ event lookup_event_type ];
+use ok 'ELO::Types',  qw[
+    :core
+    event
+    lookup_event_type
+];
 
 subtest '... define an event' => sub {
     event *eHelloWorld => ( *Str, *Int, *ArrayRef, *Float );

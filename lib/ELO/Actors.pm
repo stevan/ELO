@@ -3,7 +3,7 @@ use v5.36;
 
 use Sub::Util 'set_subname';
 
-use ELO::Events 'lookup_event_type';
+use ELO::Types 'lookup_event_type';
 
 use constant DEBUG => $ENV{ACTORS_DEBUG} || 0;
 

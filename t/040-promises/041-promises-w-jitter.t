@@ -9,20 +9,16 @@ use Test::ELO;
 use Data::Dump;
 
 use ok 'ELO::Loop';
-use ok 'ELO::Types',    qw[ :core ];
-use ok 'ELO::Events',   qw[ event ];
+use ok 'ELO::Types',    qw[ :core event ];
 use ok 'ELO::Actors',   qw[ match ];
 use ok 'ELO::Promises', qw[ promise collect ];
 use ok 'ELO::Timers',   qw[ ticker ];
 
 my $log = Test::ELO->create_logger;
 
-# FIXME: this should be this ...
-# event *eServiceRequest   => ( *Str, [ *Int, *Int ], *Promise );
-
-event *eServiceRequest   => ( *Str, *ArrayRef, *Promise ); # action : Str, args : [Int, Int], promise
-event *eServiceResponse  => ( *Int );                      # Int
-event *eServiceError     => ( *Str );                      # error : Str
+event *eServiceRequest   => ( *Str, [ *Int, *Int ], *Promise ); # action : Str, args : [Int, Int], promise
+event *eServiceResponse  => ( *Int );                           # Int
+event *eServiceError     => ( *Str );                           # error : Str
 
 sub jitter { int(rand(25)) }
 
@@ -31,9 +27,6 @@ sub Service ($this, $msg) {
     $log->debug( $this, $msg );
 
     match $msg, state $handlers = +{
-        # $request  = eServiceRequest  [ action : Str, args : [Int, Int], caller : PID ]
-        # $response = eServiceResponse [ Int ]
-        # $error    = eServiceError    [ error : Str ]
         *eServiceRequest => sub ($action, $args, $promise) {
             $log->debug( $this, "HELLO FROM Service :: eServiceRequest" );
             $log->debug( $this, +{ action => $action, args => $args, promise => $promise });

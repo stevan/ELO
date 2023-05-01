@@ -9,8 +9,7 @@ use Test::ELO;
 use Data::Dump;
 
 use ok 'ELO::Loop';
-use ok 'ELO::Types',     qw[ :core ];
-use ok 'ELO::Events',    qw[ event ];
+use ok 'ELO::Types',     qw[ :core event ];
 use ok 'ELO::Actors',    qw[ match build_actor ];
 use ok 'ELO::Constants', qw[ $SIGEXIT ];
 
