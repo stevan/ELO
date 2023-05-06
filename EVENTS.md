@@ -1,5 +1,5 @@
 <!-------------------------------------------------------->
-# Proposal for Formal Events
+# ELO - Formal Events
 <!-------------------------------------------------------->
 
 An event is the data structure used for communication between two
@@ -57,8 +57,10 @@ into account in what it is doing.
 ## How Actors and Events are implemented/integrated
 <!-------------------------------------------------------->
 
-Events can be defined as TYPELGLOBs, this will make it easier to scope
-them as they are essentially global.
+Events are defined as TYPELGLOBs, this will makes it easier to scope
+them as they are essentially global in terms of visibility, but are also
+members of the enclosing package, so as to make it easier to avoid
+name collisions.
 
 So a simple event definiton and an Actor definition would work like so:
 
@@ -110,10 +112,10 @@ package My::App::Events {
     use ELO::Types ':core'; # import Core types like *Str
 
     # make them exportable ...
-    our @EXPORT_OK = (
-        Foo
-        Bar
-        Baz
+    our @EXPORT_OK = qw(
+        *Foo
+        *Bar
+        *Baz
     );
 
     # define them ...
@@ -168,7 +170,7 @@ my $e = [ *eFoo => "Foo", 1, 2 ];
 
 While it is possible to use types like `*ArrayRef` and `*HashRef` to
 represent complex values beyond a simple SCALAR, sometimes that is
-more than is needed, so we also support nexted `Tuple` types. This
+more than is needed, so we also support nested `Tuple` types. This
 is accomplished by putting types into an ARRAY ref, like so:
 
 ```perl
@@ -187,7 +189,7 @@ my $e = [ *eFoo => "add", [ 1, 2 ] ];
 
 Hopefully this is fairly intuitive.
 
-### What are payloads used for?
+### What are event-payloads used for?
 
 The payload type definitions basically give us a level of
 signature type checking on the handler/reciever callbacks.
@@ -231,15 +233,15 @@ Given this, it makes sense to base our type system on JSON and start out with
 the following simple scalar types.
 
 ```perl
-type *Bool;  # map to Perl's ideal of a boolean (?)
-type *Int;   # map to IV (and PVIV)
-type *Float; # map to NV (and PVNV)
-type *Str;   # map to PV, and PV** varients
+type *Bool;
+type *Num;  # can be an Int or a Float
+type *Int;
+type *Float;
+type *Str;
 ```
 
-> NOTE: these are not intended to be stricter than Perl is itself, so using
-> internal SV type should work in the expected way, which is to say it matches
-> Perl's expectations.
+> NOTE: these are not intended to be stricter than Perl is itself, so align
+> your expectations accordingly.
 
 We can add the basic JSON reference scalar types as well.
 
@@ -252,7 +254,7 @@ type *HashRef;  # just checks reftype
 > so something like `*ArrayRef[*Int]` is not supported by these types
 > but more on that later.
 
-> NOTE: Consider adding `*RegExpRef` as well since they can be serialized as
+> XXX: Consider adding `*RegExpRef` as well since they can be serialized as
 > a string and would work just fine locally as well.
 
 > NOTE: We do not support things like `*ScalarRef` or `*CodeRef` as they
@@ -262,6 +264,8 @@ type *HashRef;  # just checks reftype
 > way that would cause problems/confusion.
 
 ### Perl Virtual types
+
+> NOTE: This is not done yet, and might not be, have to think on it.
 
 We also add in some "virtual" types, which are there only to model the event
 messages in a way that is meaningful to Perl.
@@ -342,9 +346,6 @@ type *TimerID; # a Timer ID (which is a ScalarRef)
 https://metacpan.org/pod/Variable::Magic#wizard
 https://metacpan.org/release/VPIT/Variable-Magic-0.63/source/t/34-glob.t
 
-- type checking should call B::svref_2object to inspect the var
-
-
 <!-------------------------------------------------------->
 ## Misc.
 <!-------------------------------------------------------->
@@ -380,24 +381,24 @@ type *Response => [ *Status, *Headers, *Body ];
 
 Less Simple version:
 ```
-enum *Method  => (*GET, *POST);
+enum *Method  => qw(GET POST);
 
 type *URL => *Str;
 
-enum *Header => (
-    *ContentType,
-    *Accept
+enum *Header => qw(
+    ContentType,
+    Accept
 );
 
 type *Headers => List[ Pair[ *Header => *Str ] ];
 
-struct *Request => {
+record *Request => {
     method  => *Method,
     url     => *URL,
     headers => *Headers,
 };
 
-struct *Response => {
+record *Response => {
     status  => *Status,
     headers => *Headers,
     body    => *Body

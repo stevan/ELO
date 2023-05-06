@@ -5,7 +5,15 @@
 <!-------------------------------------------------------->
 
 - [ ] See `EVENTS.md`
-    - add nested Tuple support to Events
+    - add type aliasing
+        - `type *Foo => *Str` etc.
+
+    - consider type extension
+        - `subtype *Foo => *Str => where { ... };`
+        - this opens up types to be arbitrarily complex
+            - this means we can't control performance :(
+
+    - should we add some kind of generics?
 
     - `protocol` needs to be implemented
         - this should act like a case class or union of the protocol types

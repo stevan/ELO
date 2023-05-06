@@ -23,9 +23,9 @@ enum *Ops => qw[
     Div
 ];
 
-event *eServiceRequest  => ( *SID, *Ops, *ArrayRef, *Process ); # sid : SID, action : Str, args : <Any>, caller : PID
-event *eServiceResponse => ( *SID, *Num );                      # sid : SID, return : <Any>
-event *eServiceError    => ( *SID, *Str );                      # sid : SID, error : Str
+event *eServiceRequest  => ( *SID, *Ops, [ *Int, *Int ], *Process ); # sid : SID, action : Str, args : <Any>, caller : PID
+event *eServiceResponse => ( *SID, *Num );                           # sid : SID, return : <Any>
+event *eServiceError    => ( *SID, *Str );                           # sid : SID, error : Str
 
 event *eServiceRegistryUpdateRequest  => ( *SID, *Str, *Process, *Process ); # sid : SID, name : Str, service : Process, caller : PID
 event *eServiceRegistryUpdateResponse => ( *SID, *Str, *Str );              # sid : SID, name : Str, service : Str
@@ -35,9 +35,9 @@ event *eServiceRegistryLookupRequest  => ( *SID, *Str, *Process ); # sid : SID, 
 event *eServiceRegistryLookupResponse => ( *SID, *Process );       # sid : SID, service : PID
 event *eServiceRegistryLookupError    => ( *SID, *Str );           # sid : SID, error   : Str
 
-event *eServiceClientRequest  => ( *Str, *Ops, *ArrayRef ); #  url : Str, action : Str, args : <Any>
-event *eServiceClientResponse => ( *Num );                  #  <Any>
-event *eServiceClientError    => ( *Str );                  #  error : Str
+event *eServiceClientRequest  => ( *Str, *Ops, [ *Int, *Int ] ); #  url : Str, action : Str, args : <Any>
+event *eServiceClientResponse => ( *Num );                       #  <Any>
+event *eServiceClientError    => ( *Str );                       #  error : Str
 
 sub Service ($this, $msg) {
 
