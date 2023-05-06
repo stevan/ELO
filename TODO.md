@@ -18,8 +18,15 @@
     - `protocol` needs to be implemented
         - this should act like a case class or union of the protocol types
 
-
 - [ ] See `PROMISES.md`
+
+- [ ] add Akka style `become` to allow for state machines
+    - see `200-actors/002-fp-examples/003-producer.t`
+
+- consider using the Queue from my P implementation so
+  that events can be deferred when needed
+    - this can come in handy when starting/stoping actors
+
 
 <!-------------------------------------------------------->
 ## Loop

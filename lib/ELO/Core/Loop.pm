@@ -7,7 +7,6 @@ use List::Util   'uniq';
 use Time::HiRes  ();
 
 use ELO::Core::Process;
-use ELO::Core::ActorRef;
 use ELO::Constants qw[ $SIGEXIT ];
 
 use parent 'UNIVERSAL::Object::Immutable';
@@ -23,19 +22,6 @@ use slots (
     _signal_queue   => sub { +[] },
     _callback_queue => sub { +[] },
 );
-
-sub create_actor ($self, $actor_class, $actor_args, $env=undef, $parent=undef) {
-    my $actor_ref = ELO::Core::ActorRef->new(
-        name        => $actor_class, # FIXME
-        actor_class => $actor_class,
-        actor_args  => $actor_args,
-        loop        => $self,
-        parent      => $parent,
-        env         => $env,
-    );
-    $self->{_process_table}->{ $actor_ref->pid } = $actor_ref;
-    return $actor_ref;
-}
 
 sub create_process ($self, $name, $f, $env=undef, $parent=undef) {
     my $process = ELO::Core::Process->new(

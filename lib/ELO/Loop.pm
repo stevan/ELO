@@ -39,25 +39,6 @@ sub run ($class, $f, %options) {
     return;
 }
 
-sub run_actor ($class, $actor_class, %options) {
-
-    my $actor_args;
-    my $logger;
-    my $env;
-
-    my $loop = build_loop( %options );
-
-    # process options ...
-    $actor_args  = $options{actor_args}  if $options{actor_args};
-    $logger      = $options{logger}      if $options{logger};
-    $env         = $options{env}         if $options{env};
-
-    # run the loop
-    $loop->run_actor( $actor_class, $actor_args // +{}, $logger, $env );
-
-    return;
-}
-
 1;
 
 __END__
