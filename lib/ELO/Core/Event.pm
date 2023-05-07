@@ -1,6 +1,8 @@
 package ELO::Core::Event;
 use v5.36;
 
+# TODO: rename this to EventType
+
 use parent 'UNIVERSAL::Object::Immutable';
 use slots (
     symbol     => sub {},
