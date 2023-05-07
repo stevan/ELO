@@ -24,7 +24,7 @@ use slots (
     _callback_queue => sub { +[] },
 );
 
-sub create_process ($self, $name, $f, $env=undef, $parent=undef) {
+sub create_process ($self, $name, $f, $parent=undef) {
     my $process = ELO::Core::Process->new(
         behavior => ELO::Core::Behavior->new(
             name   => $name,
@@ -32,18 +32,16 @@ sub create_process ($self, $name, $f, $env=undef, $parent=undef) {
         ),
         loop   => $self,
         parent => $parent,
-        env    => $env,
     );
     $self->{_process_table}->{ $process->pid } = $process;
     return $process;
 }
 
-sub create_actor ($self, $actor, $env=undef, $parent=undef) {
+sub create_actor ($self, $actor, $parent=undef) {
     my $process = ELO::Core::Process->new(
         behavior => $actor,
         loop     => $self,
         parent   => $parent,
-        env      => $env,
     );
     $self->{_process_table}->{ $process->pid } = $process;
     return $process;
@@ -450,15 +448,9 @@ sub LOOP ($self, $logger=undef) {
     return;
 }
 
-sub run ($self, $f, $args=[], $logger=undef, $env=undef) {
-    my $main = $self->create_process( main => $f, $env );
+sub run ($self, $f, $args=[], $logger=undef) {
+    my $main = $self->create_process( main => $f );
     $self->enqueue_msg([ $main, $args ]);
-    $self->LOOP( $logger );
-    return;
-}
-
-sub run_actor ($self, $actor_class, $actor_args={}, $logger=undef, $env=undef) {
-    my $root = $self->create_actor( $actor_class, $actor_args, $env );
     $self->LOOP( $logger );
     return;
 }

@@ -26,24 +26,16 @@ use slots (
     loop     => sub { die 'A `loop` is required' },
     parent   => sub {},
     # ...
-    _pid           => sub {},
-    _flags         => sub {},
-    _msg_inbox     => sub {},
-    _environment   => sub {},
+    _pid       => sub {},
+    _flags     => sub {},
+    _msg_inbox => sub {},
 );
 
 sub BUILD ($self, $params) {
-    $self->{_msg_inbox}   = [];
-    $self->{_flags}       = { trap_signals => {}, sleep_timer => undef };
-    $self->{_environment} = { ($params->{env} // $params->{ENV} // {})->%* };
-    $self->{_pid}         = sprintf '%03d:%s' => ++$PIDS, $self->{behavior}->name;
+    $self->{_msg_inbox} = [];
+    $self->{_flags}     = { trap_signals => {}, sleep_timer => undef };
+    $self->{_pid}       = sprintf '%03d:%s' => ++$PIDS, $self->{behavior}->name;
 }
-
-# XXX - is this neccesary?
-# sub DEMOLISH ($self, @args) {
-#     delete $self->{loop};
-#     delete $self->{parent};
-# }
 
 # ...
 
@@ -52,6 +44,14 @@ sub apply ($self, $event) {
 }
 
 # ...
+
+sub trap ($self, $signal) {
+    $self->{_flags}->{trap_signals}->{ $signal }++;
+}
+
+sub is_trapping ($self, $signal) {
+    !! exists $self->{_flags}->{trap_signals}->{ $signal };
+}
 
 sub is_sleeping ($self) { !! $self->{_flags}->{sleep_timer} }
 
@@ -98,14 +98,6 @@ sub tick ($self) {
 sub pid  ($self) { $self->{_pid} }
 sub name ($self) { $self->{behavior}->name }
 
-sub env ($self, $key) {
-    my $value = $self->{_environment}->{ $key };
-    if ( !(defined $value) && $self->parent ) {
-        $value = $self->parent->env( $key );
-    }
-    return $value;
-}
-
 # ...
 
 sub parent     ($self) {    $self->{parent} }
@@ -113,19 +105,6 @@ sub has_parent ($self) { !! $self->{parent} }
 
 # ...
 
-sub loop ($self) { $self->{loop} }
-
-sub spawn ($self, $name, $f, $env=undef) {
-    $self->{loop}->create_process( $name, $f, $env, $self );
-}
-
-sub spawn_actor ($self, $actor, $env=undef) {
-    $self->{loop}->create_actor( $actor, $env, $self );
-}
-
-sub kill ($self, $proc) {
-    $self->signal( $proc, $SIGEXIT, [ $self ] );
-}
 
 sub sleep ($self, $duration) {
     die 'This should not be possible' if $self->{_flags}->{sleep_timer};
@@ -143,6 +122,21 @@ sub wakeup ($self) {
     $self->tick;
 }
 
+
+sub loop ($self) { $self->{loop} }
+
+sub spawn ($self, $name, $f) {
+    $self->{loop}->create_process( $name, $f, $self );
+}
+
+sub spawn_actor ($self, $actor) {
+    $self->{loop}->create_actor( $actor, $self );
+}
+
+sub kill ($self, $proc) {
+    $self->signal( $proc, $SIGEXIT, [ $self ] );
+}
+
 sub exit ($self, $status=0) {
 
     $self->{loop}->destroy_process( $self );
@@ -154,14 +148,6 @@ sub exit ($self, $status=0) {
 
 sub signal ($self, $proc, $signal, $event) {
     $self->{loop}->enqueue_signal([ $proc, $signal, $event ]);
-}
-
-sub trap ($self, $signal) {
-    $self->{_flags}->{trap_signals}->{ $signal }++;
-}
-
-sub is_trapping ($self, $signal) {
-    !! exists $self->{_flags}->{trap_signals}->{ $signal };
 }
 
 # ...

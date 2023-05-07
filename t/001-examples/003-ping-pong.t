@@ -33,6 +33,7 @@ sub Ping ($this, $msg) {
     # object-id key.
 
     fieldhash state %count;
+    fieldhash state %max_pings;
 
     # NOTE:
     # The fieldhash function will be
@@ -73,21 +74,22 @@ sub Ping ($this, $msg) {
     # be better (once I actually write it).
 
     match $msg, +{
-        eStartPing => sub ( $pong ) {
+        eStartPing => sub ( $pong, $max_pings ) {
             isa_ok($pong, 'ELO::Core::Process');
 
+            $max_pings{$this} = $max_pings;
             $count{$this}++;
             $log->info( $this, " Starting with (".$count{$this}.")" );
             $this->send( $pong, [ ePing => $this ]);
 
-            pass('... '.$this->name.' started with '.$this->env('max_pings').' max pings');
+            pass('... '.$this->name.' started with '.$max_pings.' max pings');
         },
         ePong => sub ( $pong ) {
             isa_ok($pong, 'ELO::Core::Process');
 
             $count{$this}++;
             $log->info( $this, " Pong with (".$count{$this}.")" );
-            if ( $count{$this} >= $this->env('max_pings') ) {
+            if ( $count{$this} >= $max_pings{$this} ) {
                 $log->info( $this, " ... Stopping Ping" );
                 $this->send( $pong, [ 'eStop' ]);
 
@@ -126,10 +128,10 @@ sub Pong ($this, $msg) {
 
 sub init ($this, $msg=[]) {
 
-    state $ping = $this->spawn( Ping  => \&Ping, { max_pings => 5 } );
+    state $ping = $this->spawn( Ping  => \&Ping );
     state $pong = $this->spawn( Pong  => \&Pong );
 
-    state $ping2 = $this->spawn( Ping2  => \&Ping, { max_pings => 10 });
+    state $ping2 = $this->spawn( Ping2  => \&Ping );
     state $pong2 = $this->spawn( Pong2  => \&Pong );
 
     unless ($msg && @$msg) {
@@ -146,8 +148,8 @@ sub init ($this, $msg=[]) {
         $ping->link( $pong );
         $pong2->link( $ping2 );
 
-        $this->send( $ping,  [ eStartPing => $pong  ]);
-        $this->send( $ping2, [ eStartPing => $pong2 ]);
+        $this->send( $ping,  [ eStartPing => $pong,  5  ]);
+        $this->send( $ping2, [ eStartPing => $pong2, 10 ]);
 
         # set our process up to link to all
         # these processes, so we can see when

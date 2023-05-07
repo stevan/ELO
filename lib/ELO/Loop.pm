@@ -24,17 +24,15 @@ sub run ($class, $f, %options) {
 
     my $args;
     my $logger;
-    my $env;
 
     my $loop = build_loop( %options );
 
     # process options ...
     $args   = $options{args}   if $options{args};
     $logger = $options{logger} if $options{logger};
-    $env    = $options{env}    if $options{env};
 
     # run the loop
-    $loop->run( $f, $args // +[], $logger, $env );
+    $loop->run( $f, $args // +[], $logger );
 
     return;
 }
