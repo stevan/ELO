@@ -180,8 +180,8 @@ type *PID, sub ($pid) {
 };
 
 type *Process, sub ($process) {
-    return defined($process)                          # it is defined ...
-        && $process isa ELO::Core::Abstract::Process  # ... and is a process object
+    return defined($process)                # it is defined ...
+        && $process isa ELO::Core::Process  # ... and is a process object
 };
 
 type *Promise, sub ($promise) {

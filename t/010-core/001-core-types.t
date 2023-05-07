@@ -136,7 +136,7 @@ subtest '... checking *PID' => sub {
 };
 
 subtest '... checking *Process' => sub {
-    ok( lookup_type(*Process)->check( bless {} => 'ELO::Core::Abstract::Process' ),   '... this type checked for Process with an Process' );
+    ok( lookup_type(*Process)->check( bless {} => 'ELO::Core::Process' ),   '... this type checked for Process with an Process' );
 
     ok( !lookup_type(*Process)->check( 1.0 ),   '... this failed the type check for Process with a simple Flot' );
     ok( !lookup_type(*Process)->check( 100 ),   '... this failed the type check for Process with with an Int' );
