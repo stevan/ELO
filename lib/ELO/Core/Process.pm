@@ -22,10 +22,9 @@ use overload (
 
 use parent 'UNIVERSAL::Object::Immutable';
 use slots (
-    name   => sub { die 'A `name` is required' },
-    func   => sub { die 'A `func` is required' },
-    loop   => sub { die 'A `loop` is required' },
-    parent => sub {},
+    behavior => sub { die 'A `behavior` is required' },
+    loop     => sub { die 'A `loop` is required' },
+    parent   => sub {},
     # ...
     _pid           => sub {},
     _flags         => sub {},
@@ -37,7 +36,7 @@ sub BUILD ($self, $params) {
     $self->{_msg_inbox}   = [];
     $self->{_flags}       = { trap_signals => {}, sleep_timer => undef };
     $self->{_environment} = { ($params->{env} // $params->{ENV} // {})->%* };
-    $self->{_pid}         = sprintf '%03d:%s' => ++$PIDS, $self->{name};
+    $self->{_pid}         = sprintf '%03d:%s' => ++$PIDS, $self->{behavior}->name;
 }
 
 # XXX - is this neccesary?
@@ -48,10 +47,8 @@ sub BUILD ($self, $params) {
 
 # ...
 
-sub func ($self) { $self->{func} }
-
 sub apply ($self, $event) {
-    $self->{func}->( $self, $event );
+    $self->{behavior}->apply( $self, $event );
 }
 
 # ...
@@ -99,7 +96,7 @@ sub tick ($self) {
 # ...
 
 sub pid  ($self) { $self->{_pid} }
-sub name ($self) { $self->{name} }
+sub name ($self) { $self->{behavior}->name }
 
 sub env ($self, $key) {
     my $value = $self->{_environment}->{ $key };
@@ -122,8 +119,8 @@ sub spawn ($self, $name, $f, $env=undef) {
     $self->{loop}->create_process( $name, $f, $env, $self );
 }
 
-sub spawn_actor ($self, $actor_class, $actor_args={}, $env=undef) {
-    $self->{loop}->create_actor( $actor_class, $actor_args, $env, $self );
+sub spawn_actor ($self, $actor, $env=undef) {
+    $self->{loop}->create_actor( $actor, $env, $self );
 }
 
 sub kill ($self, $proc) {

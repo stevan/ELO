@@ -7,6 +7,7 @@ use List::Util   'uniq';
 use Time::HiRes  ();
 
 use ELO::Core::Process;
+use ELO::Core::Behavior;
 use ELO::Constants qw[ $SIGEXIT ];
 
 use parent 'UNIVERSAL::Object::Immutable';
@@ -25,11 +26,24 @@ use slots (
 
 sub create_process ($self, $name, $f, $env=undef, $parent=undef) {
     my $process = ELO::Core::Process->new(
-        name   => $name,
-        func   => $f,
+        behavior => ELO::Core::Behavior->new(
+            name   => $name,
+            func   => $f,
+        ),
         loop   => $self,
         parent => $parent,
         env    => $env,
+    );
+    $self->{_process_table}->{ $process->pid } = $process;
+    return $process;
+}
+
+sub create_actor ($self, $actor, $env=undef, $parent=undef) {
+    my $process = ELO::Core::Process->new(
+        behavior => $actor,
+        loop     => $self,
+        parent   => $parent,
+        env      => $env,
     );
     $self->{_process_table}->{ $process->pid } = $process;
     return $process;
