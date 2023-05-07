@@ -40,6 +40,12 @@ sub BUILD ($self, $params) {
     $self->{_pid}         = sprintf '%03d:%s' => ++$PIDS, $self->{name};
 }
 
+# XXX - is this neccesary?
+# sub DEMOLISH ($self, @args) {
+#     delete $self->{loop};
+#     delete $self->{parent};
+# }
+
 # ...
 
 sub func ($self) { $self->{func} }
