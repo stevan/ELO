@@ -1,5 +1,6 @@
 package ELO::Actors;
 use v5.36;
+use experimental 'try';
 
 use Sub::Util 'set_subname';
 
@@ -62,13 +63,12 @@ sub match ($msg, $table) {
             or die "Event($event) failed to type check (".(join ', ' => @args).")";
     }
 
-    eval {
+    try {
         $cb->(@args);
-        1;
-    } or do {
+    } catch ($e) {
         #warn "!!! Died calling msg(".(join ', ' => map { ref $_ ? '['.(join ', ' => @$_).']' : $_ } @$msg).")";
-        die $@;
-    };
+        die $e;
+    }
 }
 
 1;

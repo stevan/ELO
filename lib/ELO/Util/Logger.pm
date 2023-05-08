@@ -1,5 +1,6 @@
 package ELO::Util::Logger;
 use v5.36;
+use experimental 'try';
 
 use Data::Dump ();
 use Sub::Util  ();
@@ -65,7 +66,7 @@ my sub dump_msg ($msg) {
     local $Data::Dump::LINEWIDTH = $MAX_DUMP_WIDTH;
 
     my $out;
-    eval {
+    try {
         $out = Data::Dump::dumpf( $msg, sub ($ctx, $obj) {
 
             # NOTE:
@@ -96,11 +97,9 @@ my sub dump_msg ($msg) {
 
             return;
         } );
-        1;
-    } or do {
-        my $e = $@;
+    } catch ($e) {
         die Data::Dump::dump({ ERROR => $e, MSG => $msg });
-    };
+    }
     return $out;
 }
 

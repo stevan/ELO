@@ -1,5 +1,6 @@
 package ELO::Core::Promise;
 use v5.36;
+use experimental 'try';
 
 # FIXME: do better than this ...
 our $LOOP;
@@ -86,14 +87,12 @@ sub _notify ($self) {
 sub _wrap ($self, $p, $then) {
     return sub ($value) {
         my ($result, $error);
-        eval {
+        try {
             $result = $then->( $value );
-            1;
-        } or do {
-            my $e = $@;
+        } catch ($e) {
             chomp $e;
             $error = $e;
-        };
+        }
 
         if ($error) {
             $p->reject( $error );

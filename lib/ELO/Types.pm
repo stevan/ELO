@@ -123,6 +123,10 @@ sub lookup_type ( $type ) {
 
 use Scalar::Util qw[ looks_like_number ];
 
+# XXX - consider using the builtin functions here:
+# - true, false, is_bool
+# - created_as_{string,number}
+
 type *Bool, sub ($bool) {
     return defined($bool)                      # it is defined ...
         && not(ref $bool)                      # ... and it is not a reference

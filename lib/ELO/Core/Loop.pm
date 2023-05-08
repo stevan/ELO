@@ -1,8 +1,9 @@
 package ELO::Core::Loop;
 use v5.36;
+use experimental 'try', 'builtin';
+use builtin 'blessed';
 
 use Carp         'confess';
-use Scalar::Util 'blessed';
 use List::Util   'uniq';
 use Time::HiRes  ();
 
@@ -29,7 +30,7 @@ use slots (
 sub create_process ($self, @args) {
 
     my ($behavior, $parent);
-    if ( $args[0] && blessed $args[0] && $args[0]->roles::DOES('ELO::Core::Behavior') ) {
+    if ( blessed $args[0] && $args[0]->roles::DOES('ELO::Core::Behavior') ) {
         $behavior = shift @args;
     }
     else {
@@ -253,12 +254,11 @@ sub TICK ($self) {
     while (@$timers && $timers->[0]->[0] <= $now) {
         my $timer = shift @$timers;
         next if ${$timer->[2]}; # skip if the timer has been cancelled
-        eval {
+        try {
             $timer->[1]->(); 1;
-        } or do {
-            my $e = $@;
+        } catch ($e) {
             die "Timer callback failed ($timer) because: $e";
-        };
+        }
     }
 
     # next comes the Callback queue, these are
@@ -271,12 +271,11 @@ sub TICK ($self) {
 
     while (@cb_queue) {
         my $f = shift @cb_queue;
-        eval {
-            $f->(); 1;
-        } or do {
-            my $e = $@;
+        try {
+            $f->()
+        } catch ($e) {
             die "Callback failed ($f) because: $e";
-        };
+        }
     }
 
     # last is the message queue, which will process
@@ -299,18 +298,15 @@ sub TICK ($self) {
         # XXX - maybe add a dead letter queue here
         next unless $to_proc;
 
-        eval {
+        try {
             $to_proc->accept( $event );
             $to_proc->tick;
-            1;
-        } or do {
-            my $e = $@;
-
+        } catch ($e) {
             use Data::Dumper;
             warn Dumper { msg => $msg, queue => \@msg_queue };
 
             die "Message to (".$to_proc->pid.") failed with msg(".(join ', ' => @{ $event // []}).") because: $e";
-        };
+        }
     }
 
     return;
