@@ -13,7 +13,7 @@ sub HelloWorld ($this, $msg) {
     say "Hello $name from ".$this->pid;
 }
 
-sub main ($this, $msg) {
+sub init ($this, $msg) {
     my $hello = $this->spawn('HelloWorld' => \&HelloWorld);
 
     $this->send( $hello, ['World']);
@@ -28,30 +28,27 @@ With an Actor system implemented on top.
 
 ```perl
 use ELO::Loop;
-use ELO::Types  qw[ :core event ];
-use ELO::Actors qw[ match ];
-use Hash::Util  qw[ fieldhash ];
+use ELO::Types  qw[ :core :events ];
+use ELO::Actors qw[ receive ];
 
 event *eStartPing => ( *Process );
 event *ePing      => ( *Process );
 event *ePong      => ( *Process );
 
-sub Ping ($this, $msg) {
+sub Ping () {
 
-    # use inside-out objects
-    # for per-Actor state
-    fieldhash state %count;
+    my $count;
 
-    match $msg, +{
-        *eStartPing => sub ( $pong ) {
-            $count{$this}++;
-            say $this->pid." Starting with (".$count{$this}.")";
+    receive +{
+        *eStartPing => sub ( $this, $pong ) {
+            $count++;
+            say $this->pid." Starting with (".$count.")";
             $this->send( $pong, [ *ePing => $this ]);
         },
-        *ePong => sub ( $pong ) {
-            $count{$this}++;
-            say $this->pid." Pong with (".$count{$this}.")";
-            if ( $count{$this} >= 5 ) {
+        *ePong => sub ( $this, $pong ) {
+            $count++;
+            say $this->pid." Pong with (".$count.")";
+            if ( $count >= 5 ) {
                 say $this->pid." ... Stopping Ping";
                 $this->send( $pong, [ 'eStop' ]);
             }
@@ -62,25 +59,24 @@ sub Ping ($this, $msg) {
     };
 }
 
-sub Pong ($this, $msg) {
+sub Pong () {
 
-    match $msg, +{
-        *ePing => sub ( $ping ) {
+    receive +{
+        *ePing => sub ( $this, $ping ) {
             say "... Ping";
             $this->send( $ping, [ *ePong => $this ]);
         },
-        *eStop => sub () {
+        *eStop => sub ( $this ) {
             say "... Stopping Pong";
         },
     };
 }
 
 sub init ($this, $msg=[]) {
-    my $ping = $this->spawn( Ping  => \&Ping );
-    my $pong = $this->spawn( Pong  => \&Pong );
+    my $ping = $this->spawn( Ping() );
+    my $pong = $this->spawn( Pong() );
 
     $this->send( $ping, [ *eStartPing => $pong ]);
-
 }
 
 ELO::Loop->run( \&init );
@@ -89,20 +85,22 @@ ELO::Loop->run( \&init );
 And a Promise mechanism to coordinate between Actors.
 
 ```perl
+use experimental 'try';
+
 use ELO::Loop;
 use ELO::Types    qw[ :core event ];
-use ELO::Actors   qw[ match ];
+use ELO::Actors   qw[ receive ];
 use ELO::Promises qw[ promise ];
 
 event *eServiceRequest   => ( *Str, *ArrayRef, *Promise );
 event *eServiceResponse  => ( *Int );
 event *eServiceError     => ( *Str );
 
-sub Service ($this, $msg) {
+sub Service () {
 
-    match $msg, state $handlers = +{
-        *eServiceRequest => sub ($action, $args, $promise) {
-            eval {
+    receive +{
+        *eServiceRequest => sub ($this, $action, $args, $promise) {
+            try {
                 my ($x, $y) = @$args;
 
                 $promise->resolve([
@@ -114,18 +112,16 @@ sub Service ($this, $msg) {
                         die "Invalid Action: $action"
                     )
                 ]);
-                1;
-            } or do {
-                my $e = $@;
+            } catch ($e) {
                 chomp $e;
                 $promise->reject([ *eServiceError => ( $e ) ]);
-            };
+            }
         }
     }
 }
 
 sub init ($this, $msg=[]) {
-    my $service = $this->spawn( Service  => \&Service );
+    my $service = $this->spawn( Service() );
 
     my $promise = promise;
 
