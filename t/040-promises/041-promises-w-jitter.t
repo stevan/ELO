@@ -1,6 +1,7 @@
 #!perl
 
 use v5.36;
+use experimental 'try';
 
 use Test::More;
 use Test::Differences;
@@ -10,7 +11,7 @@ use Data::Dump;
 
 use ok 'ELO::Loop';
 use ok 'ELO::Types',    qw[ :core event ];
-use ok 'ELO::Actors',   qw[ match ];
+use ok 'ELO::Actors',   qw[ match receive ];
 use ok 'ELO::Promises', qw[ promise collect ];
 use ok 'ELO::Timers',   qw[ ticker ];
 
@@ -22,12 +23,10 @@ event *eServiceError     => ( *Str );                           # error : Str
 
 sub jitter { int(rand(25)) }
 
-sub Service ($this, $msg) {
+sub Service () {
 
-    $log->debug( $this, $msg );
-
-    match $msg, state $handlers = +{
-        *eServiceRequest => sub ($action, $args, $promise) {
+    receive +{
+        *eServiceRequest => sub ($this, $action, $args, $promise) {
             $log->debug( $this, "HELLO FROM Service :: eServiceRequest" );
             $log->debug( $this, +{ action => $action, args => $args, promise => $promise });
 
@@ -40,7 +39,7 @@ sub Service ($this, $msg) {
                 sub {
                     my ($x, $y) = @$args;
                     $log->info( $this, "Resolving Promise[$x] : ($promise) after timeout($timeout)" );
-                    eval {
+                    try {
                         $promise->resolve([
                             *eServiceResponse => (
                                 ($action eq 'add') ? ($x + $y) :
@@ -50,12 +49,10 @@ sub Service ($this, $msg) {
                                 die "Invalid Action: $action"
                             )
                         ]);
-                        1;
-                    } or do {
-                        my $e = $@;
+                    } catch ($e) {
                         chomp $e;
                         $promise->reject([ *eServiceError => ( $e ) ]);
-                    };
+                    }
                 }
             );
         }
@@ -64,7 +61,7 @@ sub Service ($this, $msg) {
 
 sub init ($this, $msg=[]) {
 
-    my $service = $this->spawn( Service  => \&Service );
+    my $service = $this->spawn( Service() );
     isa_ok($service, 'ELO::Core::Process');
 
     my @promises;

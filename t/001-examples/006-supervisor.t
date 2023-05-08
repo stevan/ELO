@@ -12,24 +12,19 @@ use Hash::Util qw[fieldhash];
 
 use ok 'ELO::Loop';
 use ok 'ELO::Types',     qw[ :core event ];
-use ok 'ELO::Actors',    qw[ match ];
+use ok 'ELO::Actors',    qw[ match receive ];
 use ok 'ELO::Timers',    qw[ :tickers ];
 use ok 'ELO::Constants', qw[ $SIGEXIT ];
 
 my $log = Test::ELO->create_logger;
 
-# FIXME: this should be this ...
-# event *eStartWorkers => ( *List ); # timeouts
-
 event *eStartWorkers => ( *ArrayRef ); # \@timeouts
-event *eStartWork    => ( *Int ); # timeout
+event *eStartWork    => ( *Int );      # timeout
 
-sub Worker ($this, $msg) {
+sub Worker ($name) {
 
-    $log->debug( $this, $msg );
-
-    match $msg, +{
-        *eStartWork => sub ($timeout) {
+    receive $name, +{
+        *eStartWork => sub ($this, $timeout) {
             $log->info( $this, "... started work ($timeout)" );
 
             pass('... got eStartWork message in '.$this->pid);
@@ -38,40 +33,35 @@ sub Worker ($this, $msg) {
                 $log->info( $this, "... finished work ($timeout)" );
                 $this->exit;
             })
-        },
-    };
+        }
+    }
 }
 
-sub Supervisor ($this, $msg) {
+sub Supervisor () {
 
-    $log->debug( $this, $msg );
+    my %active_workers;
 
-    fieldhash state %active_workers;
-
-    match $msg, +{
-        *eStartWorkers => sub ($timeouts) {
+    receive +{
+        *eStartWorkers => sub ($this, $timeouts) {
             pass('... got eStartWorkers message in '.$this->pid);
 
-            my %workers;
             foreach my $timeout (@$timeouts) {
-                my $worker = $this->spawn((sprintf 'Worker%02d' => scalar keys %workers), \&Worker);
+                my $worker = $this->spawn( Worker(sprintf 'Worker%02d' => scalar keys %active_workers) );
                 isa_ok($worker, 'ELO::Core::Process', $worker->pid);
 
-                $workers{ $worker->pid } = $worker;
+                $active_workers{ $worker->pid } = $worker;
 
                 $this->link( $worker );
                 $this->send( $worker, [ *eStartWork => $timeout ]);
             }
-
-            $active_workers{$this} = \%workers;
         },
-        $SIGEXIT => sub ($from) {
+        $SIGEXIT => sub ($this, $from) {
             isa_ok($from, 'ELO::Core::Process', 'SIGEXIT($from='.$from->pid.')');
             pass('... trapped SIGEXIT from '.$from->pid.' in '.$this->pid);
 
-            delete $active_workers{$this}->{ $from->pid };
+            delete $active_workers{ $from->pid };
 
-            $this->exit(0) if not scalar keys $active_workers{$this}->%*;
+            $this->exit(0) if not scalar keys %active_workers;
         }
     };
 }
@@ -82,7 +72,7 @@ sub init ($this, $msg) {
     # this kinda gross hack
     unless ($msg && @$msg) {
         # so we can use as an entry point
-        my $supervisor = $this->spawn( Supervisor => \&Supervisor );
+        my $supervisor = $this->spawn( Supervisor() );
         isa_ok($supervisor, 'ELO::Core::Process', $supervisor->pid);
 
         # trap the exit signal

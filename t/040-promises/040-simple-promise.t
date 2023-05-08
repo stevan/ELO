@@ -1,6 +1,7 @@
 #!perl
 
 use v5.36;
+use experimental 'try';
 
 use Test::More;
 use Test::Differences;
@@ -10,7 +11,7 @@ use Data::Dump;
 
 use ok 'ELO::Loop';
 use ok 'ELO::Types',    qw[ :core event ];
-use ok 'ELO::Actors',   qw[ match ];
+use ok 'ELO::Actors',   qw[ receive ];
 use ok 'ELO::Promises', qw[ promise ];
 
 my $log = Test::ELO->create_logger;
@@ -19,12 +20,10 @@ event *eServiceRequest   => ( *Str, [ *Int, *Int ], *Promise ); # action : Str, 
 event *eServiceResponse  => ( *Int );                           # Int
 event *eServiceError     => ( *Str );                           # error : Str
 
-sub Service ($this, $msg) {
+sub Service () {
 
-    $log->debug( $this, $msg );
-
-    match $msg, state $handlers = +{
-        *eServiceRequest => sub ($action, $args, $promise) {
+    receive +{
+        *eServiceRequest => sub ($this, $action, $args, $promise) {
             $log->debug( $this, "HELLO FROM Service :: eServiceRequest" );
             $log->debug( $this, +{ action => $action, args => $args, promise => $promise });
 
@@ -32,7 +31,7 @@ sub Service ($this, $msg) {
 
             my ($x, $y) = @$args;
 
-            eval {
+            try {
                 $promise->resolve([
                     *eServiceResponse => (
                         ($action eq 'add') ? ($x + $y) :
@@ -42,19 +41,17 @@ sub Service ($this, $msg) {
                         die "Invalid Action: $action"
                     )
                 ]);
-                1;
-            } or do {
-                my $e = $@;
+            } catch ($e) {
                 chomp $e;
                 $promise->reject([ *eServiceError => ( $e ) ]);
-            };
+            }
         }
     }
 }
 
 sub init ($this, $msg=[]) {
 
-    my $service = $this->spawn( Service  => \&Service );
+    my $service = $this->spawn( Service() );
     isa_ok($service, 'ELO::Core::Process');
 
     my $promise = promise;

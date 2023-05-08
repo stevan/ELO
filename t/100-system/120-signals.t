@@ -11,15 +11,15 @@ use Data::Dump;
 use Hash::Util qw[fieldhash];
 
 use ok 'ELO::Loop';
-use ok 'ELO::Actors',    qw[ match ];
+use ok 'ELO::Actors',    qw[ match receive ];
 use ok 'ELO::Constants', qw[ $SIGEXIT ];
 
 my $log = Test::ELO->create_logger;
 
-sub SigExitCatcher ($this, $msg) {
+sub SigExitCatcher () {
 
-    match $msg, +{
-        $SIGEXIT => sub ($from) {
+    receive +{
+        $SIGEXIT => sub ($this, $from) {
             $log->info( $this, "Got $SIGEXIT from (".$from->pid."), ignoring");
             pass('... got the SIGEXIT in SigExitCatcher, as we expected');
         }
@@ -37,7 +37,7 @@ sub SigExitIgnore ($this, $msg) {
 
 sub init ($this, $msg) {
 
-    state $t1 = $this->spawn( SigExitCatcher => \&SigExitCatcher );
+    state $t1 = $this->spawn( SigExitCatcher() );
     state $t2 = $this->spawn( SigExitIgnore => \&SigExitIgnore );
 
     unless ($msg && @$msg) {

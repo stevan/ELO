@@ -7,132 +7,78 @@ use Test::Differences;
 use Test::ELO;
 
 use Data::Dump;
-use Hash::Util qw[fieldhash];
 
 use ok 'ELO::Loop';
-use ok 'ELO::Actors',    qw[ match ];
+use ok 'ELO::Types',     qw[ :core :events ];
+use ok 'ELO::Actors',    qw[ receive match ];
 use ok 'ELO::Constants', qw[ $SIGEXIT ];
 
 my $log = Test::ELO->create_logger;
 
-# See Akka Example:
-# https://alvinalexander.com/scala/scala-akka-actors-ping-pong-simple-example/
+event *eStartPing => ( *Process );
+event *eStopPong  => ();
+event *ePong      => ( *Process );
+event *ePing      => ( *Process );
 
-sub Ping ($this, $msg) {
+sub Ping (%args) {
 
-    $log->debug( $this, $msg );
+    my $max_pings = $args{max_pings} // 5;
+    my $count     = 0;
 
-    # NOTE:
-    # it would be nicer if we could
-    # just do `state $count` and it
-    # would have one `$count` per
-    # instance of the Actor.
-    #
-    # Instead we need to use inside-out
-    # objects with `$this` being our
-    # object-id key.
-
-    fieldhash state %count;
-    fieldhash state %max_pings;
-
-    # NOTE:
-    # The fieldhash function will be
-    # called for each message, but since
-    # %count will already be registered
-    # it will do nothing more.
-
-    # An alternate approach, if you want
-    # to avoid that call is to do something
-    # like this:
-    #
-    # `state $ready = fieldhashes( \state %count );`
-    #
-    # In this scendario, `fieldhashes` will only
-    # be called once, to initialize `$ready`, and
-    # when it does that will register %count.
-    #
-    # The value of $ready in this case should be
-    # treated as a boolean, but it will actually
-    # be an integer representing the number of
-    # hashes thay were registered as fieldhashes.
-    # If this number were to be 0 (false) that would
-    # mean that it was unable to convert the hashes
-    # and so we should die because something has
-    # gone wrong. Something like this:
-    #
-    # `die "Actor Initialization Failed" unless $ready;`
-    #
-    # but I will be honest, it would be overkill
-    # the extra call to `fieldhash` is minimal and
-    # we are already paying the price of `match`
-    # being called at runtime, as well as the
-    # creation of the HASHref for `match` and all
-    # the subroutines in them.
-    #
-    # So if this kind of "delicate" slot management
-    # is not to your liking, the OO approach would
-    # be better (once I actually write it).
-
-    match $msg, +{
-        eStartPing => sub ( $pong, $max_pings ) {
+    receive {
+        *eStartPing => sub ( $this, $pong ) {
             isa_ok($pong, 'ELO::Core::Process');
 
-            $max_pings{$this} = $max_pings;
-            $count{$this}++;
-            $log->info( $this, " Starting with (".$count{$this}.")" );
-            $this->send( $pong, [ ePing => $this ]);
+            $count++;
+            $log->info( $this, " Starting with ($count) and max-pings($max_pings)" );
+            $this >>= [ $pong, [ *ePing => $this ]];
 
             pass('... '.$this->name.' started with '.$max_pings.' max pings');
         },
-        ePong => sub ( $pong ) {
+
+        *ePong => sub ( $this, $pong ) {
             isa_ok($pong, 'ELO::Core::Process');
 
-            $count{$this}++;
-            $log->info( $this, " Pong with (".$count{$this}.")" );
-            if ( $count{$this} >= $max_pings{$this} ) {
+            $count++;
+            $log->info( $this, " Pong with ($count)" );
+            if ( $count >= $max_pings ) {
                 $log->info( $this, " ... Stopping Ping" );
-                $this->send( $pong, [ 'eStop' ]);
+                $this >>= [ $pong, [ *eStopPong => () ]];
 
-                pass('... '.$this->name.' finished with '.$count{$this}.' pings');
+                pass('... '.$this->name.' finished with '.$count.' pings');
                 $this->exit(0);
             }
             else {
-                $this->send( $pong, [ ePing => $this ]);
+                $this >>= [ $pong, [ *ePing => $this ]];
             }
-        },
-    };
+        }
+    }
 }
 
-sub Pong ($this, $msg) {
+sub Pong () {
 
-    $log->debug( $this, $msg );
-
-    # NOTE:
-    # this is a stateless actor, so
-    # nothing going on here :)
-
-    match $msg, +{
-        ePing => sub ( $ping ) {
+    receive {
+        *ePing => sub ( $this, $ping ) {
             isa_ok($ping, 'ELO::Core::Process');
 
             $log->info( $this, " ... Ping" );
-            $this->send( $ping, [ ePong => $this ]);
+            $this >>= [ $ping, [ *ePong => $this ]];
         },
-        eStop => sub () {
+        *eStopPong => sub ( $this ) {
             $log->info( $this, " ... Stopping Pong" );
 
             pass('... '.$this->name.' finished');
-        },
-    };
+        }
+    }
 }
 
 sub init ($this, $msg=[]) {
 
-    state $ping = $this->spawn( Ping  => \&Ping );
-    state $pong = $this->spawn( Pong  => \&Pong );
+    state $ping = $this->spawn( Ping() );
+    state $pong = $this->spawn( Pong() );
 
-    state $ping2 = $this->spawn( Ping2  => \&Ping );
-    state $pong2 = $this->spawn( Pong2  => \&Pong );
+    state $ping2 = $this->spawn( Ping( max_pings => 10 ) );
+    state $pong2 = $this->spawn( Pong() );
 
     unless ($msg && @$msg) {
         isa_ok($ping, 'ELO::Core::Process');
@@ -148,8 +94,8 @@ sub init ($this, $msg=[]) {
         $ping->link( $pong );
         $pong2->link( $ping2 );
 
-        $this->send( $ping,  [ eStartPing => $pong,  5  ]);
-        $this->send( $ping2, [ eStartPing => $pong2, 10 ]);
+        $this >>= [ $ping,  [ *eStartPing => $pong  ]];
+        $this >>= [ $ping2, [ *eStartPing => $pong2 ]];
 
         # set our process up to link to all
         # these processes, so we can see when

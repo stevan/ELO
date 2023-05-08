@@ -5,6 +5,8 @@ use Sub::Util 'set_subname';
 
 use ELO::Types 'lookup_event_type';
 
+use ELO::Core::Behavior::Receiver;
+
 use constant DEBUG => $ENV{ACTORS_DEBUG} || 0;
 
 use Exporter 'import';
@@ -12,6 +14,8 @@ use Exporter 'import';
 our @EXPORT_OK = qw[
     match
     build_actor
+
+    receive
 ];
 
 sub build_actor ($name, $f) {
@@ -19,6 +23,21 @@ sub build_actor ($name, $f) {
     my $caller = (caller(1))[3];
     set_subname sprintf('%s::%s[%d]' => $caller, $name, $counters{$name}++), $f;
     $f;
+}
+
+sub receive (@args) {
+    my ($name, $receivers);
+
+    if ( scalar @args == 1 ) {
+        $name = (caller(1))[3];
+        $name =~ s/^main\:\://; # strip off main::
+        $receivers = $args[0];
+    }
+    else {
+        ($name, $receivers) = @args;
+    }
+
+    ELO::Core::Behavior::Receiver->new( name => $name, receivers => $receivers );
 }
 
 sub match ($msg, $table) {

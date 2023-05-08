@@ -125,12 +125,8 @@ sub wakeup ($self) {
 
 sub loop ($self) { $self->{loop} }
 
-sub spawn ($self, $name, $f) {
-    $self->{loop}->create_process( $name, $f, $self );
-}
-
-sub spawn_actor ($self, $actor) {
-    $self->{loop}->create_actor( $actor, $self );
+sub spawn ($self, @args) {
+    $self->{loop}->create_process( @args, $self );
 }
 
 sub kill ($self, $proc) {

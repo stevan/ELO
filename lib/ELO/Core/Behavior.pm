@@ -1,18 +1,8 @@
 package ELO::Core::Behavior;
 use v5.36;
 
-use parent 'UNIVERSAL::Object::Immutable';
-use slots (
-    name   => sub { die 'A `name` is required' },
-    func   => sub { die 'A `func` is required' },
-);
-
-sub name ($self) { $self->{name} }
-sub func ($self) { $self->{func} }
-
-sub apply ($self, $this, $event) {
-    $self->{func}->( $this, $event );
-}
+sub name;
+sub apply;
 
 1;
 

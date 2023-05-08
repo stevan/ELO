@@ -11,42 +11,11 @@ use Data::Dumper;
 use Hash::Util qw[fieldhash];
 
 use ok 'ELO::Loop';
-use ok 'ELO::Types',  qw[ :core event ];
-use ok 'ELO::Actors', qw[ match build_actor ];
+use ok 'ELO::Types',  qw[ :core :events ];
 use ok 'ELO::Timers', qw[ :tickers ];
+use ok 'ELO::Actors', qw[ receive ];
 
 my $log = Test::ELO->create_logger;
-
-package ELO::Core::Behavior2 {
-    use v5.36;
-
-    use ELO::Actors qw[ match ];
-
-    use parent 'UNIVERSAL::Object::Immutable';
-    use slots (
-        name     => sub { die 'A `name` is required' },
-        reactors => sub { die 'A `reactors` is required' },
-    );
-
-    sub name ($self) { $self->{name} }
-
-    sub apply ($self, $this, $event) {
-        my ($type, @payload) = @$event;
-        my $f = $self->{reactors}->{ $type } // do {
-            die 'Could not find reactor for type('.$type.')';
-        };
-        $f->( $this, @payload );
-    }
-}
-
-sub receive ($reactors) {
-    my $name = (caller(1))[3];
-    $name =~ s/^main\:\://; # strip off main::
-    ELO::Core::Behavior2->new( name => $name, reactors => $reactors );
-}
-
-#setup { say "HI!" };
-
 
 event *eHello => ( *Str );
 
@@ -68,9 +37,9 @@ sub Greeter ($greeting='Hello') {
 
 sub init ($this, $msg=[]) {
 
-    my $a1 = $this->spawn_actor( Greeter() );
-    my $a2 = $this->spawn_actor( Greeter( "Bonjour" ) );
-    my $a3 = $this->spawn_actor( Greeter( "Hallo" ) );
+    my $a1 = $this->spawn( Greeter() );
+    my $a2 = $this->spawn( Greeter( "Bonjour" ) );
+    my $a3 = $this->spawn( Greeter( "Hallo" ) );
 
     $this->link( $_ ) foreach $a1, $a2, $a3;
 

@@ -1,6 +1,7 @@
 #!perl
 
 use v5.36;
+use experimental 'try';
 
 use Test::More;
 use Test::Differences;
@@ -10,7 +11,7 @@ use Data::Dumper;
 
 use ok 'ELO::Loop';
 use ok 'ELO::Types',  qw[ :core :types :events ];
-use ok 'ELO::Actors', qw[ match ];
+use ok 'ELO::Actors', qw[ receive ];
 
 my $log = Test::ELO->create_logger;
 
@@ -39,22 +40,13 @@ event *eServiceClientRequest  => ( *Str, *Ops, [ *Int, *Int ] ); #  url : Str, a
 event *eServiceClientResponse => ( *Num );                       #  <Any>
 event *eServiceClientError    => ( *Str );                       #  error : Str
 
-sub Service ($this, $msg) {
+sub Service ($service_name) {
 
-    $log->debug( $this, $msg );
-
-    #warn Dumper +{ $this->pid => $msg } if DEBUG;
-
-    # NOTE:
-    # this is basically a state-less actor, which
-    # is actually kind of the ideal form, it keeps
-    # it less complex.
-
-    match $msg, state $handlers //= +{
-        *eServiceRequest => sub ($sid, $action, $args, $caller) {
+    receive $service_name, +{
+        *eServiceRequest => sub ($this, $sid, $action, $args, $caller) {
             my ($x, $y) = @$args;
 
-            eval {
+            try {
                 $this->send( $caller, [
                     *eServiceResponse => (
                         $sid,
@@ -65,66 +57,39 @@ sub Service ($this, $msg) {
                         die "Invalid Action: $action"
                     )
                 ]);
-                1;
-            } or do {
-                my $e = $@;
+            } catch ($e) {
                 chomp $e;
                 $this->send( $caller, [ *eServiceError => ( $sid, $e ) ] );
-            };
+            }
         }
     }
 }
 
-sub ServiceRegistry ($this, $msg) {
+sub ServiceRegistry ($ctx) {
 
-    $log->debug( $this, $msg );
+    my $foo = $ctx->spawn( Service('FooService') );
+    my $bar = $ctx->spawn( Service('BarService') );
 
-    #warn Dumper +{ $this->pid => $msg } if DEBUG;
-
-    # NOTE:
-    # this is an actor which has shared state
-    # across all instances. This is no need for
-    # locks because all message-sends will
-    # happen in sequence during the loop->tick
-    #
-    # you can think of this as a
-    # shared in-memory data base
-    # if you want to, but it is
-    # a bit of a stretch ;)
-
-    # NOTE:
-    # all these variables below are shared
-    # across all instances of the ServiceRegistry
-    # see NOTE in the ServiceClient for more
-    # details
-
-    state $foo = $this->spawn( FooService => \&Service );
-    state $bar = $this->spawn( BarService => \&Service );
-
-    state $services = +{
+    my $services = +{
         'foo.example.com' => $foo,
         'bar.example.com' => $bar,
     };
 
-    state sub lookup ($name)           { $services->{ $name } }
-    state sub update ($name, $service) { $services->{ $name } = $service }
+    my sub lookup ($name)           { $services->{ $name } }
+    my sub update ($name, $service) { $services->{ $name } = $service }
 
-    match $msg, state $handlers //= +{
+    receive {
 
-        # Requests ...
-
-        *eServiceRegistryUpdateRequest => sub ($sid, $name, $service, $caller) {
-            eval {
+        *eServiceRegistryUpdateRequest => sub ($this, $sid, $name, $service, $caller) {
+            try {
                 update( $name, $service );
                 $this->send( $caller, [ *eServiceRegistryUpdateResponse => $sid, $name, $service ] );
-                1;
-            } or do {
-                my $e = $@;
+            } catch ($e) {
                 $this->send( $caller, [ *eServiceRegistryUpdateError => $sid, $e ] );
             };
         },
 
-        *eServiceRegistryLookupRequest => sub ($sid, $name, $caller) {
+        *eServiceRegistryLookupRequest => sub ($this, $sid, $name, $caller) {
             if ( my $service = lookup( $name ) ) {
                 $this->send( $caller, [ *eServiceRegistryLookupResponse => $sid, $service ] );
             }
@@ -143,48 +108,23 @@ sub ServiceRegistry ($this, $msg) {
     }
 }
 
-sub ServiceClient ($this, $msg) {
+sub ServiceClient ($ctx) {
 
-    $log->debug( $this, $msg );
+    my $registry = $ctx->spawn( ServiceRegistry( $ctx ) );
+    my $sessions = +{};
+    my $next_sid = 0;
 
-    #warn Dumper +{ $this->pid => $msg } if DEBUG;
-
-    # NOTE:
-    # This is another example of a shared state
-    # across all instances, in this case it is
-    # to create a session system that will allow
-    # for the client to handle multiple concurrent
-    # requests.
-
-    # NOTE:
-    # all these variables below are shared
-    # across all instances of the ServiceClient
-    state $registry = $this->spawn( ServiceRegistry => \&ServiceRegistry );
-    state $sessions = +{};
-    state $next_sid = 0;
-
-    # NOTE:
-    # Careful not to close over any values
-    # other than the `state` variables created
-    # above, otherwise issues will come up
-    #
-    # For instance, closing over $this will
-    # end up closing over the first instance
-    # that is created. This is not what you want.
-    # If you need to use $this inside these, then
-    # it should be passed in to these subs
-    state sub session_get    ($id)   {        $sessions->{ $id } }
-    state sub session_delete ($id)   { delete $sessions->{ $id } }
-    state sub session_create ($data) {
+    my sub session_get    ($id)   {        $sessions->{ $id } }
+    my sub session_delete ($id)   { delete $sessions->{ $id } }
+    my sub session_create ($data) {
         $sessions->{ ++$next_sid } = $data;
         $next_sid;
     }
 
-    match $msg, state $handlers //= +{
-
+    receive {
         # Requests ...
 
-        *eServiceClientRequest => sub ($url, $action, $args) {
+        *eServiceClientRequest => sub ($this, $url, $action, $args) {
 
             my $sid = session_create([ $url, $action, $args ]);
 
@@ -208,7 +148,7 @@ sub ServiceClient ($this, $msg) {
         # It is possible to do all this with Promises
         # instead, but this is a different test :)
 
-        *eServiceRegistryLookupResponse => sub ($sid, $service) {
+        *eServiceRegistryLookupResponse => sub ($this, $sid, $service) {
             my $s = session_get( $sid );
             my ($url, $action, $args) = $s->@*;
             # update the service
@@ -228,7 +168,7 @@ sub ServiceClient ($this, $msg) {
             ]);
         },
 
-        *eServiceResponse => sub ($sid, $return) {
+        *eServiceResponse => sub ($this, $sid, $return) {
             my $request = session_get( $sid );
 
             $log->info( $this, +{ *eServiceClientResponse => $return, sid => $sid } );
@@ -246,7 +186,7 @@ sub ServiceClient ($this, $msg) {
 
         # Errors ...
 
-        *eServiceError => sub ($sid, $error) {
+        *eServiceError => sub ($this, $sid, $error) {
             my $request = session_get( $sid );
 
             $log->error( $this, +{ *eServiceClientError => $error, sid => $sid } );
@@ -255,7 +195,7 @@ sub ServiceClient ($this, $msg) {
             is($sid, 4, '... got the expected session id for service error');
         },
 
-        *eServiceRegistryLookupError => sub ($sid, $error) {
+        *eServiceRegistryLookupError => sub ($this, $sid, $error) {
             my $request = session_get( $sid );
 
             $log->error( $this, +{ *eServiceRegistryLookupError => $error, sid => $sid } );
@@ -269,7 +209,7 @@ sub ServiceClient ($this, $msg) {
 
 sub init ($this, $msg=[]) {
 
-    my $client = $this->spawn( ServiceClient  => \&ServiceClient );
+    my $client = $this->spawn( ServiceClient( $this ) );
     isa_ok($client, 'ELO::Core::Process');
 
     $this->send( $client, [

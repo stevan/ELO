@@ -12,7 +12,7 @@ use List::Util qw[ max min ];
 
 use ok 'ELO::Loop';
 use ok 'ELO::Types',  qw[ :core event ];
-use ok 'ELO::Actors', qw[ match build_actor ];
+use ok 'ELO::Actors', qw[ match build_actor receive ];
 use ok 'ELO::Timers', qw[ :timers ];
 
 my $log = Test::ELO->create_logger;
@@ -146,136 +146,129 @@ sub ProducerFactory (%args) {
     }
 }
 
-sub RouterFactory (%args) {
+sub Router (%args) {
 
     my $debugger = $args{debugger};
 
-    return build_actor Router => sub ($this, $msg) {
+    my %registered_workers;
+    my $producer;
+    my $producer_completed;
+    my @upstream_queue;   # items
+    my @downstream_queue; # workers
 
-        state %registered_workers;
-        state $producer;
-        state $producer_completed;
-        state @upstream_queue;   # items
-        state @downstream_queue; # workers
-
-        match $msg, state $handler //= +{
-            *eStartRouter => sub ($p) {
-                $log->info( $this, '... starting Router with producer('.$p->pid.')' );
-                $producer //= $p;
-                $this->loop->next_tick(sub {
-                    $this->send( $producer, [ *eContinue => ($this) ] )
-                });
-            },
-            *eShutdownRouter => sub ($sender) {
-                $log->warn( $this, '... eShutdownRouter => got shutdown from sender('.$sender->pid.')');
-                $log->warn( $this, '... eShutdownRouter => sending shutdown to producer('.$producer->pid.')');
-                $this->send( $producer, [ *eShutdownProducer => ($this) ] );
-                $log->warn( $this, '... eShutdownWorker => sending shutdown to workers('.(join ', ' => map { $_->pid } @downstream_queue).')');
-                $this->send( $_, [ *eShutdownWorker => ($this) ] ) foreach  @downstream_queue;
-                $this->send( $debugger, [ *eCollectShutdownData => $this, {
-                    *eShutdownRouter => {
-                        upstream_queue   => \@upstream_queue,
-                        downstream_queue => [ map { $_->pid } @downstream_queue ],
-                        workers          => \%registered_workers,
-                    }
-                }]);
-                $this->exit(0);
-            },
-
-            *eRegister => sub ($worker) {
-                $log->info( $this, '... got eRegister from worker('.$worker->pid.')' );
-                $registered_workers{ $worker->pid }++;
-                $this->send_to_self([ *eContinue => ($worker) ] );
-            },
-
-            *eContinue => sub ($sender) {
-                $log->info( $this, '... got eContinue from sender('.$sender->pid.')' );
-                if ( scalar @upstream_queue == 0 ) {
-                    $log->info( $this, '... eContinue => nothing in the upstream, adding sender('.$sender->pid.') to downstream');
-                    push @downstream_queue => $sender;
-
-                    # if the producer has completed, and all the workers have reported back, we can start shutdown ..
-                    if ( $producer_completed && scalar @downstream_queue == scalar keys %registered_workers ) {
-                        $log->warn( $this, '... eContinue => no more items to process, and all workers have reported back and producer('.$producer->pid.') is Completed');
-                        $this->send_to_self([ *eShutdownRouter => ($this) ]);
-                    }
-                    elsif ( $producer_completed ) {
-                        $log->warn( $this, '... eContinue => no more items to process, some workers are still busy, and producer('.$producer->pid.') is Completed');
-                    }
+    receive +{
+        *eStartRouter => sub ($this, $p) {
+            $log->info( $this, '... starting Router with producer('.$p->pid.')' );
+            $producer //= $p;
+            $this->loop->next_tick(sub {
+                $this->send( $producer, [ *eContinue => ($this) ] )
+            });
+        },
+        *eShutdownRouter => sub ($this, $sender) {
+            $log->warn( $this, '... eShutdownRouter => got shutdown from sender('.$sender->pid.')');
+            $log->warn( $this, '... eShutdownRouter => sending shutdown to producer('.$producer->pid.')');
+            $this->send( $producer, [ *eShutdownProducer => ($this) ] );
+            $log->warn( $this, '... eShutdownWorker => sending shutdown to workers('.(join ', ' => map { $_->pid } @downstream_queue).')');
+            $this->send( $_, [ *eShutdownWorker => ($this) ] ) foreach  @downstream_queue;
+            $this->send( $debugger, [ *eCollectShutdownData => $this, {
+                *eShutdownRouter => {
+                    upstream_queue   => \@upstream_queue,
+                    downstream_queue => [ map { $_->pid } @downstream_queue ],
+                    workers          => \%registered_workers,
                 }
-                else {
-                    my $item = shift @upstream_queue;
-                    $log->info( $this, '... eContinue => got item('.$item.') from upstream, sending eItem to sender('.$sender->pid.') and eContinue to producer('.$producer->pid.')');
-                    $this->send( $sender,   [ *eItem     => ($this, $item) ] );
-                    $this->send( $producer, [ *eContinue => ($this)        ] );
-                }
-            },
+            }]);
+            $this->exit(0);
+        },
 
-            *eItem => sub ($sender, $item) {
-                $log->info( $this, '... got eItem from sender('.$sender->pid.')' );
-                if ( scalar @downstream_queue == 0 ) {
-                    $log->info( $this, '... eItem => nothing in the downstream, adding item('.$item.') to upstream');
-                    push @upstream_queue => $item;
-                }
-                else {
-                    my $consumer = shift @downstream_queue;
-                    $log->info( $this, '... eItem => got consumer('.$consumer->pid.') from downstream, sending eItem to consumer('.$consumer->pid.') and eContinue to producer('.$producer->pid.')');
-                    $this->send( $consumer, [ *eItem     => ($this, $item) ] );
-                    $this->send( $producer, [ *eContinue => ($this)        ] );
-                }
-            },
+        *eRegister => sub ($this, $worker) {
+            $log->info( $this, '... got eRegister from worker('.$worker->pid.')' );
+            $registered_workers{ $worker->pid }++;
+            $this->send_to_self([ *eContinue => ($worker) ] );
+        },
 
-            *eCompleted => sub ($sender) {
-                $log->warn( $this, '... got eCompleted from sender('.$sender->pid.')' );
-                $producer_completed = 1;
+        *eContinue => sub ($this, $sender) {
+            $log->info( $this, '... got eContinue from sender('.$sender->pid.')' );
+            if ( scalar @upstream_queue == 0 ) {
+                $log->info( $this, '... eContinue => nothing in the upstream, adding sender('.$sender->pid.') to downstream');
+                push @downstream_queue => $sender;
+
+                # if the producer has completed, and all the workers have reported back, we can start shutdown ..
+                if ( $producer_completed && scalar @downstream_queue == scalar keys %registered_workers ) {
+                    $log->warn( $this, '... eContinue => no more items to process, and all workers have reported back and producer('.$producer->pid.') is Completed');
+                    $this->send_to_self([ *eShutdownRouter => ($this) ]);
+                }
+                elsif ( $producer_completed ) {
+                    $log->warn( $this, '... eContinue => no more items to process, some workers are still busy, and producer('.$producer->pid.') is Completed');
+                }
             }
-        };
+            else {
+                my $item = shift @upstream_queue;
+                $log->info( $this, '... eContinue => got item('.$item.') from upstream, sending eItem to sender('.$sender->pid.') and eContinue to producer('.$producer->pid.')');
+                $this->send( $sender,   [ *eItem     => ($this, $item) ] );
+                $this->send( $producer, [ *eContinue => ($this)        ] );
+            }
+        },
+
+        *eItem => sub ($this, $sender, $item) {
+            $log->info( $this, '... got eItem from sender('.$sender->pid.')' );
+            if ( scalar @downstream_queue == 0 ) {
+                $log->info( $this, '... eItem => nothing in the downstream, adding item('.$item.') to upstream');
+                push @upstream_queue => $item;
+            }
+            else {
+                my $consumer = shift @downstream_queue;
+                $log->info( $this, '... eItem => got consumer('.$consumer->pid.') from downstream, sending eItem to consumer('.$consumer->pid.') and eContinue to producer('.$producer->pid.')');
+                $this->send( $consumer, [ *eItem     => ($this, $item) ] );
+                $this->send( $producer, [ *eContinue => ($this)        ] );
+            }
+        },
+
+        *eCompleted => sub ($this, $sender) {
+            $log->warn( $this, '... got eCompleted from sender('.$sender->pid.')' );
+            $producer_completed = 1;
+        }
     }
 }
 
-sub WorkerFactory (%args) {
+sub Worker (%args) {
 
     my $debugger = $args{debugger};
 
-    return build_actor Worker => sub ($this, $msg) {
+    my $router;
+    my @processing;
+    my @processed;
+    my @timers;
 
-        state $router;
-        state @processing;
-        state @processed;
+    receive +{
+        *eStartWorker => sub ($this, $r) {
+            $log->info( $this, '... eStartWorker : starting Worker with router('.$r->pid.')' );
+            $router //= $r;
+            $this->loop->next_tick(sub {
+                $log->info( $this, '... eStartWorker : sending eContinue to router('.$router->pid.')' );
+                $this->send( $router, [ *eRegister => ($this) ] );
+            });
+        },
+        *eShutdownWorker => sub ($this, $sender) {
+            $log->warn( $this, '... eShutdownWorker => got shutdown from sender('.$sender->pid.')');
+            $this->send( $debugger, [ *eCollectShutdownData => $this, {
+                processing => \@processing,
+                processed  => \@processed,
+                timers     => \@timers
+            }]);
+            $this->exit(0);
+        },
+        *eItem => sub ($this, $sender, $item) {
+            $log->info( $this, '... eItem : starting job with item('.$item.') from sender('.$sender->pid.')' );
+            $log->warn( $this, '... eItem : sleeping instead of working ;)' );
+            push @processing => $item;
+            push @timers => jitter($MAX_WORK_TIME, $MAX_WORK_TIME_MULTIPLER);
+            timer( $this, $timers[-1], sub {
+                $log->warn( $this, '... eItem : waking up and sending eContinue to router('.$router->pid.')' );
+                $this->send( $router, [ *eContinue => ($this) ] );
+                push @processed => pop @processing;
 
-        state @timers;
-
-        match $msg, state $handler //= +{
-            *eStartWorker => sub ($r) {
-                $log->info( $this, '... eStartWorker : starting Worker with router('.$r->pid.')' );
-                $router //= $r;
-                $this->loop->next_tick(sub {
-                    $log->info( $this, '... eStartWorker : sending eContinue to router('.$router->pid.')' );
-                    $this->send( $router, [ *eRegister => ($this) ] );
-                });
-            },
-            *eShutdownWorker => sub ($sender) {
-                $log->warn( $this, '... eShutdownWorker => got shutdown from sender('.$sender->pid.')');
-                $this->send( $debugger, [ *eCollectShutdownData => $this, {
-                    processing => \@processing,
-                    processed  => \@processed,
-                    timers     => \@timers
-                }]);
-                $this->exit(0);
-            },
-            *eItem => sub ($sender, $item) {
-                $log->info( $this, '... eItem : starting job with item('.$item.') from sender('.$sender->pid.')' );
-                $log->warn( $this, '... eItem : sleeping instead of working ;)' );
-                push @processing => $item;
-                push @timers => jitter($MAX_WORK_TIME, $MAX_WORK_TIME_MULTIPLER);
-                timer( $this, $timers[-1], sub {
-                    $log->warn( $this, '... eItem : waking up and sending eContinue to router('.$router->pid.')' );
-                    $this->send( $router, [ *eContinue => ($this) ] );
-                    push @processed => pop @processing;
-
-                    $log->info( $this, { pid => $this->pid, processing => \@processing, processed => \@processed, } );
-                });
-            }
+                $log->info( $this, { pid => $this->pid, processing => \@processing, processed => \@processed, } );
+            });
         }
     }
 }
@@ -337,14 +330,14 @@ sub init ($this, $msg=[]) {
 
     # this is a singleton ...
     my $debugger = $this->spawn( Debugger => \&Debugger );
-    my $router   = $this->spawn( Router   => RouterFactory( debugger => $debugger ) );
+    my $router   = $this->spawn( Router( debugger => $debugger ) );
     my $producer = $this->spawn( Producer => ProducerFactory(
         datasource => \@DATASOURCE,
         debugger   => $debugger,
     ));
 
     my @workers  = map {
-        $this->spawn( Worker => WorkerFactory( debugger => $debugger ) );
+        $this->spawn( Worker( debugger => $debugger ) );
     } (1 .. $NUM_WORKERS);
 
     $this->send( $producer, [ *eStartProducer => $router   ] );

@@ -7,7 +7,9 @@ use List::Util   'uniq';
 use Time::HiRes  ();
 
 use ELO::Core::Process;
-use ELO::Core::Behavior;
+
+use ELO::Core::Behavior::FunctionWrapper;
+
 use ELO::Constants qw[ $SIGEXIT ];
 
 use parent 'UNIVERSAL::Object::Immutable';
@@ -24,22 +26,31 @@ use slots (
     _callback_queue => sub { +[] },
 );
 
-sub create_process ($self, $name, $f, $parent=undef) {
-    my $process = ELO::Core::Process->new(
-        behavior => ELO::Core::Behavior->new(
-            name   => $name,
-            func   => $f,
-        ),
-        loop   => $self,
-        parent => $parent,
-    );
-    $self->{_process_table}->{ $process->pid } = $process;
-    return $process;
-}
+sub create_process ($self, @args) {
 
-sub create_actor ($self, $actor, $parent=undef) {
+    my ($behavior, $parent);
+    if ( $args[0] && blessed $args[0] && $args[0]->roles::DOES('ELO::Core::Behavior') ) {
+        $behavior = shift @args;
+    }
+    else {
+        my $name = shift @args;
+        my $f    = shift @args;
+
+        ($name)
+            || confess 'You must specify a name as the first parameter to spawn';
+        ($f && ref $f eq 'CODE')
+            || confess 'You must specify a function as the second parameter to spawn';
+
+        $behavior = ELO::Core::Behavior::FunctionWrapper->new(
+            name => $name,
+            func => $f,
+        );
+    }
+
+    $parent = shift @args if @args;
+
     my $process = ELO::Core::Process->new(
-        behavior => $actor,
+        behavior => $behavior,
         loop     => $self,
         parent   => $parent,
     );

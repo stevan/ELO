@@ -1,6 +1,7 @@
 #!perl
 
 use v5.36;
+use experimental 'try';
 
 use Test::More;
 use Test::Differences;
@@ -10,7 +11,7 @@ use Data::Dumper;
 
 use ok 'ELO::Loop';
 use ok 'ELO::Types',    qw[ :core :types :events ];
-use ok 'ELO::Actors',   qw[ match ];
+use ok 'ELO::Actors',   qw[ receive ];
 use ok 'ELO::Promises', qw[ promise collect ];
 
 my $log = Test::ELO->create_logger;
@@ -24,17 +25,10 @@ event *eServiceError     => ( *Str );                                 # error : 
 
 event *eServiceClientRequest => ( *Process, *ListOps, *ArrayRef ); # service, action, args
 
-sub Service ($this, $msg) {
+sub Service () {
 
-    $log->debug( $this, $msg );
-
-    # NOTE:
-    # this is basically a stateless service,
-    # and uses Promises instead of the callback
-    # format used in other tests.
-
-    match $msg, state $handlers //= +{
-        *eServiceRequest => sub ($action, $args, $promise) {
+    receive +{
+        *eServiceRequest => sub ($this, $action, $args, $promise) {
             $log->debug( $this, "HELLO FROM Service :: eServiceRequest" );
             $log->debug( $this, +{ action => $action, args => $args, promise => $promise });
 
@@ -42,7 +36,7 @@ sub Service ($this, $msg) {
 
             my ($x, $y) = @$args;
 
-            eval {
+            try {
                 no warnings 'once';
                 $promise->resolve([
                     *eServiceResponse => (
@@ -53,27 +47,23 @@ sub Service ($this, $msg) {
                         die "Invalid Action: $action"
                     )
                 ]);
-                1;
-            } or do {
-                my $e = $@;
+            } catch ($e) {
                 chomp $e;
                 $log->fatal( $this, "Got error: eServiceRequest => $e" );
                 $promise->reject([ *eServiceError => ( $e ) ]);
-            };
+            }
         }
     }
 }
 
-sub ServiceClient ($this, $msg) {
+sub ServiceClient () {
 
     state $expected = [ 28, 108 ];
 
-    $log->debug( $this, $msg );
-
-    match $msg, state $handlers //= +{
+    receive +{
 
         # Requests ...
-        *eServiceClientRequest => sub ($service, $action, $args) {
+        *eServiceClientRequest => sub ($this, $service, $action, $args) {
             isa_ok($service, 'ELO::Core::Process');
 
             $log->debug( $this, "HELLO FROM ServiceClient :: eServiceClientRequest" );
@@ -121,8 +111,8 @@ sub ServiceClient ($this, $msg) {
 
 sub init ($this, $msg=[]) {
 
-    my $service = $this->spawn( Service  => \&Service       );
-    my $client  = $this->spawn( Client   => \&ServiceClient );
+    my $service = $this->spawn( Service()       );
+    my $client  = $this->spawn( ServiceClient() );
 
     isa_ok($service, 'ELO::Core::Process');
     isa_ok($client, 'ELO::Core::Process');
