@@ -2,7 +2,7 @@ package ELO::Types;
 use v5.36;
 
 use ELO::Core::Type;
-use ELO::Core::Event;
+use ELO::Core::EventType;
 
 use constant DEBUG => $ENV{TYPES_DEBUG} || 0;
 
@@ -92,7 +92,7 @@ sub enum ($enum, @values) {
 
 sub event ($type, @definition) {
     warn "Creating event $type" if DEBUG;
-    $EVENT_REGISTRY{ $type } = ELO::Core::Event->new(
+    $EVENT_REGISTRY{ $type } = ELO::Core::EventType->new(
         symbol       => $type,
         definition   => \@definition,
         _type_lookup => \&lookup_type,

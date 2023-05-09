@@ -38,7 +38,11 @@ sub receive (@args) {
         ($name, $receivers) = @args;
     }
 
-    ELO::Core::Behavior::Receiver->new( name => $name, receivers => $receivers );
+    ELO::Core::Behavior::Receiver->new(
+        name          => $name,
+        receivers     => $receivers,
+        _event_lookup => \&lookup_event_type
+    );
 }
 
 sub match ($msg, $table) {
