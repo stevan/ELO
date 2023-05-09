@@ -197,6 +197,11 @@ sub lookup_active_process ($self, $to_proc) {
 
 # ...
 
+my $TIMERS_RUN         = 0;
+my $CALLBACKS_RUN      = 0;
+my $SIGNALS_HANDLED    = 0;
+my $MESSAGES_PROCESSED = 0;
+
 sub TICK ($self) {
 
     # Signals are handled first, as they
@@ -224,6 +229,8 @@ sub TICK ($self) {
         # if the process is not active, ignore all signals
         # XXX - maybe add a dead signal queue here
         next unless $to_proc;
+
+        $SIGNALS_HANDLED++;
 
         # is the signal trapped?
         if ( $to_proc->is_trapping( $signal ) ) {
@@ -255,7 +262,8 @@ sub TICK ($self) {
         my $timer = shift @$timers;
         next if ${$timer->[2]}; # skip if the timer has been cancelled
         try {
-            $timer->[1]->(); 1;
+            $timer->[1]->();
+            $TIMERS_RUN++;
         } catch ($e) {
             die "Timer callback failed ($timer) because: $e";
         }
@@ -272,7 +280,8 @@ sub TICK ($self) {
     while (@cb_queue) {
         my $f = shift @cb_queue;
         try {
-            $f->()
+            $f->();
+            $CALLBACKS_RUN++
         } catch ($e) {
             die "Callback failed ($f) because: $e";
         }
@@ -297,6 +306,8 @@ sub TICK ($self) {
         # if the process is not active, ignore all messages
         # XXX - maybe add a dead letter queue here
         next unless $to_proc;
+
+        $MESSAGES_PROCESSED++;
 
         try {
             $to_proc->accept( $event );
@@ -357,6 +368,9 @@ sub LOOP ($self, $logger=undef) {
     my $total_slept   = 0;
     my $total_waited  = 0;
 
+    my $early_timers = 0;
+    my $late_timers  = 0;
+
     while ( $self->_poll ){
         $tick = $self->_update_tick;
 
@@ -390,6 +404,7 @@ sub LOOP ($self, $logger=undef) {
                 # that the timer is essentially already
                 # late.
                 if ($wait > 0) {
+                    $early_timers++;
                     # XXX - should have some kind of max-timeout here
                     $logger->log_tick_wait( $logger->INFO, $self, sprintf 'WAITING(%f)' => $wait ) if $logger;
                     $self->sleep( $wait );
@@ -404,6 +419,7 @@ sub LOOP ($self, $logger=undef) {
                     # the next tick if it is a timeout of 0
                     # but if it was just a long running tick
                     # then maybe we should run them. Hmmm??
+                    $late_timers++;
                     #warn "next-timer: $next_timer now: $now wait: $wait\n";
                     #use Data::Dumper;
                     #warn $self->{_timers}->[0]->[1];
@@ -432,15 +448,27 @@ sub LOOP ($self, $logger=undef) {
     if ($logger) {
         $logger->log_tick( $logger->INFO, $self, $tick, 'END' );
         $logger->log_tick_loop_stat( $logger->DEBUG, $self, 'ZOMBIES:' );
-        my $format = join "\n   " =>
+        my $format = join "\n" =>
+                        'TOTALS:',
+                        '    timers_run         : %d  (early: %d, late: %d = loss: ~%0.3f%%)',
+                        '    callbacks_run      : %d',
+                        '    signals_handled    : %d',
+                        '    messages_processed : %d',
                         'TIMINGS:',
-                            '%6s = (%f)',
-                            '%6s = (%f) %5.2f%%',
-                            '%6s = (%f) %5.2f%%',
-                            '%6s = (%f) %5.2f%%',
-                            '%6s = (%f) %5.2f%%';
+                        '    %6s = (%f)',
+                        '    %6s = (%f) %5.2f%%',
+                        '    %6s = (%f) %5.2f%%',
+                        '    %6s = (%f) %5.2f%%',
+                        '    %6s = (%f) %5.2f%%';
         $logger->log_tick_stat( $logger->DEBUG, $self,
             sprintf $format => (
+                $TIMERS_RUN,
+                    $early_timers,
+                    $late_timers,
+                    ($late_timers && $TIMERS_RUN ? (($late_timers / $TIMERS_RUN) * 100) : 0),
+                $CALLBACKS_RUN,
+                $SIGNALS_HANDLED,
+                $MESSAGES_PROCESSED,
                 total => $elapsed,
                 map  { $_->@* }
                 sort { $b->[-1] <=> $a->[-1] }
@@ -449,6 +477,39 @@ sub LOOP ($self, $logger=undef) {
                 [ slept  => $total_slept,   (($total_slept   / $elapsed) * 100) ],
                 [ waited => $total_waited,  (($total_waited  / $elapsed) * 100) ],
             )
+        );
+    }
+
+    if ( $ENV{ELO_LOOP_DUMP_STATS} ) {
+        my $format = join "\n" =>
+                            'TOTALS:',
+                            '    timers_run         : %d  (early: %d, late: %d = loss: ~%0.3f%%)',
+                            '    callbacks_run      : %d',
+                            '    signals_handled    : %d',
+                            '    messages_processed : %d',
+                            'TIMINGS:',
+                            '    %6s = (%f)',
+                            '    %6s = (%f) %5.2f%%',
+                            '    %6s = (%f) %5.2f%%',
+                            '    %6s = (%f) %5.2f%%',
+                            '    %6s = (%f) %5.2f%%';
+
+                                 ;
+        warn sprintf $format => (
+            $TIMERS_RUN,
+                $early_timers,
+                $late_timers,
+                (($late_timers / $TIMERS_RUN) * 100),
+            $CALLBACKS_RUN,
+            $SIGNALS_HANDLED,
+            $MESSAGES_PROCESSED,
+            total => $elapsed,
+            map  { $_->@* }
+            sort { $b->[-1] <=> $a->[-1] }
+            [ system => $total_system,  (($total_system  / $elapsed) * 100) ],
+            [ user   => $total_elapsed, (($total_elapsed / $elapsed) * 100) ],
+            [ slept  => $total_slept,   (($total_slept   / $elapsed) * 100) ],
+            [ waited => $total_waited,  (($total_waited  / $elapsed) * 100) ],
         );
     }
 

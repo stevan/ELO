@@ -5,86 +5,99 @@ use v5.36;
 use Data::Dumper;
 
 use ELO::Loop;
-use ELO::Actors qw[ match build_actor ];
+use ELO::Actors qw[ receive ];
 use ELO::Timers qw[ :timers :tickers ];
 use ELO::Types  qw[ :core :events ];
 
-use Term::ANSIColor qw[ colored ];
+use Term::ANSIColor qw[ colored uncolor ];
 
 use ELO::Util::TermDisplay;
 
 my $term = ELO::Util::TermDisplay->new;
 
-event *eTick => ();
+my $term_height = $term->term_height - 1;
+my $term_width  = $term->term_width  - 1;
 
-sub ParticleFactory (%args) {
+event *eTick;
 
-    my $sprite  = $args{sprite} //= '#';
+sub Particle ($id) {
 
-    my $start_x = $args{start_x} //= 0;
-    my $start_y = $args{start_y} //= 0;
+    state $sprite  = '●';
 
-    return build_actor Particle => sub ($this, $msg) {
+    my $color = 'ansi'.($id % 255);
 
-        state $up_down    = !!1; # DOWN,  0 = UP
-        state $right_left = !!1; # RIGHT, 0 = LEFT
+    my $up_down    = !!(rand); # 1 = DOWN,  0 = UP
+    my $right_left = !!(rand); # 1 = RIGHT, 0 = LEFT
 
-        state $fade = 255;
+    my $x_weight = rand;
+    my $y_weight = rand;
 
-        state $x = $start_x;
-        state $y = $start_y;
+    my $x_seed = rand;
+    my $y_seed = rand;
 
-        match $msg, state $handlers //= {
-            *eTick => sub () {
-                # clear the old ...
-                $term->go_to( $x, $y )->put_string(' ');
+    my $x = rand($term_height);
+    my $y = rand($term_width);
 
-                $fade = 255 unless $fade;
+    receive +{
+        *eTick => sub ($this) {
 
-                $x += ($up_down    ? rand : -rand );
-                $y += ($right_left ? rand : -rand );
+            my ($old_x, $old_y) = ($x, $y);
 
-                if ($x >= $term->term_height) {
-                    $x = $term->term_height;
-                    $up_down = !$up_down;
-                }
-                elsif ($x <= 0) {
-                    $x = 0;
-                    $up_down = !$up_down
-                }
+            my $_x = ($up_down    ? $x_seed : -$x_seed );
+            my $_y = ($right_left ? $y_seed : -$x_seed );
 
-                if ($y >= $term->term_width) {
-                    $y = $term->term_width;
-                    $right_left = !$right_left;
-                }
-                elsif ($y <= 0) {
-                    $y = 0;
-                    $right_left = !$right_left
-                }
+            $x += $_x * $x_weight;
+            $y += $_y * $y_weight;
 
-                $term->go_to( $x, $y )
-                     ->put_string( $sprite )
-                     ->go_to( 0, $term->term_width + 2 );
+            if ($x >= $term_height) {
+                $x = $term_height;
+                $up_down = !$up_down;
             }
-        };
+            elsif ($x <= 0) {
+                $x = 0;
+                $up_down = !$up_down;
+                $x_weight = rand;
+            }
+
+            if ($y >= $term_width) {
+                $y = $term_width;
+                $right_left = !$right_left;
+            }
+            elsif ($y <= 0) {
+                $y = 0;
+                $right_left = !$right_left;
+                $y_weight = rand;
+            }
+
+            $term->go_to( $old_x, $old_y )
+                 ->put_string( colored('_', 'dark blue') )
+                 ->go_to( $x, $y )
+                 ->put_string( colored( $sprite, $color ) )
+                 ->go_to( 0, $term_width + 100 )
+            unless $old_x == $x && $old_y == $y;
+        }
     }
 }
+
+my $NUM_PARTICLES = shift(@ARGV) // 1;
+my $WAIT_TIME     = shift(@ARGV) // 10;
 
 sub init ($this, $msg) {
 
     my @ws = map {
-        $this->spawn(
-            Wander => ParticleFactory(
-                sprite  => colored('.', 'ansi'.($_) ),
-                start_x => $term->term_height
-            )
-        )
-    } 0 .. 255;
+        $this->spawn( Particle( $_ ) )
+    } 1 .. $NUM_PARTICLES;
 
     $term->clear_screen;
 
+    # ~ 60 fps
     my $i1 = interval( $this, 0.01, sub {
-        $this->send( $_, [ *eTick => () ] ) foreach @ws;
+        $this->send( $_, [ *eTick ] ) foreach @ws;
+    });
+
+    my $t = timer( $this, $WAIT_TIME, sub {
+        cancel_timer( $this, $i1 );
+        $this->exit(0);
     });
 }
 
