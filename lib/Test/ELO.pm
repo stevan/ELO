@@ -19,6 +19,8 @@ sub create_logger ($class) {
     );
 }
 
+
+
 1;
 
 __END__

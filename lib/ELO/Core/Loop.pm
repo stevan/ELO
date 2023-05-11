@@ -60,29 +60,33 @@ sub create_process ($self, @args) {
 }
 
 sub destroy_process ($self, $process) {
+
+    my $pid = $process->pid;
+
     # tell everyone bye
-    $self->notify_links( $process );
+    $self->notify_links( $process )
+        # and remove the process links as well ..
+        && delete $self->{_process_links}->{ $pid }
+            # if we need to ...
+            if exists $self->{_process_links}->{ $pid };
 
     # remove self from the process table ...
-    delete $self->{_process_table}->{ $process->pid };
-
-    # remove the process links as well ..
-    delete $self->{_process_links}->{ $process->pid };
+    delete $self->{_process_table}->{ $pid };
 
     # remove any other references to
     # the process in other links
     foreach my $links ( values $self->{_process_links}->%* ) {
-        @$links = grep { $_->pid ne $process->pid } @$links;
+        @$links = grep $_->pid ne $pid, @$links;
     }
 
     # remove signals for this process currently in the queue
     $self->{_signal_queue}->@* = grep {
-        (blessed $_->[0] ?  $_->[0]->pid : $_->[0]) ne $process->pid
+        (blessed $_->[0] ?  $_->[0]->pid : $_->[0]) ne $pid
     } $self->{_signal_queue}->@*;
 
     # remove messages for this process currently in the queue
     $self->{_message_queue}->@* = grep {
-        (blessed $_->[0] ?  $_->[0]->pid : $_->[0]) ne $process->pid
+        (blessed $_->[0] ?  $_->[0]->pid : $_->[0]) ne $pid
     } $self->{_message_queue}->@*;
 }
 

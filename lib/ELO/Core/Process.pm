@@ -33,7 +33,7 @@ use slots (
 
 sub BUILD ($self, $params) {
     $self->{_msg_inbox} = [];
-    $self->{_flags}     = { trap_signals => {}, sleep_timer => undef };
+    $self->{_flags}     = { trap_signals => {}, sleep_timer => undef, status => 1 };
     $self->{_pid}       = sprintf '%03d:%s' => ++$PIDS, $self->{behavior}->name;
 }
 
@@ -54,6 +54,8 @@ sub is_trapping ($self, $signal) {
 }
 
 sub is_sleeping ($self) { !! $self->{_flags}->{sleep_timer} }
+
+sub is_alive ($self) { !! $self->{_flags}->{status} }
 
 sub has_pending_messages ($self) { scalar $self->{_msg_inbox}->@* }
 
@@ -137,7 +139,7 @@ sub exit ($self, $status=0) {
 
     $self->{loop}->destroy_process( $self );
 
-    $status;
+    $self->{_flags}->{status} = $status;
 }
 
 # ...

@@ -2,7 +2,8 @@ package ELO::Types;
 use v5.36;
 
 use ELO::Core::Type;
-use ELO::Core::EventType;
+use ELO::Core::Type::Alias;
+use ELO::Core::Type::Event;
 
 use constant DEBUG => $ENV{TYPES_DEBUG} || 0;
 
@@ -92,7 +93,7 @@ sub enum ($enum, @values) {
 
 sub event ($type, @definition) {
     warn "Creating event $type" if DEBUG;
-    $EVENT_REGISTRY{ $type } = ELO::Core::EventType->new(
+    $EVENT_REGISTRY{ $type } = ELO::Core::Type::Event->new(
         symbol       => $type,
         definition   => \@definition,
         _type_lookup => \&lookup_type,
@@ -101,10 +102,22 @@ sub event ($type, @definition) {
 
 sub type ($type, $checker) {
     warn "Creating type $type" if DEBUG;
-    $TYPE_REGISTRY{ $type } = ELO::Core::Type->new(
-        symbol  => $type,
-        checker => $checker,
-    );
+
+    if ( ref $checker eq 'CODE' ) {
+        $TYPE_REGISTRY{ $type } = ELO::Core::Type->new(
+            symbol  => $type,
+            checker => $checker,
+        );
+    }
+    else {
+        my $alias = $TYPE_REGISTRY{ $checker }
+            || die "Unable to alias type($type) to alias($checker): alias type not found";
+
+        $TYPE_REGISTRY{ $type } = ELO::Core::Type::Alias->new(
+            symbol => $type,
+            alias  => $alias,
+        );
+    }
 }
 
 # ...

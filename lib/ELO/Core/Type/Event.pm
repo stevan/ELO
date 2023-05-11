@@ -1,4 +1,4 @@
-package ELO::Core::EventType;
+package ELO::Core::Type::Event;
 use v5.36;
 
 use parent 'UNIVERSAL::Object::Immutable';

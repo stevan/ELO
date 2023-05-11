@@ -5,7 +5,7 @@ use experimental 'signatures', 'postderef';
 
 use POSIX;
 use Term::Cap;
-use Term::ReadKey 'GetTerminalSize';
+use Term::ReadKey qw[ GetTerminalSize ReadKey ReadMode ];
 
 $|++;
 
