@@ -7,7 +7,8 @@ use Sub::Util 'set_subname';
 use ELO::Types     qw[ :events ];
 use ELO::Constants qw[ $SIGEXIT ];
 
-use ELO::Core::Behavior::Receiver;
+use ELO::Core::Behavior::Receive;
+use ELO::Core::Behavior::Setup;
 
 use constant DEBUG => $ENV{ACTORS_DEBUG} || 0;
 
@@ -17,6 +18,7 @@ our @EXPORT_OK = qw[
     match
     build_actor
 
+    setup
     receive
 ];
 
@@ -27,11 +29,33 @@ sub build_actor ($name, $f) {
     $f;
 }
 
+sub setup (@args) {
+    my ($name, $setup);
+
+    if ( scalar @args == 1 ) {
+        $name = (caller(1))[3];
+        $name =~ s/^main\:\://; # strip off main::
+        $setup = $args[0];
+    }
+    else {
+        ($name, $setup) = @args;
+    }
+
+    ELO::Core::Behavior::Setup->new(
+        name  => $name,
+        setup => $setup,
+    );
+}
+
 sub receive (@args) {
     my ($name, $receivers);
 
     if ( scalar @args == 1 ) {
         $name = (caller(1))[3];
+
+        # TODO- if we find setup here, then
+        # we need to look higher up
+
         $name =~ s/^main\:\://; # strip off main::
         $receivers = $args[0];
     }
@@ -43,7 +67,7 @@ sub receive (@args) {
     my $protocol = resolve_event_types( \@protocol );
     my %protocol = map { $_->symbol => $_ } @$protocol;
 
-    ELO::Core::Behavior::Receiver->new(
+    ELO::Core::Behavior::Receive->new(
         name      => $name,
         receivers => $receivers,
         protocol  => \%protocol,

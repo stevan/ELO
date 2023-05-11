@@ -1,4 +1,4 @@
-package ELO::Core::Behavior::Receiver;
+package ELO::Core::Behavior::Receive;
 use v5.36;
 
 use ELO::Constants qw[ $SIGEXIT ];

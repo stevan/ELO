@@ -20,7 +20,7 @@ my sub build_loop (%options) {
     return $loop;
 }
 
-sub run ($class, $f, %options) {
+sub run ($class, $b, %options) {
 
     my $args;
     my $logger;
@@ -32,7 +32,7 @@ sub run ($class, $f, %options) {
     $logger = $options{logger} if $options{logger};
 
     # run the loop
-    $loop->run( $f, $args // +[], $logger );
+    $loop->run( $b, $args // +[], $logger );
 
     return;
 }
