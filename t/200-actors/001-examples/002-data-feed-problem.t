@@ -151,18 +151,25 @@ event *eStopConsumer;
 sub PeriodicConsumer ($feed, $fdb) {
 
     my $interval_timer;
+    my $awaiting_responses;
 
     receive {
         *eStartConsumer => sub ($this, $interval) {
-            $log->info( $this, 'Starting PeriodicConsumer with interval of '.$interval );
+            $log->info( $this, "Starting PeriodicConsumer with interval of $interval" );
             $interval_timer = interval(
                 $this,
                 $interval,
-                [ $feed, [ *eGetLatestDataFeed => $this ] ]
+                sub {
+                    $this->send( $feed, [ *eGetLatestDataFeed => $this ] );
+                    $awaiting_responses++;
+                }
             );
         },
         *eStopConsumer => sub ($this) {
-            $log->info( $this, 'Stopping PeriodicConsumer' );
+            $log->info( $this, "Stopping PeriodicConsumer ($awaiting_responses)" );
+            if ( $awaiting_responses != 0 ) {
+                $log->fatal( $this, "PeriodicConsumer stopped while still awaiting ($awaiting_responses) responses" );
+            }
             cancel_timer( $this, $interval_timer );
             undef $interval_timer;
         },
@@ -171,6 +178,7 @@ sub PeriodicConsumer ($feed, $fdb) {
         *eDataFeedResponse => sub ($this, $timestamp, $data_set) {
             $log->debug( $this, [ "Sending Data Feed Response to DB", $timestamp, scalar @$data_set, $data_set ] );
             $this->send( $fdb, [ *eInsertData => $timestamp, $data_set ] );
+            $awaiting_responses--;
         }
     };
 }
@@ -180,11 +188,11 @@ sub PeriodicConsumer ($feed, $fdb) {
 sub Debugger () {
     receive {
         *eDataFeedResponse => sub ($this, $timestamp, $args) {
-            $log->info( $this, [ $timestamp, scalar @$args, $args ] );
+            $log->fatal( $this, [ $timestamp, scalar @$args, $args ] );
         },
 
         *eResultSet => sub ($this, $resultset) {
-            $log->info( $this, [ scalar @$resultset, $resultset ] );
+            $log->fatal( $this, [ scalar @$resultset, $resultset ] );
         }
     };
 }
@@ -203,7 +211,7 @@ sub init ($this, $msg=[]) {
 
     my $last = $this->loop->now;
 
-    my $i1 = interval( $this, 5, sub {
+    my $i1 = interval( $this, 3, sub {
         $this->send( $fdb, [ *eQueryDataSince => $last, $debug ]);
         $last = $this->loop->now;
     });
