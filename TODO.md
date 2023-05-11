@@ -4,6 +4,8 @@
 ## General
 <!-------------------------------------------------------->
 
+- Make SIGEXIT into an Event
+
 - [ ] See `EVENTS.md`
     - consider type extension
         - `subtype *Foo => *Str => where { ... };`

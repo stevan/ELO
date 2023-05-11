@@ -521,8 +521,8 @@ sub LOOP ($self, $logger=undef) {
 }
 
 sub run ($self, $f, $args=[], $logger=undef) {
-    my $main = $self->create_process( main => $f );
-    $self->enqueue_msg([ $main, $args ]);
+    my $init = $self->create_process( init => $f );
+    $self->enqueue_msg([ $init, $args ]);
     $self->LOOP( $logger );
     return;
 }
