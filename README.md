@@ -39,7 +39,7 @@ sub Ping () {
 
     my $count;
 
-    receive +{
+    receive {
         *eStartPing => sub ( $this, $pong ) {
             $count++;
             say $this->pid." Starting with (".$count.")";
@@ -61,7 +61,7 @@ sub Ping () {
 
 sub Pong () {
 
-    receive +{
+    receive {
         *ePing => sub ( $this, $ping ) {
             say "... Ping";
             $this->send( $ping, [ *ePong => $this ]);
@@ -88,7 +88,7 @@ And a Promise mechanism to coordinate between Actors.
 use experimental 'try';
 
 use ELO::Loop;
-use ELO::Types    qw[ :core event ];
+use ELO::Types    qw[ :core :events ];
 use ELO::Actors   qw[ receive ];
 use ELO::Promises qw[ promise ];
 
@@ -98,7 +98,7 @@ event *eServiceError     => ( *Str );
 
 sub Service () {
 
-    receive +{
+    receive {
         *eServiceRequest => sub ($this, $action, $args, $promise) {
             try {
                 my ($x, $y) = @$args;

@@ -5,9 +5,6 @@
 <!-------------------------------------------------------->
 
 - [ ] See `EVENTS.md`
-    - add type aliasing
-        - `type *Foo => *Str` etc.
-
     - consider type extension
         - `subtype *Foo => *Str => where { ... };`
         - this opens up types to be arbitrarily complex
@@ -16,17 +13,12 @@
     - should we add some kind of generics?
 
     - `protocol` needs to be implemented
-        - this should act like a case class or union of the protocol types
+        - see sketch in 002-data-feed-problem.t
 
 - [ ] See `PROMISES.md`
 
 - [ ] add Akka style `become` to allow for state machines
     - see `200-actors/002-fp-examples/003-producer.t`
-
-- consider using the Queue from my P implementation so
-  that events can be deferred when needed
-    - this can come in handy when starting/stoping actors
-
 
 <!-------------------------------------------------------->
 ## Loop
@@ -38,12 +30,6 @@
 
 - [ ] add dead-letter-queue to the loop
     - allow it be configured as a black-hole
-
-- should we add `monitors`?
-    - basically something that can observe the system at runtime
-    - what about system probes?
-        - things that can sample actor state, etc.
-        - are they also a `monitor` responsibility?
 
 - should we add `idle` callbacks?
     - they could be done instead of/in addition to waiting when there is nothing to do
@@ -57,8 +43,7 @@
     - immediately link to the new process
 
 - [ ] trampoline needs building!
-    - in loop? in process?
-    - Abstract::Process::tick is the best place probably
+    - in loop? in process? in behavior?
     - also review code and ...
         - make sure we catch/handle all exceptions properly
         - some should be handleable via user code
@@ -103,21 +88,6 @@
 <!-------------------------------------------------------->
 ## Actors
 <!-------------------------------------------------------->
-
-- make a way to mark a given Actor as accepting Promises
-    - `sub SomeActor ($this, $msg) : Promise { ... }`
-    - this could be used to implement `ask` like behavior perhaps
-        - `ask` could create and return the promise
-            - but throw an exception of the recieving Actor doesn't do `Promise` trait
-
-- Hmm, does it make sense to try and type the various actors patterns?
-    - `sub SomeActor ($this, $msg) : Promise(eResponse, eError) { ... }`
-        - this tells the system, that actor wants promises
-        - it can also say the events is expects to get back
-    - `sub SomeActor ($this, $msg) : Callback { ... }`
-        - this tells it it needs a PID callback
-    - `sub SomeActor ($this, $msg) : SessionId { ... }`
-        - this tells that a session ID is expected
 
 <!-------------------------------------------------------->
 ## Links
