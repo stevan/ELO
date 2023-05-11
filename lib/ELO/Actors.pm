@@ -50,15 +50,6 @@ sub match ($msg, $table) {
 
     my $cb = $table->{ $event };
 
-    # NOTE:
-    # I want to support this, but _ doesn't
-    # really fit in Perl, it already has meaning
-    # and we need something better.
-    #
-    # $cb = $table->{'_'}
-    #     if not defined $cb
-    #     && exists $table->{'_'};
-
     die "No match for $event" unless $cb;
 
     if ( my $event_type = lookup_event_type( $event ) ) {
@@ -70,7 +61,6 @@ sub match ($msg, $table) {
     try {
         $cb->(@args);
     } catch ($e) {
-        #warn "!!! Died calling msg(".(join ', ' => map { ref $_ ? '['.(join ', ' => @$_).']' : $_ } @$msg).")";
         die $e;
     }
 }

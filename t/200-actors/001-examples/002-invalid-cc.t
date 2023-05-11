@@ -53,9 +53,19 @@ my $log = Test::ELO->create_logger;
 # ...
 
 type *TimeStamp => *Float;
+type *DataSet   => *ArrayRef;
 
 event *eGetLatestDataFeed => (*Process);
-event *eDataFeedResponse  => (*TimeStamp, *ArrayRef);
+event *eDataFeedResponse  => (*TimeStamp, *DataSet);
+
+#event *eDataFeedError => (*Reason);
+
+# protocol *DATA_FEED => [
+#    pair   *eGetLatestDataFeed => *eDataFeedResponse,
+#    raises *eDataFeedError,
+# ];
+#
+# receive [ *DATA_FEED ] => { ... }
 
 sub DataFeed ($baud=10) {
 
@@ -93,10 +103,17 @@ sub DataFeed ($baud=10) {
 
 # ...
 
-event *eInsertData     => (*TimeStamp, *ArrayRef);
-event *eQueryDataSince => (*TimeStamp);
+event *eInsertData     => (*TimeStamp, *DataSet);
+
+event *eQueryDataSince => (*TimeStamp, *Process);
+event *eResultSet      => (*DataSet);
 
 #event *eDataExists => (*Str, *Process);
+
+# protocol *DATABASE => [
+#     accepts *eInsertData,
+#     pair    *eQueryDataSince => *eResultSet,
+# ];
 
 sub FeedDatabase ($window_size=100) {
 
@@ -110,12 +127,11 @@ sub FeedDatabase ($window_size=100) {
             $log->info( $this, [ "AFTER INSERT", (scalar @data), $data[0], $data[-1] ] );
         },
 
-        *eQueryDataSince => sub ($this, $since) {
+        *eQueryDataSince => sub ($this, $since, $caller) {
             $log->debug( $this, [ "SELECT LATEST SINCE $since" ] );
-
             my @results = grep $_->[1] >= $since, @data;
-
-            $log->fatal( $this, \@results );
+            $log->info( $this, [ 'AFTER SELECT', scalar @results ] );
+            $this->send( $caller, [ *eResultSet => \@results ] );
         },
     };
 }
@@ -124,6 +140,13 @@ sub FeedDatabase ($window_size=100) {
 
 event *eStartConsumer => (*Float);
 event *eStopConsumer;
+
+# protocol *PeriodicConsumer => [
+#     accepts   *eStartConsumer,
+#     accepts   *eStopConsumer,
+#     # ...
+#     receives  *eDataFeedResponse,
+# ];
 
 sub PeriodicConsumer ($feed, $fdb) {
 
@@ -154,26 +177,34 @@ sub PeriodicConsumer ($feed, $fdb) {
 
 # ...
 
-sub DataFeed::Debug () {
+sub Debugger () {
     receive {
         *eDataFeedResponse => sub ($this, $timestamp, $args) {
             $log->info( $this, [ $timestamp, scalar @$args, $args ] );
+        },
+
+        *eResultSet => sub ($this, $resultset) {
+            $log->info( $this, [ scalar @$resultset, $resultset ] );
         }
     };
 }
 
+# ...
+
+
 sub init ($this, $msg=[]) {
 
-    my $fdb  = $this->spawn( FeedDatabase( 250 ) );
-    my $feed = $this->spawn( DataFeed() );
-    my $cron = $this->spawn( PeriodicConsumer( $feed, $fdb ) );
+    my $debug = $this->spawn( Debugger() );
+    my $fdb   = $this->spawn( FeedDatabase( 250 ) );
+    my $feed  = $this->spawn( DataFeed() );
+    my $cron  = $this->spawn( PeriodicConsumer( $feed, $fdb ) );
 
     $this->send( $cron, [ *eStartConsumer => 1 ] );
 
     my $last = $this->loop->now;
 
     my $i1 = interval( $this, 5, sub {
-        $this->send( $fdb, [ *eQueryDataSince => $last ]);
+        $this->send( $fdb, [ *eQueryDataSince => $last, $debug ]);
         $last = $this->loop->now;
     });
 
