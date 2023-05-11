@@ -8,8 +8,8 @@ use Test::Differences;
 
 use ok 'ELO::Types',  qw[
     :core
-    event
-    lookup_event_type
+    :events
+    :types
 ];
 
 subtest '... define an event' => sub {
@@ -21,7 +21,7 @@ subtest '... define an event' => sub {
 subtest '... retrieve an event' => sub {
     eq_or_diff(
         [ lookup_event_type(*eHelloWorld)->definition ],
-        [ *Str, *Int, *ArrayRef, *Float ],
+        [ map lookup_type($_), *Str, *Int, *ArrayRef, *Float ],
         '... got the event definition'
     );
 };

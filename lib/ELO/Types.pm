@@ -50,14 +50,17 @@ our @EXPORT_OK = (qw[
 
     lookup_event_type
     lookup_type
+
+    resolve_event_types
+    resolve_types
     ],
     @ALL_TYPE_GLOBS,
 );
 
 our %EXPORT_TAGS = (
     core   => [ @ALL_TYPE_GLOBS ],
-    types  => [qw[ enum type lookup_type ]],
-    events => [qw[ event lookup_event_type ]],
+    types  => [qw[ enum type lookup_type       resolve_types       ]],
+    events => [qw[ event     lookup_event_type resolve_event_types ]],
 );
 
 # ...
@@ -95,8 +98,7 @@ sub event ($type, @definition) {
     warn "Creating event $type" if DEBUG;
     $EVENT_REGISTRY{ $type } = ELO::Core::Type::Event->new(
         symbol       => $type,
-        definition   => \@definition,
-        _type_lookup => \&lookup_type,
+        definition   => resolve_types( \@definition ),
     );
 }
 
@@ -130,6 +132,36 @@ sub lookup_event_type ($type) {
 sub lookup_type ( $type ) {
     warn "Looking up type($type)" if DEBUG;
     $TYPE_REGISTRY{ $type }
+}
+
+sub resolve_types ( $types ) {
+    my @resolved;
+    foreach my $t ( @$types ) {
+        # if we encounter a tuple ...
+        if ( ref $t eq 'ARRAY' ) {
+            # otherwise recurse and check the tuple ...
+            push @resolved => __SUB__->( $t );
+        }
+        else {
+            my $type = $TYPE_REGISTRY{ $t }
+                || die "Could not resolve type($t) in registry";
+
+            push @resolved => $type;
+        }
+    }
+
+    return \@resolved;
+}
+
+sub resolve_event_types ( $events ) {
+    my @resolved;
+    foreach my $e ( @$events ) {
+        my $type = $EVENT_REGISTRY{ $e }
+            || die "Could not resolve event($e) in registry";
+        push @resolved => $type;
+    }
+
+    return \@resolved;
 }
 
 # ...

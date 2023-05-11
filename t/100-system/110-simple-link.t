@@ -12,6 +12,7 @@ use Hash::Util qw[fieldhash];
 
 use ok 'ELO::Loop';
 use ok 'ELO::Actors',    qw[ match receive ];
+use ok 'ELO::Types',     qw[ :events ];
 use ok 'ELO::Timers',    qw[ :tickers ];
 use ok 'ELO::Constants', qw[ $SIGEXIT ];
 
@@ -26,13 +27,15 @@ my $log = Test::ELO->create_logger;
 # this shows uni-directional link signals, here
 # the Cat gets triggered and sends to init.
 
+event *Meow;
+
 sub Cat () {
 
     my $lives = 0;
 
     receive {
-        meow => sub ($this) {
-            $log->info( $this, 'meow');
+        *Meow => sub ($this) {
+            $log->info( $this, *Meow );
         },
         $SIGEXIT => sub ($this, $from) {
             $lives++;
@@ -67,7 +70,7 @@ sub init ($this, $msg) {
         $cat->trap( $SIGEXIT );
         $this->trap( $SIGEXIT );
 
-        $this->send( $cat, [ 'meow' ] );
+        $this->send( $cat, [ *Meow ] );
 
         # keep trying to kill the cat
         $interval = interval_ticker( $this, 2, sub {

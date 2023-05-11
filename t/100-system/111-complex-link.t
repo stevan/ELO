@@ -12,19 +12,22 @@ use Hash::Util qw[fieldhash];
 
 use ok 'ELO::Loop';
 use ok 'ELO::Actors',    qw[ match receive ];
+use ok 'ELO::Types',     qw[ :events ];
 use ok 'ELO::Timers',    qw[ ticker ];
 use ok 'ELO::Constants', qw[ $SIGEXIT ];
 
 my $log = Test::ELO->create_logger;
+
+event *Meow;
 
 sub Cat () {
 
     state $expected = [ 1, 0 ];
 
     receive +{
-        meow => sub ($this) {
+        *Meow => sub ($this) {
             $log->info( $this, 'meow');
-            $this->send_to_self([ 'meow' ]);
+            $this->send_to_self([ *Meow ]);
         },
         $SIGEXIT => sub ($this, $from) {
             my $e = shift(@$expected);
@@ -60,8 +63,8 @@ sub init ($this, $msg) {
         $cat2->trap( $SIGEXIT );
         $this->trap( $SIGEXIT );
 
-        $this->send( $cat1, [ 'meow' ] );
-        $this->send( $cat2, [ 'meow' ] );
+        $this->send( $cat1, [ *Meow ] );
+        $this->send( $cat2, [ *Meow ] );
 
         ticker( $this, 10, sub {
             $log->warn( $this, 'I can not take it anymore!');
