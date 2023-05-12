@@ -4,7 +4,10 @@
 ## General
 <!-------------------------------------------------------->
 
-- Make SIGEXIT into an Event
+- `protocol` needs to be implemented
+    - see sketch in 002-data-feed-problem.t
+    - write up `PROTOCOLS.md`
+
 
 - [ ] See `EVENTS.md`
     - consider type extension
@@ -13,9 +16,6 @@
             - this means we can't control performance :(
 
     - should we add some kind of generics?
-
-    - `protocol` needs to be implemented
-        - see sketch in 002-data-feed-problem.t
 
 - [ ] See `PROMISES.md`
 

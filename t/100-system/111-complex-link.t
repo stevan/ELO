@@ -12,9 +12,8 @@ use Hash::Util qw[fieldhash];
 
 use ok 'ELO::Loop';
 use ok 'ELO::Actors',    qw[ match receive ];
-use ok 'ELO::Types',     qw[ :events ];
+use ok 'ELO::Types',     qw[ :events *SIGEXIT ];
 use ok 'ELO::Timers',    qw[ ticker ];
-use ok 'ELO::Constants', qw[ $SIGEXIT ];
 
 my $log = Test::ELO->create_logger;
 
@@ -29,7 +28,7 @@ sub Cat () {
             $log->info( $this, 'meow');
             $this->send_to_self([ *Meow ]);
         },
-        $SIGEXIT => sub ($this, $from) {
+        *SIGEXIT => sub ($this, $from) {
             my $e = shift(@$expected);
             is($this->loop->is_process_alive( $from ), $e, '... this('.$this->pid.') got SIGTERM the process('.$from->pid.') and worked as expected('.$e.')');
             $log->fatal( $this, 'Oh no, you ('.$from->pid.') got me!');
@@ -59,9 +58,9 @@ sub init ($this, $msg) {
         $cat1->link( $this );
         $this->link( $cat2 );
 
-        $cat1->trap( $SIGEXIT );
-        $cat2->trap( $SIGEXIT );
-        $this->trap( $SIGEXIT );
+        $cat1->trap( *SIGEXIT );
+        $cat2->trap( *SIGEXIT );
+        $this->trap( *SIGEXIT );
 
         $this->send( $cat1, [ *Meow ] );
         $this->send( $cat2, [ *Meow ] );
@@ -75,7 +74,7 @@ sub init ($this, $msg) {
     }
 
     match $msg, +{
-        $SIGEXIT => sub ($from) {
+        *SIGEXIT => sub ($from) {
             ok(!$this->loop->is_process_alive( $from ), '... this('.$this->pid.') got SIGTERM from process('.$from->pid.') as expected');
             $log->error( $this, '... one of our kitty died! ('.$from->pid.')');
             $log->fatal( $this, 'Goodbye cruel world!');

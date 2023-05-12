@@ -11,16 +11,16 @@ use Data::Dump;
 use Hash::Util qw[fieldhash];
 
 use ok 'ELO::Loop';
-use ok 'ELO::Actors',    qw[ match receive ];
-use ok 'ELO::Constants', qw[ $SIGEXIT ];
+use ok 'ELO::Actors', qw[ match receive ];
+use ok 'ELO::Types',  qw[ *SIGEXIT ];
 
 my $log = Test::ELO->create_logger;
 
 sub SigExitCatcher () {
 
     receive +{
-        $SIGEXIT => sub ($this, $from) {
-            $log->info( $this, "Got $SIGEXIT from (".$from->pid."), ignoring");
+        *SIGEXIT => sub ($this, $from) {
+            $log->info( $this, "Got *SIGEXIT from (".$from->pid."), ignoring");
             pass('... got the SIGEXIT in SigExitCatcher, as we expected');
         }
     }
@@ -45,11 +45,11 @@ sub init ($this, $msg) {
         isa_ok($t1, 'ELO::Core::Process');
         isa_ok($t2, 'ELO::Core::Process');
 
-        $this->trap( $SIGEXIT );
-        $t1->trap( $SIGEXIT );
+        $this->trap( *SIGEXIT );
+        $t1->trap( *SIGEXIT );
 
-        ok($this->is_trapping( $SIGEXIT ), '... init can trap SIGEXIT');
-        ok($t1->is_trapping( $SIGEXIT ), '... t1 can trap SIGEXIT');
+        ok($this->is_trapping( *SIGEXIT ), '... init can trap SIGEXIT');
+        ok($t1->is_trapping( *SIGEXIT ), '... t1 can trap SIGEXIT');
 
         $log->info( $this, '... linking to '.$t1->pid);
         $this->link( $t1 );
@@ -57,7 +57,7 @@ sub init ($this, $msg) {
         $this->link( $t2 );
 
         $log->info( $this, '... sending SIGEXIT to '.$t1->pid);
-        $this->signal( $t1, $SIGEXIT, [ $this ] );
+        $this->signal( $t1, *SIGEXIT, [ $this ] );
 
         $this->loop->next_tick(sub {
             $log->info( $this, '... sending kill to '.$t1->pid);
@@ -70,7 +70,7 @@ sub init ($this, $msg) {
         });
 
         $log->info( $this, '... sending SIGEXIT to '.$t2->pid);
-        $this->signal( $t2, $SIGEXIT, [ $this ] );
+        $this->signal( $t2, *SIGEXIT, [ $this ] );
 
         return;
     }
@@ -78,7 +78,7 @@ sub init ($this, $msg) {
     state $expected = [ $t2, $t1 ];
 
     match $msg, +{
-        $SIGEXIT => sub ($from) {
+        *SIGEXIT => sub ($from) {
             $log->warn( $this, '... got SIGEXIT from ('.$from->pid.')');
 
             is($from, shift(@$expected), '... got the expected process');

@@ -1,8 +1,6 @@
 package ELO::Core::Behavior::Receive;
 use v5.36;
 
-use ELO::Constants qw[ $SIGEXIT ];
-
 use parent 'UNIVERSAL::Object::Immutable';
 use roles  'ELO::Core::Behavior';
 use slots (
@@ -17,16 +15,12 @@ sub apply ($self, $this, $event) {
 
     my ($type, @payload) = @$event;
 
-    # XXX - this is gross!!!
-    if ( $type ne $SIGEXIT ) {
-
-        if ( my $event_type = $self->{protocol}->{ $type } ) {
-            $event_type->check( @payload )
-                or die "Event($type) failed to type check (".(join ', ' => @payload).")";
-        }
-        else {
-            die "Event($type) does not have a receiver in ".$self->name;
-        }
+    if ( my $event_type = $self->{protocol}->{ $type } ) {
+        $event_type->check( @payload )
+            or die "Event($type) failed to type check (".(join ', ' => @payload).")";
+    }
+    else {
+        die "Event($type) does not have a receiver in ".$self->name;
     }
 
     my $f = $self->{receivers}->{ $type };

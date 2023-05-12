@@ -4,8 +4,7 @@ use experimental 'try';
 
 use Sub::Util 'set_subname';
 
-use ELO::Types     qw[ :events ];
-use ELO::Constants qw[ $SIGEXIT ];
+use ELO::Types qw[ :events ];
 
 use ELO::Core::Behavior::Receive;
 use ELO::Core::Behavior::Setup;
@@ -59,8 +58,7 @@ sub receive (@args) {
         ($name, $receivers) = @args;
     }
 
-    my @protocol = grep $_ ne $SIGEXIT, keys %$receivers;
-    my $protocol = resolve_event_types( \@protocol );
+    my $protocol = resolve_event_types( [ keys %$receivers ] );
     my %protocol = map { $_->symbol => $_ } @$protocol;
 
     ELO::Core::Behavior::Receive->new(

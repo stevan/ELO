@@ -11,7 +11,7 @@ use ELO::Core::Process;
 
 use ELO::Core::Behavior::FunctionWrapper;
 
-use ELO::Constants qw[ $SIGEXIT ];
+use ELO::Types qw[ *SIGEXIT ];
 
 use parent 'UNIVERSAL::Object::Immutable';
 use slots (
@@ -101,7 +101,7 @@ sub notify_links ($self, $process) {
             # let link know we exited
             $process->kill( $link );
             # is the same as
-            # $process->signal( $link, $SIGEXIT, [ $process ] );
+            # $process->signal( $link, *SIGEXIT, [ $process ] );
         }
     }
     #else {
@@ -244,7 +244,7 @@ sub TICK ($self) {
         else {
             # run the immediate handlers
             # XXX - this should be done better, but works for now
-            if ( $signal eq $SIGEXIT ) {
+            if ( $signal eq *SIGEXIT ) {
                 # exit is a terminal signal,
                 $to_proc->exit(1);
             }

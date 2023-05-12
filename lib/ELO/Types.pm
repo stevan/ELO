@@ -29,6 +29,15 @@ my @ELO_CORE_TYPES = (
     *TimerId, # a Timer ID value
 );
 
+my @ELO_CORE_SIGNALS = (
+    *SIGEXIT
+);
+
+my @ALL_SIGNALS      = ( @ELO_CORE_SIGNALS );
+my @ALL_SIGNAL_NAMES = map   get_type_name($_),      @ALL_SIGNALS;
+my @ALL_SIGNAL_GLOBS = map   '*'.$_,                 @ALL_SIGNAL_NAMES;
+my %ALL_SIGNALS      = map { get_type_name($_), $_ } @ALL_SIGNALS;
+
 my @ALL_TYPES      = ( @PERL_TYPES, @ELO_CORE_TYPES );
 my @ALL_TYPE_NAMES = map   get_type_name($_),      @ALL_TYPES;
 my @ALL_TYPE_GLOBS = map   '*'.$_,                 @ALL_TYPE_NAMES;
@@ -55,12 +64,14 @@ our @EXPORT_OK = (qw[
     resolve_types
     ],
     @ALL_TYPE_GLOBS,
+    @ALL_SIGNAL_GLOBS
 );
 
 our %EXPORT_TAGS = (
-    core   => [ @ALL_TYPE_GLOBS ],
-    types  => [qw[ enum type lookup_type       resolve_types       ]],
-    events => [qw[ event     lookup_event_type resolve_event_types ]],
+    core    => [ @ALL_TYPE_GLOBS ],
+    signals => [ @ALL_SIGNAL_GLOBS ],
+    types   => [qw[ enum type lookup_type       resolve_types       ]],
+    events  => [qw[ event     lookup_event_type resolve_event_types ]],
 );
 
 # ...
@@ -243,6 +254,10 @@ type *TimerId, sub ($timer_id) {
         && ref($timer_id) eq 'SCALAR' # and it is a SCALAR reference
         # FIXME: we should probably bless the timed IDs
 };
+
+# Signals as Events
+
+event *SIGEXIT => (*Process);
 
 1;
 

@@ -5,7 +5,7 @@ use Carp 'confess';
 
 my $PIDS = 0;
 
-use ELO::Constants qw[ $SIGEXIT ];
+use ELO::Types qw[ *SIGEXIT ];
 
 use overload (
     fallback => 1,
@@ -137,7 +137,7 @@ sub spawn ($self, @args) {
 }
 
 sub kill ($self, $proc) {
-    $self->signal( $proc, $SIGEXIT, [ $self ] );
+    $self->signal( $proc, *SIGEXIT, [ $self ] );
 }
 
 sub exit ($self, $status=0) {

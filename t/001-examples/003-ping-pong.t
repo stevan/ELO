@@ -9,9 +9,8 @@ use Test::ELO;
 use Data::Dump;
 
 use ok 'ELO::Loop';
-use ok 'ELO::Types',     qw[ :core :events ];
-use ok 'ELO::Actors',    qw[ receive match setup ];
-use ok 'ELO::Constants', qw[ $SIGEXIT ];
+use ok 'ELO::Types',  qw[ :core :events *SIGEXIT ];
+use ok 'ELO::Actors', qw[ receive match setup ];
 
 my $log = Test::ELO->create_logger;
 
@@ -101,7 +100,7 @@ sub Init () {
         # these processes, so we can see when
         # they exit
 
-        $this->trap( $SIGEXIT );
+        $this->trap( *SIGEXIT );
         $this->link( $_ ) foreach ($ping, $pong, $ping2, $pong2);
 
         # ...
@@ -109,7 +108,7 @@ sub Init () {
         my $expected = [ $ping, $pong, $ping2, $pong2 ];
 
         receive +{
-            $SIGEXIT => sub ($this, $from) {
+            *SIGEXIT => sub ($this, $from) {
                 $log->warn( $this, '... got SIGEXIT from ('.$from->pid.')');
 
                 is($from, shift(@$expected), '... got the expected process');

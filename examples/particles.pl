@@ -8,7 +8,6 @@ use ELO::Loop;
 use ELO::Actors    qw[ match receive ];
 use ELO::Timers    qw[ :timers :tickers ];
 use ELO::Types     qw[ :core :events ];
-use ELO::Constants qw[ $SIGEXIT ];
 
 use Term::ANSIColor qw[ colored uncolor ];
 
