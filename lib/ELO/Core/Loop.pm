@@ -520,9 +520,16 @@ sub LOOP ($self, $logger=undef) {
     return;
 }
 
-sub run ($self, $f, $args=[], $logger=undef) {
+sub run ($self, $f, $args=undef, $logger=undef) {
+    # NOTE:
+    # we support both the old style $f behavior for init
+    # where it is expected to run like any other process
+    # AND
+    # the better version which is an Actor usually with a
+    # setup behavior that will just work where needed
+
     my $init = $self->create_process( blessed $f ? $f : init => $f );
-    $self->enqueue_msg([ $init, $args ]);
+    $self->enqueue_msg([ $init, $args // [] ]) if not blessed $f;
     $self->LOOP( $logger );
     return;
 }

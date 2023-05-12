@@ -10,7 +10,7 @@ use Data::Dump;
 
 use ok 'ELO::Loop';
 use ok 'ELO::Types',     qw[ :core :events ];
-use ok 'ELO::Actors',    qw[ receive match ];
+use ok 'ELO::Actors',    qw[ receive match setup ];
 use ok 'ELO::Constants', qw[ $SIGEXIT ];
 
 my $log = Test::ELO->create_logger;
@@ -72,15 +72,15 @@ sub Pong () {
     }
 }
 
-sub init ($this, $msg=[]) {
+sub Init () {
 
-    state $ping = $this->spawn( Ping() );
-    state $pong = $this->spawn( Pong() );
+    setup sub ($this) {
+        my $ping = $this->spawn( Ping() );
+        my $pong = $this->spawn( Pong() );
 
-    state $ping2 = $this->spawn( Ping( max_pings => 10 ) );
-    state $pong2 = $this->spawn( Pong() );
+        my $ping2 = $this->spawn( Ping( max_pings => 10 ) );
+        my $pong2 = $this->spawn( Pong() );
 
-    unless ($msg && @$msg) {
         isa_ok($ping, 'ELO::Core::Process');
         isa_ok($pong, 'ELO::Core::Process');
 
@@ -104,21 +104,21 @@ sub init ($this, $msg=[]) {
         $this->trap( $SIGEXIT );
         $this->link( $_ ) foreach ($ping, $pong, $ping2, $pong2);
 
-        return;
-    }
+        # ...
 
-    state $expected = [ $ping, $pong, $ping2, $pong2 ];
+        my $expected = [ $ping, $pong, $ping2, $pong2 ];
 
-    match $msg, +{
-        $SIGEXIT => sub ($from) {
-            $log->warn( $this, '... got SIGEXIT from ('.$from->pid.')');
+        receive +{
+            $SIGEXIT => sub ($this, $from) {
+                $log->warn( $this, '... got SIGEXIT from ('.$from->pid.')');
 
-            is($from, shift(@$expected), '... got the expected process');
+                is($from, shift(@$expected), '... got the expected process');
+            }
         }
     }
 }
 
-ELO::Loop->run( \&init, logger => $log );
+ELO::Loop->run( Init(), logger => $log );
 
 done_testing;
 

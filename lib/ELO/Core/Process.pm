@@ -35,7 +35,12 @@ sub BUILD ($self, $params) {
     $self->{_msg_inbox} = [];
     $self->{_flags}     = { trap_signals => {}, sleep_timer => undef, status => 1 };
     $self->{_pid}       = sprintf '%03d:%s' => ++$PIDS, $self->{behavior}->name;
+
+    if ( $self->{behavior} isa ELO::Core::Behavior::Setup ) {
+        $self->{behavior} = $self->{behavior}->setup( $self );
+    }
 }
+
 
 # ...
 

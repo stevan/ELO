@@ -32,7 +32,7 @@ sub run ($class, $b, %options) {
     $logger = $options{logger} if $options{logger};
 
     # run the loop
-    $loop->run( $b, $args // +[], $logger );
+    $loop->run( $b, $args, $logger );
 
     return;
 }

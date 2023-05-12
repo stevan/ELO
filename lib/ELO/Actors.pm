@@ -52,10 +52,6 @@ sub receive (@args) {
 
     if ( scalar @args == 1 ) {
         $name = (caller(1))[3];
-
-        # TODO- if we find setup here, then
-        # we need to look higher up
-
         $name =~ s/^main\:\://; # strip off main::
         $receivers = $args[0];
     }
