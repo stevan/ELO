@@ -4,10 +4,11 @@
 ## General
 <!-------------------------------------------------------->
 
+- implement Conways Game of Life for a good example
+
 - `protocol` needs to be implemented
     - see sketch in 002-data-feed-problem.t
     - write up `PROTOCOLS.md`
-
 
 - [ ] See `EVENTS.md`
     - consider type extension
