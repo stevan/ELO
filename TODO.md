@@ -4,6 +4,20 @@
 ## General
 <!-------------------------------------------------------->
 
+- improve the term library to handle "windows"
+    - always put the cursor back in a sensible position
+      if possible
+    - make it aware of the logger so that we can make a
+      log "window" where needed
+
+- make a repl
+    - use term library to make a "console.log" style interface
+        - it is okay if "running" things blocks this UI
+
+- implement some test utilities
+    - first thing is a timer/interval with a variable amount
+       of jitter
+
 - implement Conways Game of Life for a good example
 
 - `protocol` needs to be implemented
@@ -11,6 +25,13 @@
     - write up `PROTOCOLS.md`
 
 - [ ] See `EVENTS.md`
+    - consider supporting (but ignoring) fieldnames in
+      the events
+        - `event *Person => ( *Str, *Str )`
+        - `event *Person => ( first_name => *Str, last_name => *Str )`
+        - We can just ignore them in the type check, but we
+          can keep them around to make things nice
+
     - consider type extension
         - `subtype *Foo => *Str => where { ... };`
         - this opens up types to be arbitrarily complex
