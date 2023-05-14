@@ -1,7 +1,14 @@
 #!perl
 
 use v5.36;
-use experimental 'try';
+
+
+=pod
+
+This is an example of "cold" streams in that
+they are not async  at all.
+
+=cut
 
 use ELO::Streams;
 
