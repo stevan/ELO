@@ -2,6 +2,9 @@
 
 use v5.36;
 
+use Test::More;
+
+use constant DEBUG => 0;
 
 =pod
 
@@ -33,7 +36,7 @@ package MySubscription {
     }
 
     sub request ($self, $num_elements) {
-        warn "MySubscription::request($num_elements) called\n";
+        warn "MySubscription::request($num_elements) called\n" if main::DEBUG();
         for (1 .. $num_elements) {
             if ( $self->{publisher}->has_next ) {
                 $self->{subscriber}->on_next(
@@ -46,14 +49,14 @@ package MySubscription {
             }
         }
 
-        warn "/// MySubscription::request($num_elements) should we refresh ????\n";
+        warn "/// MySubscription::request($num_elements) should we refresh ????\n" if main::DEBUG();
         if ( $self->{subscriber}->should_refresh ) {
             $self->{subscriber}->refresh;
         }
     }
 
     sub cancel ($self) {
-        warn "MySubscription::cancel called\n";
+        warn "MySubscription::cancel called\n" if main::DEBUG();
         $self->{publisher}->unsubscribe( $self );
     }
 }
@@ -75,12 +78,12 @@ package MySubscriber {
     # ...
 
     sub should_refresh ($self) {
-        warn "MySubscriber::should_refresh called\n";
+        warn "MySubscriber::should_refresh called\n" if main::DEBUG();
         $self->{frame_seen} == $self->{frame_size}
     }
 
     sub refresh ($self) {
-        warn "MySubscriber::refresh called\n";
+        warn "MySubscriber::refresh called\n" if main::DEBUG();
         $self->{frame_size} = $self->{frame_size};
         $self->{frame_seen} = 0;
         $self->{subscription}->request( $self->{frame_size});
@@ -89,21 +92,21 @@ package MySubscriber {
     # ...
 
     sub on_subscribe ($self, $subscription) {
-        warn "MySubscriber::on_subscribe called with ($subscription)\n";
+        warn "MySubscriber::on_subscribe called with ($subscription)\n" if main::DEBUG();
         $self->{subscription} = $subscription;
         $self->refresh;
     }
 
     sub on_complete ($self) {
-        warn "MySubscriber::on_complete called\n";
+        warn "MySubscriber::on_complete called\n" if main::DEBUG();
     }
 
     sub on_error ($self, $e) {
-        warn "MySubscriber::on_error called with ($e)\n";
+        warn "MySubscriber::on_error called with ($e)\n" if main::DEBUG();
     }
 
     sub on_next ($self, $i) {
-        warn "MySubscriber::on_next called with arg($i)\n";
+        warn "MySubscriber::on_next called with arg($i)\n" if main::DEBUG();
         $self->{total_seen}++;
         $self->{frame_seen}++;
     }
@@ -123,7 +126,7 @@ package MyPublisher {
     );
 
     sub subscribe ($self, $subscriber) {
-        warn "MyPublisher::subscribe called with subscriber($subscriber)\n";
+        warn "MyPublisher::subscribe called with subscriber($subscriber)\n" if main::DEBUG();
         my $subscription = MySubscription->new(
             publisher  => $self,
             subscriber => $subscriber,
@@ -134,17 +137,17 @@ package MyPublisher {
     }
 
     sub unsubscribe ($self, $subscription) {
-        warn "MyPublisher::unsubscribe called with subscription($subscription)\n";
+        warn "MyPublisher::unsubscribe called with subscription($subscription)\n" if main::DEBUG();
         $self->{subscriptions}->@* = grep $_ eq $subscription, $self->{subscriptions}->@*;
     }
 
     sub has_next ($self) {
-        warn "MyPublisher::has_next called\n";
+        warn "MyPublisher::has_next called\n" if main::DEBUG();
         $self->{counter} <= $self->{max_value}
     }
 
     sub next ($self) {
-        warn "MyPublisher::next called\n";
+        warn "MyPublisher::next called\n" if main::DEBUG();
         return $self->{counter}++;
     }
 }
@@ -153,6 +156,10 @@ my $s = MySubscriber->new;
 my $p = MyPublisher
             ->new( max_value => 50 )
             ->subscribe( $s );
+
+ok(1);
+
+done_testing;
 
 1;
 

@@ -16,7 +16,7 @@ sub apply ($self, $this, $event) {
     my ($type, @payload) = @$event;
 
     if ( my $event_type = $self->{protocol}->{ $type } ) {
-        $event_type->check( @payload )
+        $event_type->check( \@payload )
             or die "Event($type) failed to type check (".(join ', ' => @payload).")";
     }
     else {

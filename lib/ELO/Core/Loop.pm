@@ -317,9 +317,8 @@ sub TICK ($self) {
             $to_proc->accept( $event );
             $to_proc->tick;
         } catch ($e) {
-            use Data::Dumper;
-            warn Dumper { msg => $msg, queue => \@msg_queue };
-
+            #use Data::Dumper;
+            #warn Dumper { msg => $msg, queue => \@msg_queue };
             die "Message to (".$to_proc->pid.") failed with msg(".(join ', ' => @{ $event // []}).") because: $e";
         }
     }

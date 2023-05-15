@@ -82,8 +82,8 @@ my sub dump_msg ($msg) {
 
             return +{
                 object  => {
-                    pid  => $obj->pid,
-                    f    => Sub::Util::subname( $obj->func ),
+                    pid      => $obj->pid,
+                    behavior => $obj->behavior,
                 }
             } if $ctx->object_isa('ELO::Core::Process');
 

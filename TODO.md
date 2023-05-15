@@ -18,13 +18,22 @@
     - first thing is a timer/interval with a variable amount
        of jitter
 
+- add probes for Behavior objects
+    - can inspect the state by peeking at the closed_over variables
+
+- set subnames where appropriate
+    - the Behavior has a name, but the dispatchable subs do not
+        - they should use a combination of
+            - the behavior name
+            - the event name
+
 - implement Conways Game of Life for a good example
 
 - `protocol` needs to be implemented
     - see sketch in 002-data-feed-problem.t
     - write up `PROTOCOLS.md`
 
-- [ ] See `EVENTS.md`
+- See `EVENTS.md`
     - consider supporting (but ignoring) fieldnames in
       the events
         - `event *Person => ( *Str, *Str )`
@@ -39,20 +48,32 @@
 
     - should we add some kind of generics?
 
-- [ ] See `PROMISES.md`
+    - add tagged unions (ADTs)
+        - https://en.wikipedia.org/wiki/Tagged_union
 
-- [ ] add Akka style `become` to allow for state machines
+- See `PROMISES.md`
+
+- add Akka style `become` to allow for state machines
     - see `200-actors/002-fp-examples/003-producer.t`
+
+- now that we have `receive`, we can make `match` more
+  general purpose and usable in other situations as well
+    - would be good if we want to and support for:
+        - `Option` type (ex. `Some(T)` & `None()`)
+        - `Result` type (ex. `Ok(T)` & `Error()`)
+
+- Is it possible to change the Perl runloop to become
+  the ELO runloop? What would move to C, etc.
 
 <!-------------------------------------------------------->
 ## Loop
 <!-------------------------------------------------------->
 
-- [ ] implement waking from sleep via signal
+- implement waking from sleep via signal
     - `$SIGWAKE`
     - add on_wake, on_sleep to Actors::Actor
 
-- [ ] add dead-letter-queue to the loop
+- add dead-letter-queue to the loop
     - allow it be configured as a black-hole
 
 - should we add `idle` callbacks?
@@ -66,7 +87,7 @@
 - consider a `spawn_link()` that will
     - immediately link to the new process
 
-- [ ] trampoline needs building!
+- trampoline needs building!
     - in loop? in process? in behavior?
     - also review code and ...
         - make sure we catch/handle all exceptions properly

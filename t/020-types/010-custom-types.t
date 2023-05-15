@@ -8,7 +8,7 @@ use Test::Differences;
 
 use ok 'ELO::Types', qw[ :core :types :events ];
 
-# ...
+# ... Custom Types
 
 type *Foo, sub ($foo) { "$foo" eq 'foo' };
 
@@ -21,14 +21,14 @@ subtest '... checking *Foo' => sub {
     ok( !lookup_type(*Foo)->check( {} ),    '... this failed the type check for Foo with an HashRef' );
 };
 
-# ...
+# ... Enumeration Types
 
-enum *Ops => qw[
-    Add
-    Sub
-    Mul
-    Div
-];
+enum *Ops => (
+    *Ops::Add,
+    *Ops::Sub,
+    *Ops::Mul,
+    *Ops::Div,
+);
 
 subtest '... checking *Ops' => sub {
     ok( lookup_type(*Ops)->check( *Ops::Add ), '... this passed the type check for Ops with an Ops::Add' );
@@ -44,7 +44,7 @@ subtest '... checking *Ops' => sub {
     ok( !lookup_type(*Ops)->check( {} ),    '... this failed the type check for Ops with an HashRef' );
 };
 
-# ...
+# ... Type Aliases
 
 type *MyFloat    => *Float;
 type *MyArrayRef => *ArrayRef;

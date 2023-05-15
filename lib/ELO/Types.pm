@@ -4,8 +4,13 @@ use v5.36;
 use ELO::Core::Type;
 use ELO::Core::Type::Alias;
 use ELO::Core::Type::Event;
+use ELO::Core::Type::Enum;
 
 use constant DEBUG => $ENV{TYPES_DEBUG} || 0;
+
+# -----------------------------------------------------------------------------
+# Setup the Core Types
+# -----------------------------------------------------------------------------
 
 my @PERL_TYPES = (
     *Bool,     # 1, 0 or ''
@@ -33,6 +38,10 @@ my @ELO_CORE_SIGNALS = (
     *SIGEXIT
 );
 
+# -----------------------------------------------------------------------------
+# Collect types
+# -----------------------------------------------------------------------------
+
 my @ALL_SIGNALS      = ( @ELO_CORE_SIGNALS );
 my @ALL_SIGNAL_NAMES = map   get_type_name($_),      @ALL_SIGNALS;
 my @ALL_SIGNAL_GLOBS = map   '*'.$_,                 @ALL_SIGNAL_NAMES;
@@ -47,7 +56,9 @@ sub get_type_name ( $type ) {
     (split /\:\:/ => "$type")[-1]
 }
 
-# ...
+# -----------------------------------------------------------------------------
+# Setup Exporter
+# -----------------------------------------------------------------------------
 
 use Exporter 'import';
 
@@ -74,9 +85,49 @@ our %EXPORT_TAGS = (
     events  => [qw[ event     lookup_event_type resolve_event_types ]],
 );
 
-# ...
+# -----------------------------------------------------------------------------
+# Type Checkers (INTERNAL USE ONLY)
+# -----------------------------------------------------------------------------
 
-my %EVENT_REGISTRY;
+my sub check_types ($types, $values) {
+
+    #use Data::Dumper;
+    #warn Dumper [ $types, $values ];
+
+    #warn "START";
+
+    # check arity base first ...
+    return unless scalar @$types == scalar @$values; # XXX - should this throw an error?
+
+    #warn "HERE";
+
+    foreach my $i ( 0 .. $#{$types} ) {
+        my $type  = $types->[$i];
+        my $value = $values->[$i];
+
+        #warn Dumper [ $type, $value ];
+
+        # if we encounter a tuple ...
+        if ( ref $type eq 'ARRAY' ) {
+            # make sure the values are a tuple as well
+            return unless ref $value eq 'ARRAY'; # XXX - should this throw an error?
+
+            # otherwise recurse and check the tuple ...
+            return unless __SUB__->( $type, $value );
+        }
+        else {
+            return unless $type->check( $value );
+        }
+    }
+
+    return 1;
+}
+
+
+# -----------------------------------------------------------------------------
+# Tyoe Builders
+# -----------------------------------------------------------------------------
+
 my %TYPE_REGISTRY;
 
 sub enum ($enum, @values) {
@@ -85,15 +136,16 @@ sub enum ($enum, @values) {
     my %enum_map;
     {
         no strict 'refs';
-        foreach my $value (@values) {
-            my $glob = *{"${enum}::${value}"}; # create the GLOB
-            *{$glob} = \(my $x = $i);          # assign it the value
-            $enum_map{ $glob } = $i;           # note in the map
+        foreach my $glob (@values) {
+            *$glob = \(my $x = $i);  # assign it the value
+            $enum_map{ $glob } = $i; # note in the map
             $i++;
         }
     }
-    $TYPE_REGISTRY{ $enum } = ELO::Core::Type->new(
+
+    $TYPE_REGISTRY{ $enum } = ELO::Core::Type::Enum->new(
         symbol  => $enum,
+        values  => \%enum_map,
         checker => sub ($enum_value) {
 
             #use Data::Dumper;
@@ -107,9 +159,13 @@ sub enum ($enum, @values) {
 
 sub event ($type, @definition) {
     warn "Creating event $type" if DEBUG;
-    $EVENT_REGISTRY{ $type } = ELO::Core::Type::Event->new(
-        symbol       => $type,
-        definition   => resolve_types( \@definition ),
+    my $definition = resolve_types( \@definition );
+    $TYPE_REGISTRY{ $type } = ELO::Core::Type::Event->new(
+        symbol     => $type,
+        definition => $definition,
+        checker    => sub ($values) {
+            check_types( $definition, $values );
+        }
     );
 }
 
@@ -127,22 +183,26 @@ sub type ($type, $checker) {
             || die "Unable to alias type($type) to alias($checker): alias type not found";
 
         $TYPE_REGISTRY{ $type } = ELO::Core::Type::Alias->new(
-            symbol => $type,
-            alias  => $alias,
+            symbol  => $type,
+            alias   => $alias,
+            checker => sub ($value) { $alias->check( $value ) }
         );
     }
 }
 
-# ...
+# -----------------------------------------------------------------------------
+# Type Lookup and Resolution
+# -----------------------------------------------------------------------------
 
 sub lookup_event_type ($type) {
     warn "Looking up event($type)" if DEBUG;
-    $EVENT_REGISTRY{ $type }
+    $TYPE_REGISTRY{ $type };
+    # TODO: make sure the type is an ELO::Core::Type::Event
 }
 
 sub lookup_type ( $type ) {
     warn "Looking up type($type)" if DEBUG;
-    $TYPE_REGISTRY{ $type }
+    $TYPE_REGISTRY{ $type };
 }
 
 sub resolve_types ( $types ) {
@@ -167,8 +227,9 @@ sub resolve_types ( $types ) {
 sub resolve_event_types ( $events ) {
     my @resolved;
     foreach my $e ( @$events ) {
-        my $type = $EVENT_REGISTRY{ $e }
+        my $type = $TYPE_REGISTRY{ $e }
             || die "Could not resolve event($e) in registry";
+        # TODO: make sure the type is an ELO::Core::Type::Event
         push @resolved => $type;
     }
 

@@ -17,12 +17,12 @@ my $log = Test::ELO->create_logger;
 
 type *SID, sub ($sid) { (state $Int = lookup_type(*Int))->check( $sid ) && $sid < 255 };
 
-enum *Ops => qw[
-    Add
-    Sub
-    Mul
-    Div
-];
+enum *Ops => (
+    *Ops::Add,
+    *Ops::Sub,
+    *Ops::Mul,
+    *Ops::Div,
+);
 
 event *eServiceRequest  => ( *SID, *Ops, [ *Int, *Int ], *Process ); # sid : SID, action : Str, args : <Any>, caller : PID
 event *eServiceResponse => ( *SID, *Num );                           # sid : SID, return : <Any>

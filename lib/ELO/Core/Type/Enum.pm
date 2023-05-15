@@ -1,9 +1,9 @@
-package ELO::Core::Type::Alias;
+package ELO::Core::Type::Enum;
 use v5.36;
 
 use parent 'ELO::Core::Type';
 use slots (
-    alias => sub {},
+    values => sub {}
 );
 
 1;

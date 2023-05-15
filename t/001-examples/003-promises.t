@@ -16,8 +16,13 @@ use ok 'ELO::Promises', qw[ promise collect ];
 
 my $log = Test::ELO->create_logger;
 
-enum *ListOps   => qw[ Sum ];
-enum *ScalarOps => qw[ Add Sub Mul Div ];
+enum *ListOps   => ( *ListOps::Sum );
+enum *ScalarOps => (
+    *ScalarOps::Add,
+    *ScalarOps::Sub,
+    *ScalarOps::Mul,
+    *ScalarOps::Div,
+);
 
 event *eServiceRequest   => ( *ScalarOps, [ *Int, *Int ], *Promise ); # action : Str, args : [Int, Int], promise
 event *eServiceResponse  => ( *Num );                                 # Int

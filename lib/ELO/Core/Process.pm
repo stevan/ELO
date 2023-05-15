@@ -41,8 +41,9 @@ sub BUILD ($self, $params) {
     }
 }
 
-
 # ...
+
+sub behavior ($self) { $self->{behavior} }
 
 sub apply ($self, $event) {
     $self->{behavior}->apply( $self, $event );

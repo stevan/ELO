@@ -4,7 +4,10 @@ use experimental 'try';
 
 use Sub::Util 'set_subname';
 
-use ELO::Types qw[ :events ];
+use ELO::Types qw[
+    lookup_type
+    resolve_event_types
+];
 
 use ELO::Core::Behavior::Receive;
 use ELO::Core::Behavior::Setup;
@@ -68,23 +71,30 @@ sub receive (@args) {
     );
 }
 
-sub match ($msg, $table) {
-    my ($event, @args) = @$msg;
+# This shoud be moved to ELO::Types
+sub match ($target, $table) {
+    my ($type, @args) = @$target;
 
-    my $cb = $table->{ $event };
+    my $match;
+    if ( my $type_checker = lookup_type( $type ) ) {
+        warn "Checking $type against $type_checker" if DEBUG;
 
-    die "No match for $event" unless $cb;
-
-    if ( my $event_type = lookup_event_type( $event ) ) {
-        warn "Checking $event against $event_type" if DEBUG;
-        $event_type->check( @args )
-            or die "Event($event) failed to type check (".(join ', ' => @args).")";
+        if ( $type_checker isa ELO::Core::Type::Event ) {
+            $type_checker->check( \@args )
+                or die "Event($type) failed to type check (".(join ', ' => @args).")";
+            $match = $table->{ $type }
+                or die "Unable to find match for Event($type)";
+        }
+        else {
+            die "matching on T($type_checker) is not (yet) supported";
+        }
     }
+    # check other types as well ...
 
     try {
-        $cb->(@args);
+        $match->(@args);
     } catch ($e) {
-        die $e;
+        die "Match failed because: $e";
     }
 }
 
