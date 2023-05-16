@@ -11,7 +11,7 @@ use Data::Dumper;
 
 use ok 'ELO::Loop';
 use ok 'ELO::Types',    qw[ :core :types :events ];
-use ok 'ELO::Actors',   qw[ receive ];
+use ok 'ELO::Actors',   qw[ match receive ];
 use ok 'ELO::Promises', qw[ promise collect ];
 
 my $log = Test::ELO->create_logger;
@@ -45,11 +45,12 @@ sub Service () {
                 no warnings 'once';
                 $promise->resolve([
                     *eServiceResponse => (
-                        ($action eq *ScalarOps::Add) ? ($x + $y) :
-                        ($action eq *ScalarOps::Sub) ? ($x - $y) :
-                        ($action eq *ScalarOps::Mul) ? ($x * $y) :
-                        ($action eq *ScalarOps::Div) ? ($x / $y) :
-                        die "Invalid Action: $action"
+                        match [ *ScalarOps, $action ] => {
+                            *ScalarOps::Add => sub () { $x + $y },
+                            *ScalarOps::Sub => sub () { $x - $y },
+                            *ScalarOps::Mul => sub () { $x * $y },
+                            *ScalarOps::Div => sub () { $x / $y },
+                        }
                     )
                 ]);
             } catch ($e) {

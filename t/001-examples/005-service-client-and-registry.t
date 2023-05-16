@@ -11,7 +11,7 @@ use Data::Dumper;
 
 use ok 'ELO::Loop';
 use ok 'ELO::Types',  qw[ :core :types :events ];
-use ok 'ELO::Actors', qw[ receive setup ];
+use ok 'ELO::Actors', qw[ match receive setup ];
 
 my $log = Test::ELO->create_logger;
 
@@ -50,11 +50,12 @@ sub Service ($service_name) {
                 $this->send( $caller, [
                     *eServiceResponse => (
                         $sid,
-                        ($action eq *Ops::Add) ? ($x + $y) :
-                        ($action eq *Ops::Sub) ? ($x - $y) :
-                        ($action eq *Ops::Mul) ? ($x * $y) :
-                        ($action eq *Ops::Div) ? ($x / $y) :
-                        die "Invalid Action: $action"
+                        match [ *Ops, $action ] => {
+                            *Ops::Add => sub () { $x + $y },
+                            *Ops::Sub => sub () { $x - $y },
+                            *Ops::Mul => sub () { $x * $y },
+                            *Ops::Div => sub () { $x / $y },
+                        }
                     )
                 ]);
             } catch ($e) {
@@ -86,7 +87,7 @@ sub ServiceRegistry () {
                     $this->send( $caller, [ *eServiceRegistryUpdateResponse => $sid, $name, $service ] );
                 } catch ($e) {
                     $this->send( $caller, [ *eServiceRegistryUpdateError => $sid, $e ] );
-                };
+                }
             },
 
             *eServiceRegistryLookupRequest => sub ($this, $sid, $name, $caller) {
