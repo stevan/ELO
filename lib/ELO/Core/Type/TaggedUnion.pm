@@ -6,7 +6,7 @@ use slots (
     cases => sub {},
 );
 
-sub cases ($self) { $self->{cases}->@* }
+sub cases ($self) { $self->{cases} }
 
 1;
 

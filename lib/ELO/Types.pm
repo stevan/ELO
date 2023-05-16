@@ -170,8 +170,9 @@ sub datatype ($symbol, $cases) {
             };
 
         $cases{$constructor_tag} = ELO::Core::Type::TaggedUnion::Constructor->new(
+            symbol      => $constructor,
             constructor => \&{"${caller}::${constructor}"},
-            definition  => $definition
+            definition  => $definition,
         );
     };
 

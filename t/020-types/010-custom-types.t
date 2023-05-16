@@ -6,7 +6,8 @@ no warnings 'once';
 use Test::More;
 use Test::Differences;
 
-use ok 'ELO::Types', qw[ :core :types :events ];
+use ok 'ELO::Actors', qw[ match ];
+use ok 'ELO::Types',  qw[ :core :types :events ];
 
 # ... Custom Types
 
@@ -42,6 +43,20 @@ subtest '... checking *Ops' => sub {
     ok( !lookup_type(*Ops)->check( 0.01 ),  '... this failed the type check for Ops with an Float' );
     ok( !lookup_type(*Ops)->check( [] ),    '... this failed the type check for Ops with an ArrayRef' );
     ok( !lookup_type(*Ops)->check( {} ),    '... this failed the type check for Ops with an HashRef' );
+};
+
+subtest '... check enum with match' => sub {
+
+    my ($op, $l, $r) = (*Ops::Add, 2, 2);
+
+    my $result = match [ *Ops, $op ] => {
+        *Ops::Add => sub () { $l + $r },
+        *Ops::Sub => sub () { $l - $r },
+        *Ops::Mul => sub () { $l * $r },
+        *Ops::Div => sub () { $l / $r },
+    };
+
+    is_deeply( $result, 4, '... enum match succeeded' );
 };
 
 # ... Type Aliases

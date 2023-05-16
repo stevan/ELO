@@ -28,8 +28,17 @@ protocol *Pong => sub {
 
 subtest '... check the protocol instance' => sub {
 
+    # would mostly be used in this way ...
 
     receive[*Ping] => {
+        *eStartPing => sub ($p) {},
+        *ePong      => sub ($p) {},
+    };
+
+    # in theory this should work too
+    # assuming we tell match how to do it
+
+    match [ *Ping, $msg ] => {
         *eStartPing => sub ($p) {},
         *ePong      => sub ($p) {},
     };
