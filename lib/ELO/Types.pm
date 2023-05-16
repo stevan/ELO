@@ -8,6 +8,7 @@ use Scalar::Util qw[ looks_like_number ];
 use ELO::Core::Type;
 use ELO::Core::Type::Alias;
 use ELO::Core::Type::Event;
+use ELO::Core::Type::Event::Protocol;
 use ELO::Core::Type::Enum;
 use ELO::Core::Type::TaggedUnion;
 use ELO::Core::Type::TaggedUnion::Constructor;
@@ -73,7 +74,7 @@ our @EXPORT_OK = (qw[
     datatype case
 
     type
-    event
+    event protocol
 
     lookup_event_type
     lookup_type
@@ -89,7 +90,7 @@ our %EXPORT_TAGS = (
     core    => [ @ALL_TYPE_GLOBS ],
     signals => [ @ALL_SIGNAL_GLOBS ],
     types   => [qw[ enum type datatype case lookup_type resolve_types ]],
-    events  => [qw[ event lookup_event_type resolve_event_types ]],
+    events  => [qw[ event lookup_event_type resolve_event_types protocol ]],
 );
 
 # -----------------------------------------------------------------------------
@@ -193,6 +194,52 @@ sub datatype ($symbol, $cases) {
     # to allow for recurisve types :)
 }
 
+sub protocol ($symbol, $events) {
+    my $caller = caller;
+
+    no strict 'refs';
+
+    my $orig = \&{"${caller}::event"};
+
+    my %events;
+    local *{"${caller}::event"} = sub ($type, @definition) {
+        $events{$type} = $orig->($type, @definition);
+    };
+
+    $events->();
+
+    #use Data::Dumper;
+    #warn Dumper \%events;
+
+    $TYPE_REGISTRY{ $symbol } = ELO::Core::Type::Event::Protocol->new(
+        symbol => $symbol,
+        events => \%events,
+        checker => sub ( $msg ) {
+            #warn 1;
+            return unless ref $msg eq 'ARRAY';
+            #warn 2;
+            my ($event_type, @args) = @$msg;
+            return unless defined $event_type;
+            #warn 3, $event_type;
+            return unless exists $events{ $event_type };
+            #warn 4;
+            return $events{ $event_type }->check( \@args );
+        }
+    );
+}
+
+sub event ($type, @definition) {
+    warn "Creating event $type" if DEBUG;
+    my $definition = resolve_types( \@definition );
+    $TYPE_REGISTRY{ $type } = ELO::Core::Type::Event->new(
+        symbol     => $type,
+        definition => $definition,
+        checker    => sub ($values) {
+            check_types( $definition, $values );
+        }
+    );
+}
+
 sub enum ($enum, @values) {
     warn "Creating enum $enum" if DEBUG;
     my $i = 0;
@@ -217,18 +264,6 @@ sub enum ($enum, @values) {
             return defined($enum_value)
                 && exists $enum_map{ $enum_value }
         },
-    );
-}
-
-sub event ($type, @definition) {
-    warn "Creating event $type" if DEBUG;
-    my $definition = resolve_types( \@definition );
-    $TYPE_REGISTRY{ $type } = ELO::Core::Type::Event->new(
-        symbol     => $type,
-        definition => $definition,
-        checker    => sub ($values) {
-            check_types( $definition, $values );
-        }
     );
 }
 

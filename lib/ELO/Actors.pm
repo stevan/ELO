@@ -96,6 +96,19 @@ sub match ($target, $table) {
             $match = $table->{ $type }
                 or die "Unable to find match for Event($type)";
         }
+        elsif ( $type_checker isa ELO::Core::Type::Event::Protocol ) {
+
+            my ($msg) = @args;
+            $type_checker->check( $msg )
+                or die "Event::Protocol($type) failed to type check msg(".(join ', ' => @$msg).")";
+
+            my ($event, @_args) = @$msg;
+            $match = $table->{ $event }
+                or die "Unable to find match for Event::Protocol($type) with event($event)";
+            # fixup the args ...
+            @args = @_args;
+
+        }
         elsif ( $type_checker isa ELO::Core::Type::TaggedUnion ) {
             my ($arg) = @args;
             $type_checker->check( $arg )

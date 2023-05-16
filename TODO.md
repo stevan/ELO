@@ -48,19 +48,10 @@
 
     - should we add some kind of generics?
 
-    - add tagged unions (ADTs)
-        - https://en.wikipedia.org/wiki/Tagged_union
-
 - See `PROMISES.md`
 
 - add Akka style `become` to allow for state machines
     - see `200-actors/002-fp-examples/003-producer.t`
-
-- now that we have `receive`, we can make `match` more
-  general purpose and usable in other situations as well
-    - would be good if we want to and support for:
-        - `Option` type (ex. `Some(T)` & `None()`)
-        - `Result` type (ex. `Ok(T)` & `Error()`)
 
 - Is it possible to change the Perl runloop to become
   the ELO runloop? What would move to C, etc.
