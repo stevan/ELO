@@ -81,6 +81,15 @@ sub match ($target, $table) {
         warn "Checking $type against $type_checker" if DEBUG;
 
         # TODO - turn conditionals into polymorphic method calls
+        #
+        # NOTE:
+        # they can be just deconstructable, like event
+        # or deconstructable and bounds checkable, like tagged unions
+        # or just bounds checkable, like enums
+        #
+        # bounds checks should be memoized, so we dont
+        # have to do them every time match is called
+
         if ( $type_checker isa ELO::Core::Type::Event ) {
             $type_checker->check( \@args )
                 or die "Event($type) failed to type check (".(join ', ' => @args).")";
