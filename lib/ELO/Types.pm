@@ -1,10 +1,16 @@
 package ELO::Types;
 use v5.36;
+use experimental 'builtin';
+
+use builtin      qw[ blessed ];
+use Scalar::Util qw[ looks_like_number ];
 
 use ELO::Core::Type;
 use ELO::Core::Type::Alias;
 use ELO::Core::Type::Event;
 use ELO::Core::Type::Enum;
+use ELO::Core::Type::TaggedUnion;
+use ELO::Core::Type::TaggedUnion::Constructor;
 
 use constant DEBUG => $ENV{TYPES_DEBUG} || 0;
 
@@ -64,6 +70,7 @@ use Exporter 'import';
 
 our @EXPORT_OK = (qw[
     enum
+    datatype case
 
     type
     event
@@ -81,8 +88,8 @@ our @EXPORT_OK = (qw[
 our %EXPORT_TAGS = (
     core    => [ @ALL_TYPE_GLOBS ],
     signals => [ @ALL_SIGNAL_GLOBS ],
-    types   => [qw[ enum type lookup_type       resolve_types       ]],
-    events  => [qw[ event     lookup_event_type resolve_event_types ]],
+    types   => [qw[ enum type datatype case lookup_type resolve_types ]],
+    events  => [qw[ event lookup_event_type resolve_event_types ]],
 );
 
 # -----------------------------------------------------------------------------
@@ -129,6 +136,61 @@ my sub check_types ($types, $values) {
 # -----------------------------------------------------------------------------
 
 my %TYPE_REGISTRY;
+
+sub case ($, @) { die 'You cannot call `case` outside of `datatype`' }
+
+sub datatype ($symbol, $cases) {
+    my $caller = caller;
+    warn "Calling datatype ($symbol) from $caller" if DEBUG;
+
+    # FIXME - use the MOP here
+
+    no strict 'refs';
+
+    my %cases;
+    local *{"${caller}::case"} = sub ($constructor, @definition) {
+
+        my $definition = resolve_types( \@definition );
+
+        my $constructor_tag = "${symbol}::${constructor}";
+           $constructor_tag =~ s/main//;
+
+        # TODO:
+        # this could be done much nicer, and we can
+        # do better in the classes as well. The empty
+        # constructor can use a bless scalar (perhaps the constructor name)
+        # and we could make them proper classes that use
+        # U::O::Imuttable as a base class.
+        *{"${caller}::${constructor}"} = scalar @definition == 0
+            ? sub ()      { bless [] => $constructor_tag }
+            : sub (@args) {
+                check_types( $definition, \@args )
+                    || die "Typecheck failed for $constructor_tag with (".(join ', ' => @args).')';
+                bless [ @args ] => $constructor_tag;
+            };
+
+        $cases{$constructor_tag} = ELO::Core::Type::TaggedUnion::Constructor->new(
+            constructor => \&{"${caller}::${constructor}"},
+            definition  => $definition
+        );
+    };
+
+    # first register the type ...
+    $TYPE_REGISTRY{ $symbol } = ELO::Core::Type::TaggedUnion->new(
+        symbol => $symbol,
+        cases  => \%cases,
+        checker => sub ( $instance ) {
+            my $type = blessed($instance);
+            return unless $type;
+            return exists $cases{ $type };
+        }
+    );
+
+    # now create the cases ...
+    $cases->();
+
+    # to allow for recurisve types :)
+}
 
 sub enum ($enum, @values) {
     warn "Creating enum $enum" if DEBUG;
@@ -236,9 +298,9 @@ sub resolve_event_types ( $events ) {
     return \@resolved;
 }
 
-# ...
-
-use Scalar::Util qw[ looks_like_number ];
+# -----------------------------------------------------------------------------
+# Define Core Types
+# -----------------------------------------------------------------------------
 
 # XXX - consider using the builtin functions here:
 # - true, false, is_bool
@@ -286,6 +348,10 @@ type *HashRef, sub ($hash_ref) {
         && ref($hash_ref) eq 'HASH' # and it is a HASH reference
 };
 
+# -----------------------------------------------------------------------------
+# ELO Core Types
+# -----------------------------------------------------------------------------
+
 # FIXME:
 # these type definitions require too much
 # knowledge of things, and so therefore
@@ -319,6 +385,8 @@ type *TimerId, sub ($timer_id) {
 # Signals as Events
 
 event *SIGEXIT => (*Process);
+
+# -----------------------------------------------------------------------------
 
 1;
 
