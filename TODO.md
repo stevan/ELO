@@ -29,10 +29,6 @@
 
 - implement Conways Game of Life for a good example
 
-- `protocol` needs to be implemented
-    - see sketch in 002-data-feed-problem.t
-    - write up `PROTOCOLS.md`
-
 - See `EVENTS.md`
     - consider supporting (but ignoring) fieldnames in
       the events
@@ -55,6 +51,7 @@
 
 - Is it possible to change the Perl runloop to become
   the ELO runloop? What would move to C, etc.
+  - or to somehow take advantage of interpreter threads?
 
 <!-------------------------------------------------------->
 ## Loop
