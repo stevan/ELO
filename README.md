@@ -31,15 +31,21 @@ use ELO::Loop;
 use ELO::Types  qw[ :core :events ];
 use ELO::Actors qw[ receive ];
 
-event *eStartPing => ( *Process );
-event *ePing      => ( *Process );
-event *ePong      => ( *Process );
+protocol *Ping => sub {
+    event *eStartPing => ( *Process );
+    event *ePong      => ( *Process );
+};
+
+protocol *Pong => sub {
+    event *eStopPong  => ();
+    event *ePing      => ( *Process );
+};
 
 sub Ping () {
 
     my $count;
 
-    receive {
+    receive[*Ping], +{
         *eStartPing => sub ( $this, $pong ) {
             $count++;
             say $this->pid." Starting with (".$count.")";
@@ -61,7 +67,7 @@ sub Ping () {
 
 sub Pong () {
 
-    receive {
+    receive[*Pong], +{
         *ePing => sub ( $this, $ping ) {
             say "... Ping";
             $this->send( $ping, [ *ePong => $this ]);
@@ -92,13 +98,15 @@ use ELO::Types    qw[ :core :events ];
 use ELO::Actors   qw[ receive ];
 use ELO::Promises qw[ promise ];
 
-event *eServiceRequest   => ( *Str, *ArrayRef, *Promise );
-event *eServiceResponse  => ( *Int );
-event *eServiceError     => ( *Str );
+protocol *ServiceProtocol => sub {
+    event *eServiceRequest   => ( *Str, *ArrayRef, *Promise );
+    event *eServiceResponse  => ( *Int );
+    event *eServiceError     => ( *Str );
+};
 
 sub Service () {
 
-    receive {
+    receive[*ServiceProtocol], +{
         *eServiceRequest => sub ($this, $action, $args, $promise) {
             try {
                 my ($x, $y) = @$args;
