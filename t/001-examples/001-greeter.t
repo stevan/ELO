@@ -17,13 +17,15 @@ use ok 'ELO::Actors', qw[ receive ];
 
 my $log = Test::ELO->create_logger;
 
-event *eHello => ( *Str );
+protocol *Greeter => sub {
+    event *eHello => ( *Str );
+};
 
 sub Greeter ($greeting='Hello') {
 
     my $counter = 0;
 
-    receive {
+    receive[*Greeter] => +{
         *eHello => sub ( $this, $name ) {
             $counter++;
             $log->info( $this, "$greeting $name ($counter)" );

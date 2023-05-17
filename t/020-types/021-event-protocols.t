@@ -8,7 +8,7 @@ use Data::Dumper;
 use Test::More;
 use Test::Differences;
 
-use ok 'ELO::Actors', qw[ match ];
+use ok 'ELO::Actors', qw[ match receive ];
 use ok 'ELO::Types',  qw[
     :core
     :events
@@ -39,20 +39,25 @@ subtest '... checking *Ping' => sub {
     ok( !lookup_type(*Ping)->check( {} ),    '... this failed the type check for Ping with an HashRef' );
 };
 
-# subtest '... check the protocol instance with receive' => sub {
-#
-#     my $this = bless {} => 'ELO::Core::Process';
-#     my $msg  = [ *StartPing, $this ];
-#
-#     # would mostly be used in this way ...
-#
-#     my $behavior = receive[ *Ping ] => {
-#         *eStartPing => sub ($this, $p) { 'Started Ping' },
-#         *ePong      => sub ($this, $p) { 'Pong'},
-#     };
-#
-#     my $result = $behavior->apply( $this, $msg );
-# };
+subtest '... check the protocol instance with receive' => sub {
+
+    my $this = bless {} => 'ELO::Core::Process';
+    my @msgs = ([ *eStartPing, $this ], [ *ePong, $this ]);
+    my @exp  = ('Started Ping', 'Pong');
+
+    # would mostly be used in this way ...
+
+    my $behavior = receive[ *Ping ] => {
+        *eStartPing => sub ($this, $p) { 'Started Ping' },
+        *ePong      => sub ($this, $p) { 'Pong'},
+    };
+
+    foreach my $msg ( @msgs ) {
+        my $result = $behavior->apply( $this, $msg );
+        is($result, shift(@exp), '... got the expected result');
+    }
+
+};
 
 subtest '... check the protocol instance with match' => sub {
 

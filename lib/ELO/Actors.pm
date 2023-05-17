@@ -54,24 +54,50 @@ sub setup (@args) {
 }
 
 sub receive (@args) {
-    my ($name, $receivers);
+    my ($name, $receivers, $protocol);
 
     if ( scalar @args == 1 ) {
+        ref $args[0] eq 'HASH'
+            || die 'If you only pass one arg to receive then it must be a HASH ref';
         $name = (caller(1))[3];
         $name =~ s/^main\:\://; # strip off main::
         $receivers = $args[0];
     }
     else {
-        ($name, $receivers) = @args;
+        ref $args[0] eq 'ARRAY' && ref $args[1] eq 'HASH'
+            || die 'If you pass two args to receive then it must be an ARRAY ref and a HASH ref';
+        $receivers = $args[1];
+        if ( scalar $args[0]->@* == 2 ) {
+            ($name, $protocol) = $args[0]->@*;
+            $protocol = lookup_type( $protocol )
+                or die 'Could not find protocol('.$protocol.')';
+
+        }
+        elsif ( scalar $args[0]->@* == 1 ) {
+            if ( ref \($args[0]->[0]) eq 'GLOB' ) {
+                $protocol = lookup_type( $args[0]->[0] )
+                    or die 'Could not find protocol('.$protocol.')';
+                $name = (caller(1))[3];
+                $name =~ s/^main\:\://; # strip off main::
+            }
+            else {
+                $name = $args[0]->[0];
+            }
+        }
+        else {
+            die 'Too many args to receive [@args] +{}, expected 2 @args, got '.scalar $args[0]->@*;
+        }
     }
 
-    # create a protocol if we need to
-    my @events = keys %$receivers;
-    my %events = mesh \@events, resolve_event_types( \@events );
+    unless ($protocol) {
+        # create a protocol if we need to
+        my @events = keys %$receivers;
+        my %events = mesh \@events, resolve_event_types( \@events );
 
-    my $protocol = ELO::Core::Type::Event::Protocol->new(
-        events => \%events
-    );
+        $protocol = ELO::Core::Type::Event::Protocol->new(
+            events => \%events
+        );
+    }
 
     ELO::Core::Behavior::Receive->new(
         name      => $name,

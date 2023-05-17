@@ -22,7 +22,7 @@ event *eStartWork    => ( *Int );      # timeout
 
 sub Worker ($name) {
 
-    receive $name, +{
+    receive [$name], +{
         *eStartWork => sub ($this, $timeout) {
             $log->info( $this, "... started work ($timeout)" );
 

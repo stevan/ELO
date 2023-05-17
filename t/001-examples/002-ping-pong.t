@@ -14,17 +14,22 @@ use ok 'ELO::Actors', qw[ receive match setup ];
 
 my $log = Test::ELO->create_logger;
 
-event *eStartPing => ( *Process );
-event *eStopPong  => ();
-event *ePong      => ( *Process );
-event *ePing      => ( *Process );
+protocol *Ping => sub {
+    event *eStartPing => ( *Process );
+    event *ePong      => ( *Process );
+};
+
+protocol *Pong => sub {
+    event *eStopPong  => ();
+    event *ePing      => ( *Process );
+};
 
 sub Ping (%args) {
 
     my $max_pings = $args{max_pings} // 5;
     my $count     = 0;
 
-    receive {
+    receive[*Ping] => +{
         *eStartPing => sub ( $this, $pong ) {
             isa_ok($pong, 'ELO::Core::Process');
 
@@ -56,7 +61,7 @@ sub Ping (%args) {
 
 sub Pong () {
 
-    receive {
+    receive[*Pong] => +{
         *ePing => sub ( $this, $ping ) {
             isa_ok($ping, 'ELO::Core::Process');
 

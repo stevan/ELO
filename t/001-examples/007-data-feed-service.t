@@ -55,17 +55,10 @@ my $log = Test::ELO->create_logger;
 type *TimeStamp => *Float;
 type *DataSet   => *ArrayRef;
 
-event *eGetLatestDataFeed => (*Process);
-event *eDataFeedResponse  => (*TimeStamp, *DataSet);
-
-#event *eDataFeedError => (*Reason);
-
-# protocol *DATA_FEED => [
-#    pair   *eGetLatestDataFeed => *eDataFeedResponse,
-#    raises *eDataFeedError,
-# ];
-#
-# receive [ *DATA_FEED ] => { ... }
+protocol *DataFeed => sub {
+    event *eGetLatestDataFeed => (*Process);
+    event *eDataFeedResponse  => (*TimeStamp, *DataSet);
+};
 
 sub DataFeed ($baud=10) {
 
@@ -74,7 +67,7 @@ sub DataFeed ($baud=10) {
 
     my sub format_packet ($packet) { sprintf '0123-4567-8910-%04d' => $packet }
 
-    receive {
+    receive[*DataFeed], +{
         *eGetLatestDataFeed => sub ($this, $caller) {
 
             my $now        = $this->loop->now;
@@ -103,23 +96,17 @@ sub DataFeed ($baud=10) {
 
 # ...
 
-event *eInsertData     => (*TimeStamp, *DataSet);
-
-event *eQueryDataSince => (*TimeStamp, *Process);
-event *eResultSet      => (*DataSet);
-
-#event *eDataExists => (*Str, *Process);
-
-# protocol *DATABASE => [
-#     accepts *eInsertData,
-#     pair    *eQueryDataSince => *eResultSet,
-# ];
+protocol *FeedDatabase => sub {
+    event *eInsertData     => (*TimeStamp, *DataSet);
+    event *eQueryDataSince => (*TimeStamp, *Process);
+    event *eResultSet      => (*DataSet);
+};
 
 sub FeedDatabase ($window_size=100) {
 
     my @data;  # [ [ $number, $timestamp ], ... ]
 
-    receive {
+    receive[*FeedDatabase], +{
         *eInsertData => sub ($this, $timestamp, $data_set) {
             $log->debug( $this, [ "INSERT", (scalar @$data_set), $data_set ] );
             push @data => map [ $_, $timestamp ], @$data_set;
@@ -138,22 +125,20 @@ sub FeedDatabase ($window_size=100) {
 
 # ...
 
-event *eStartConsumer => (*Float);
-event *eStopConsumer;
+protocol *PeriodicConsumer => sub {
+    event *eStartConsumer => (*Float);
+    event *eStopConsumer;
 
-# protocol *PeriodicConsumer => [
-#     accepts   *eStartConsumer,
-#     accepts   *eStopConsumer,
-#     # ...
-#     receives  *eDataFeedResponse,
-# ];
+    # FIXME: this should not be duplicated
+    event *eDataFeedResponse  => (*TimeStamp, *DataSet);
+};
 
 sub PeriodicConsumer ($feed, $fdb) {
 
     my $interval_timer;
     my $awaiting_responses;
 
-    receive {
+    receive[*PeriodicConsumer], +{
         *eStartConsumer => sub ($this, $interval) {
             $log->info( $this, "Starting PeriodicConsumer with interval of $interval" );
             $interval_timer = interval(

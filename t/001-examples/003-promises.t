@@ -24,15 +24,19 @@ enum *ScalarOps => (
     *ScalarOps::Div,
 );
 
-event *eServiceRequest   => ( *ScalarOps, [ *Int, *Int ], *Promise ); # action : Str, args : [Int, Int], promise
-event *eServiceResponse  => ( *Num );                                 # Int
-event *eServiceError     => ( *Str );                                 # error : Str
+protocol *ServiceProtocol => sub {
+    event *eServiceRequest   => ( *ScalarOps, [ *Int, *Int ], *Promise ); # action : Str, args : [Int, Int], promise
+    event *eServiceResponse  => ( *Num );                                 # Int
+    event *eServiceError     => ( *Str );                                 # error : Str
+};
 
-event *eServiceClientRequest => ( *Process, *ListOps, *ArrayRef ); # service, action, args
+protocol *ServiceClientProtocol => sub {
+    event *eServiceClientRequest => ( *Process, *ListOps, *ArrayRef ); # service, action, args
+};
 
 sub Service () {
 
-    receive +{
+    receive[*ServiceProtocol], +{
         *eServiceRequest => sub ($this, $action, $args, $promise) {
             $log->debug( $this, "HELLO FROM Service :: eServiceRequest" );
             $log->debug( $this, +{ action => $action, args => $args, promise => $promise });
@@ -66,7 +70,7 @@ sub ServiceClient () {
 
     state $expected = [ 28, 108 ];
 
-    receive +{
+    receive[*ServiceClientProtocol], +{
 
         # Requests ...
         *eServiceClientRequest => sub ($this, $service, $action, $args) {

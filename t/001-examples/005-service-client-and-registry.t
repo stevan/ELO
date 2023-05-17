@@ -24,25 +24,37 @@ enum *Ops => (
     *Ops::Div,
 );
 
-event *eServiceRequest  => ( *SID, *Ops, [ *Int, *Int ], *Process ); # sid : SID, action : Str, args : <Any>, caller : PID
-event *eServiceResponse => ( *SID, *Num );                           # sid : SID, return : <Any>
-event *eServiceError    => ( *SID, *Str );                           # sid : SID, error : Str
+protocol *ServiceProtocol => sub {
+    event *eServiceRequest  => ( *SID, *Ops, [ *Int, *Int ], *Process ); # sid : SID, action : Str, args : <Any>, caller : PID
+    event *eServiceResponse => ( *SID, *Num );                           # sid : SID, return : <Any>
+    event *eServiceError    => ( *SID, *Str );                           # sid : SID, error : Str
+};
 
-event *eServiceRegistryUpdateRequest  => ( *SID, *Str, *Process, *Process ); # sid : SID, name : Str, service : Process, caller : PID
-event *eServiceRegistryUpdateResponse => ( *SID, *Str, *Str );              # sid : SID, name : Str, service : Str
-event *eServiceRegistryUpdateError    => ( *SID, *Str );                    # sid : SID, error : Str
+protocol *ServiceRegistryProtocol => sub {
+    event *eServiceRegistryUpdateRequest  => ( *SID, *Str, *Process, *Process ); # sid : SID, name : Str, service : Process, caller : PID
+    event *eServiceRegistryUpdateResponse => ( *SID, *Str, *Str );              # sid : SID, name : Str, service : Str
+    event *eServiceRegistryUpdateError    => ( *SID, *Str );                    # sid : SID, error : Str
 
-event *eServiceRegistryLookupRequest  => ( *SID, *Str, *Process ); # sid : SID, name : Str, caller : PID
-event *eServiceRegistryLookupResponse => ( *SID, *Process );       # sid : SID, service : PID
-event *eServiceRegistryLookupError    => ( *SID, *Str );           # sid : SID, error   : Str
+    event *eServiceRegistryLookupRequest  => ( *SID, *Str, *Process ); # sid : SID, name : Str, caller : PID
+    event *eServiceRegistryLookupResponse => ( *SID, *Process );       # sid : SID, service : PID
+    event *eServiceRegistryLookupError    => ( *SID, *Str );           # sid : SID, error   : Str
+};
 
+# NOTE:
+# the service client needs to
+# accept many different responses
+# from above, so we just dont bother
+# to put this in a protcol right now
+#
+# a possible soltuion is to use the Akka
+# technique of wrapping the event in
+# another event, which can then be easily
+# handled by the protocol
 event *eServiceClientRequest  => ( *Str, *Ops, [ *Int, *Int ] ); #  url : Str, action : Str, args : <Any>
-event *eServiceClientResponse => ( *Num );                       #  <Any>
-event *eServiceClientError    => ( *Str );                       #  error : Str
 
 sub Service ($service_name) {
 
-    receive $service_name, +{
+    receive [$service_name => *ServiceProtocol], +{
         *eServiceRequest => sub ($this, $sid, $action, $args, $caller) {
             my ($x, $y) = @$args;
 
@@ -80,7 +92,7 @@ sub ServiceRegistry () {
         my sub lookup ($name)           { $services->{ $name } }
         my sub update ($name, $service) { $services->{ $name } = $service }
 
-        receive {
+        receive[*ServiceRegistryProtocol], +{
             *eServiceRegistryUpdateRequest => sub ($this, $sid, $name, $service, $caller) {
                 try {
                     update( $name, $service );
@@ -125,7 +137,7 @@ sub ServiceClient () {
             $next_sid;
         }
 
-        receive {
+        receive +{
             # Requests ...
 
             *eServiceClientRequest => sub ($this, $url, $action, $args) {
@@ -175,8 +187,6 @@ sub ServiceClient () {
             *eServiceResponse => sub ($this, $sid, $return) {
                 my $request = session_get( $sid );
 
-                $log->info( $this, +{ *eServiceClientResponse => $return, sid => $sid } );
-
                 my %expected = (
                     1 => 4,
                     2 => 20,
@@ -193,16 +203,12 @@ sub ServiceClient () {
             *eServiceError => sub ($this, $sid, $error) {
                 my $request = session_get( $sid );
 
-                $log->error( $this, +{ *eServiceClientError => $error, sid => $sid } );
-
                 like($error, qr/^Invalid Action\: multiply/, '... got the expected service error');
                 is($sid, 4, '... got the expected session id for service error');
             },
 
             *eServiceRegistryLookupError => sub ($this, $sid, $error) {
                 my $request = session_get( $sid );
-
-                $log->error( $this, +{ *eServiceRegistryLookupError => $error, sid => $sid } );
 
                 is($error, 'Could not find service(baz.example.com)', '... got the expected lookup error');
                 is($sid, 3, '... got the expected session id for lookup error');
