@@ -2,7 +2,7 @@
 
 ### Event Loop Orchestra
 
-This is an experiment in adding simple co-operative message passing style concurrency for Perl. 
+Simple co-operative message passing style concurrency for Perl.
 
 ```perl
 use ELO::Loop;
@@ -37,8 +37,8 @@ protocol *Ping => sub {
 };
 
 protocol *Pong => sub {
-    event *eStopPong  => ();
-    event *ePing      => ( *Process );
+    event *eStopPong => ();
+    event *ePing     => ( *Process );
 };
 
 sub Ping () {
@@ -95,13 +95,20 @@ use experimental 'try';
 
 use ELO::Loop;
 use ELO::Types    qw[ :core :events ];
-use ELO::Actors   qw[ receive ];
+use ELO::Actors   qw[ receive match ];
 use ELO::Promises qw[ promise ];
 
+enum *MathOps => (
+    *MathOps::Add,
+    *MathOps::Sub,
+    *MathOps::Mul,
+    *MathOps::Div,
+);
+
 protocol *ServiceProtocol => sub {
-    event *eServiceRequest   => ( *Str, *ArrayRef, *Promise );
-    event *eServiceResponse  => ( *Int );
-    event *eServiceError     => ( *Str );
+    event *eServiceRequest  => ( *MathOps, [ *Int, *Int ], *Promise );
+    event *eServiceResponse => ( *Int );
+    event *eServiceError    => ( *Str );
 };
 
 sub Service () {
@@ -113,11 +120,12 @@ sub Service () {
 
                 $promise->resolve([
                     *eServiceResponse => (
-                        ($action eq 'add') ? ($x + $y) :
-                        ($action eq 'sub') ? ($x - $y) :
-                        ($action eq 'mul') ? ($x * $y) :
-                        ($action eq 'div') ? ($x / $y) :
-                        die "Invalid Action: $action"
+                        match [ *MathOps, $action ] => {
+                            *MathOps::Add => sub () { $x + $y },
+                            *MathOps::Sub => sub () { $x - $y },
+                            *MathOps::Mul => sub () { $x * $y },
+                            *MathOps::Div => sub () { $x / $y },
+                        }
                     )
                 ]);
             } catch ($e) {
