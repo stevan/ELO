@@ -43,7 +43,7 @@ protocol *Pong => sub {
 
 sub Ping () {
 
-    my $count;
+    my $count = 0;
 
     receive[*Ping], +{
         *eStartPing => sub ( $this, $pong ) {
