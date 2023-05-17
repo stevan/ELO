@@ -13,17 +13,12 @@ sub name ($self) { $self->{name} }
 
 sub apply ($self, $this, $event) {
 
+    $self->{protocol}->check( $event )
+        or die "Event::Protocol(".($self->{protocol}->symbol//'__ANON__').") failed to type check event(".(join ', ' => @$event).")";;
+
     my ($type, @payload) = @$event;
-
-    if ( my $event_type = $self->{protocol}->{ $type } ) {
-        $event_type->check( \@payload )
-            or die "Event($type) failed to type check (".(join ', ' => @payload).")";
-    }
-    else {
-        die "Event($type) does not have a receiver in ".$self->name;
-    }
-
-    my $f = $self->{receivers}->{ $type };
+    my $f = $self->{receivers}->{ $type }
+        or die "Unable to find match for Event::Protocol(".($self->{protocol}->symbol//'__ANON__').")) with event($type)";
 
     $f->( $this, @payload );
 }

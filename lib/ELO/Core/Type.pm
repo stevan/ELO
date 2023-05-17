@@ -8,11 +8,12 @@ use slots (
     checker => sub {},
 );
 
-sub symbol ($self) { $self->{symbol} }
+sub symbol  ($self) { $self->{symbol}  }
+sub checker ($self) { $self->{checker} }
 
 sub check ($self, $value) {
     try {
-        $self->{checker}->( $value )
+        $self->checker->( $value )
     } catch ($e) {
         use Data::Dumper;
         die Dumper [ "TYPE CHECK FAILED!", $e, $self ];

@@ -213,20 +213,12 @@ sub protocol ($symbol, $events) {
 
     $TYPE_REGISTRY{ $symbol } = ELO::Core::Type::Event::Protocol->new(
         symbol => $symbol,
-        events => \%events,
-        checker => sub ( $msg ) {
-            #warn 1;
-            return unless ref $msg eq 'ARRAY';
-            #warn 2;
-            my ($event_type, @args) = @$msg;
-            return unless defined $event_type;
-            #warn 3, $event_type;
-            return unless exists $events{ $event_type };
-            #warn 4;
-            return $events{ $event_type }->check( \@args );
-        }
+        events => \%events
     );
 }
+
+# TODO:
+# move other checkers to the classes
 
 sub event ($type, @definition) {
     warn "Creating event $type" if DEBUG;

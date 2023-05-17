@@ -2,13 +2,16 @@ package ELO::Actors;
 use v5.36;
 use experimental 'try', 'builtin';
 
-use builtin   qw[ blessed ];
-use Sub::Util qw[ set_subname ];
+use builtin    qw[ blessed ];
+use Sub::Util  qw[ set_subname ];
+use List::Util qw[ mesh ];
 
 use ELO::Types qw[
     lookup_type
     resolve_event_types
 ];
+
+use ELO::Core::Type::Event::Protocol;
 
 use ELO::Core::Behavior::Receive;
 use ELO::Core::Behavior::Setup;
@@ -62,13 +65,18 @@ sub receive (@args) {
         ($name, $receivers) = @args;
     }
 
-    my $protocol = resolve_event_types( [ keys %$receivers ] );
-    my %protocol = map { $_->symbol => $_ } @$protocol;
+    # create a protocol if we need to
+    my @events = keys %$receivers;
+    my %events = mesh \@events, resolve_event_types( \@events );
+
+    my $protocol = ELO::Core::Type::Event::Protocol->new(
+        events => \%events
+    );
 
     ELO::Core::Behavior::Receive->new(
         name      => $name,
         receivers => $receivers,
-        protocol  => \%protocol,
+        protocol  => $protocol,
     );
 }
 
