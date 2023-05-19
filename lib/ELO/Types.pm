@@ -28,6 +28,12 @@ my @PERL_TYPES = (
 
     *ArrayRef, # an ARRAY reference
     *HashRef,  # a HASH reference
+
+    # TODO: we need an object type
+    # *Blessed is too simple, but might
+    # work for now, but then again it
+    # should be serializable, so maybe
+    # this is just a bad idea
 );
 
 # TODO: The Perl Virtual Types (see if we actually need them).
@@ -334,29 +340,35 @@ sub resolve_event_types ( $events ) {
 # - true, false, is_bool
 # - created_as_{string,number}
 
+type *Any, sub ($) { return 1 };                # anything ...
+
+type *Scalar, sub ($scalar) {
+    return defined($scalar);                    # it is defined ...
+};
+
 type *Bool, sub ($bool) {
-    return defined($bool)                      # it is defined ...
-        && not(ref $bool)                      # ... and it is not a reference
-        && ($bool =~ /^[01]$/ || $bool eq '')  # ... and is either 1,0 or an empty string
+    return defined($bool)                       # it is defined ...
+        && not(ref $bool)                       # ... and it is not a reference
+        && ($bool =~ /^[01]$/ || $bool eq '')   # ... and is either 1,0 or an empty string
 };
 
 type *Str, sub ($str) {
-    return defined($str)                      # it is defined ...
-        && not(ref $str)                      # ... and it is not a reference
-        && ref(\$str) eq 'SCALAR'             # ... and its just a scalar
+    return defined($str)                        # it is defined ...
+        && not(ref $str)                        # ... and it is not a reference
+        && ref(\$str) eq 'SCALAR'               # ... and its just a scalar
 };
 
 type *Num, sub ($num) {
-    return defined($num)                      # it is defined ...
-        && not(ref $num)                      # if it is not a reference
-        && looks_like_number($num)            # ... if it looks like a number
+    return defined($num)                        # it is defined ...
+        && not(ref $num)                        # if it is not a reference
+        && looks_like_number($num)              # ... if it looks like a number
 };
 
 type *Int, sub ($int) {
-    return defined($int)                      # it is defined ...
-        && not(ref $int)                      # if it is not a reference
-        && looks_like_number($int)            # ... if it looks like a number
-        && int($int) == $int                  # and is the same value when converted to int()
+    return defined($int)                        # it is defined ...
+        && not(ref $int)                        # if it is not a reference
+        && looks_like_number($int)              # ... if it looks like a number
+        && int($int) == $int                    # and is the same value when converted to int()
 };
 
 type *Float, sub ($float) {
@@ -367,13 +379,13 @@ type *Float, sub ($float) {
 };
 
 type *ArrayRef, sub ($array_ref) {
-    return defined($array_ref)        # it is defined ...
-        && ref($array_ref) eq 'ARRAY' # and it is an ARRAY reference
+    return defined($array_ref)                  # it is defined ...
+        && ref($array_ref) eq 'ARRAY'           # and it is an ARRAY reference
 };
 
 type *HashRef, sub ($hash_ref) {
-    return defined($hash_ref)       # it is defined ...
-        && ref($hash_ref) eq 'HASH' # and it is a HASH reference
+    return defined($hash_ref)                   # it is defined ...
+        && ref($hash_ref) eq 'HASH'             # and it is a HASH reference
 };
 
 # -----------------------------------------------------------------------------

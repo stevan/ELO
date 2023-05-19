@@ -15,7 +15,7 @@ on the subscriber to signal need.
 
 =cut
 
-use ELO::Streams;
+use ELO::Stream;
 
 # ...
 
@@ -25,7 +25,7 @@ package MySubscription {
     my $log = Test::ELO->create_logger;
 
     use parent 'UNIVERSAL::Object::Immutable';
-    use roles 'ELO::Streams::Subscription';
+    use roles 'ELO::Stream::Subscription';
     use slots (
         ctx        => sub {},
         publisher  => sub {},
@@ -33,15 +33,15 @@ package MySubscription {
     );
 
     sub BUILD ($self, $) {
-        $self->{publisher}->roles::DOES('ELO::Streams::Iterator')
-            || die 'The `publisher` must do the `ELO::Streams::Iterator` role ('.$self->{publisher}.')';
+        $self->{publisher}->roles::DOES('ELO::Stream::Iterator')
+            || die 'The `publisher` must do the `ELO::Stream::Iterator` role ('.$self->{publisher}.')';
 
-        $self->{subscriber}->roles::DOES('ELO::Streams::Refreshable')
-            || die 'The `subscriber` must do the `ELO::Streams::Refreshable` role ('.$self->{subscriber}.')';
+        $self->{subscriber}->roles::DOES('ELO::Stream::Refreshable')
+            || die 'The `subscriber` must do the `ELO::Stream::Refreshable` role ('.$self->{subscriber}.')';
     }
 
     sub request ($self, $num_elements) {
-        $self->{ctx}->loop->next_tick(sub {
+        #$self->{ctx}->loop->next_tick(sub {
             $log->info( $self->{ctx}, "MySubscription::request($num_elements) called" );
             for (1 .. $num_elements) {
                 if ( $self->{publisher}->has_next ) {
@@ -59,7 +59,7 @@ package MySubscription {
             if ( $self->{subscriber}->should_refresh ) {
                 $self->{subscriber}->refresh;
             }
-        });
+        #});
     }
 
     sub cancel ($self) {
@@ -74,8 +74,8 @@ package MySubscriber {
     my $log = Test::ELO->create_logger;
 
     use parent 'UNIVERSAL::Object';
-    use roles 'ELO::Streams::Subscriber',
-              'ELO::Streams::Refreshable';
+    use roles 'ELO::Stream::Subscriber',
+              'ELO::Stream::Refreshable';
 
     use slots (
         ctx          => sub {},
@@ -99,7 +99,9 @@ package MySubscriber {
         $log->info( $self->{ctx}, "${self}::refresh called" );
         $self->{frame_size} = $self->{frame_size};
         $self->{frame_seen} = 0;
-        $self->{subscription}->request( $self->{frame_size});
+        $self->{ctx}->loop->next_tick(sub {
+            $self->{subscription}->request( $self->{frame_size});
+        });
     }
 
     # ...
@@ -136,8 +138,8 @@ package MyPublisher {
     my $log = Test::ELO->create_logger;
 
     use parent 'UNIVERSAL::Object';
-    use roles  'ELO::Streams::Publisher',
-               'ELO::Streams::Iterator';
+    use roles  'ELO::Stream::Publisher',
+               'ELO::Stream::Iterator';
 
     use slots (
         ctx          => sub {},

@@ -1,12 +1,9 @@
-package ELO::Streams::Subscriber;
+package ELO::Stream::Sink;
 use v5.36;
-
-use roles 'ELO::Streams::Sink';
 
 sub on_complete;  # ()             -> ()
 sub on_error;     # (Error)        -> ()
 sub on_next;      # (T)            -> ()
-sub on_subscribe; # (Subscription) -> ()
 
 1;
 

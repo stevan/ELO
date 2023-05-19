@@ -1,4 +1,4 @@
-package ELO::Streams::Publisher;
+package ELO::Stream::Publisher;
 use v5.36;
 
 sub subscribe; # Subscriber -> ()

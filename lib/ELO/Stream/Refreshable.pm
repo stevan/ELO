@@ -1,4 +1,4 @@
-package ELO::Streams::Refreshable;
+package ELO::Stream::Refreshable;
 use v5.36;
 
 sub should_refresh; # () -> bool
