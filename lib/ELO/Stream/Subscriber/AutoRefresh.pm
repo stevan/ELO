@@ -1,7 +1,9 @@
-package ELO::Stream::Core::Subscriber::AutoRefresh;
+package ELO::Stream::Subscriber::AutoRefresh;
 use v5.36;
 
-use roles 'ELO::Stream::Refreshable';
+# TODO: Rename this Behavior::AutoRefresh or something
+
+use roles 'ELO::Stream::API::Refreshable';
 use slots (
     request_size => sub {},
 );

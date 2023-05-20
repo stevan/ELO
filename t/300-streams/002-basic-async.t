@@ -17,6 +17,8 @@ on the subscriber to signal need.
 
 use ELO::Stream;
 
+use ELO::Stream::Source::CountTo;
+
 # ...
 
 package MySubscription {
@@ -24,18 +26,15 @@ package MySubscription {
 
     my $log = Test::ELO->create_logger;
 
-    use parent 'UNIVERSAL::Object::Immutable';
-    use roles 'ELO::Stream::Core::Subscription';
-    use slots (
-        ctx        => sub {},
-    );
+    use parent 'ELO::Stream::Subscription';
+    use slots ( ctx => sub {} );
 
     sub BUILD ($self, $) {
-        $self->publisher->roles::DOES('ELO::Stream::Iterator')
-            || die 'The `publisher` must do the `ELO::Stream::Iterator` role ('.$self->publisher.')';
+        $self->publisher->roles::DOES('ELO::Stream::API::Source')
+            || die 'The `publisher` must do the `ELO::Stream::API::Source` role ('.$self->publisher.')';
 
-        $self->subscriber->roles::DOES('ELO::Stream::Refreshable')
-            || die 'The `subscriber` must do the `ELO::Stream::Refreshable` role ('.$self->subscriber.')';
+        $self->subscriber->roles::DOES('ELO::Stream::API::Refreshable')
+            || die 'The `subscriber` must do the `ELO::Stream::API::Refreshable` role ('.$self->subscriber.')';
     }
 
     sub request ($self, $num_elements) {
@@ -66,22 +65,20 @@ package MySubscriber {
 
     my $log = Test::ELO->create_logger;
 
-    use parent 'UNIVERSAL::Object';
-    use roles 'ELO::Stream::Core::Subscriber',
-              'ELO::Stream::Core::Subscriber::AutoRefresh';
+    use parent 'ELO::Stream::Subscriber';
+    use roles  'ELO::Stream::Subscriber::AutoRefresh';
 
     use slots (
         ctx          => sub {},
         total_seen   => sub { 0 },
         seen         => sub { 0 },
-        completed    => sub { 0 },
     );
 
     # ...
 
     sub should_refresh ($self) {
         $log->info( $self->{ctx}, "${self}::should_refresh called" );
-        return if $self->{completed};
+        return if $self->is_completed;
         return $self->{seen} == $self->request_size
     }
 
@@ -92,8 +89,6 @@ package MySubscriber {
 
     # ...
 
-    sub is_completed ($self) { !! $self->{completed} }
-
     sub on_subscribe ($self, $subscription) {
         $log->info( $self->{ctx}, "${self}::on_subscribe called with ($subscription)" );
         $self->refresh( $subscription );
@@ -101,7 +96,7 @@ package MySubscriber {
 
     sub on_complete ($self) {
         $log->error( $self->{ctx}, "${self}::on_complete called" );
-        $self->{completed} = 1;
+        $self->is_completed(1);
     }
 
     sub on_next ($self, $i) {
@@ -116,15 +111,8 @@ package MyPublisher {
 
     my $log = Test::ELO->create_logger;
 
-    use parent 'UNIVERSAL::Object';
-    use roles  'ELO::Stream::Core::Publisher',
-               'ELO::Stream::Iterator';
-
-    use slots (
-        ctx          => sub {},
-        counter       => sub { 0 },
-        max_value     => sub { 300 },
-    );
+    use parent 'ELO::Stream::Publisher';
+    use slots ( ctx => sub {} );
 
     sub create_subscription_for ($self, $subscriber) {
         MySubscription->new(
@@ -132,16 +120,6 @@ package MyPublisher {
             publisher  => $self,
             subscriber => $subscriber
         )
-    }
-
-    sub has_next ($self) {
-        $log->info( $self->{ctx}, "MyPublisher::has_next called");
-        $self->{counter} <= $self->{max_value}
-    }
-
-    sub next ($self) {
-        $log->warn( $self->{ctx}, "MyPublisher::next called" );
-        return $self->{counter}++;
     }
 }
 
@@ -163,7 +141,7 @@ sub init ($this, $msg) {
 
     my $p = MyPublisher->new(
         ctx       => $this,
-        max_value => 300
+        source    => ELO::Stream::Source::CountTo->new( max_value => 300 ),
     );
 
     my $s1 = MySubscriber->new( ctx => $this, request_size => 1 );
@@ -179,7 +157,7 @@ sub init ($this, $msg) {
         $log->fatal( $this, $s2->{total_seen} );
         $log->fatal( $this, $s3->{total_seen} );
         $log->fatal( $this, $s1->{total_seen} + $s2->{total_seen} + $s3->{total_seen} );
-        $log->fatal( $this, $p->{counter} );
+        $log->fatal( $this, $p->{source}->{counter} );
     });
 }
 

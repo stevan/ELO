@@ -1,13 +1,18 @@
 package ELO::Stream;
 use v5.36;
 
-use ELO::Stream::Publisher;
-use ELO::Stream::Subscriber;
-use ELO::Stream::Subscription;
+# load the API (no reason, just cause)
 
-use ELO::Stream::Sink;
+use ELO::Stream::API::Publisher;
+use ELO::Stream::API::Subscriber;
+use ELO::Stream::API::Subscription;
 
-use ELO::Stream::Refreshable;
+use ELO::Stream::API::Source;
+use ELO::Stream::API::Sink;
+
+use ELO::Stream::API::Refreshable;
+
+# ...
 
 1;
 

@@ -1,4 +1,4 @@
-package ELO::Stream::Iterator;
+package ELO::Stream::Source;
 use v5.36;
 
 sub has_next; # () -> bool
