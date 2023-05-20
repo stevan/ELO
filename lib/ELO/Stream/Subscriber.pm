@@ -18,7 +18,7 @@ sub is_completed ($self, $val=undef) {
     $self->{is_completed};
 }
 
-# ...
+# ... Reactive Streams API
 
 sub on_subscribe ($self, $subscription) {
     $self->{on_subscribe}->($self, $subscription) if $self->{on_subscribe};
@@ -40,6 +40,10 @@ sub on_next ($self, $v) {
     $self->{on_next}->($self, $v) if $self->{on_next};
     return;
 }
+
+# never full ..
+
+sub is_full ($) { 0 }
 
 1;
 

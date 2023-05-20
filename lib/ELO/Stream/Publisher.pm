@@ -35,6 +35,8 @@ sub unsubscribe ($self, $subscription) {
 
 # ...
 
+sub is_exhausted ($self) { $self->{source}->has_next }
+
 sub has_next ($self) { $self->{source}->has_next }
 sub next     ($self) { $self->{source}->next     }
 
