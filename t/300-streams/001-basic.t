@@ -15,8 +15,6 @@ they are not async  at all.
 
 use ELO::Stream;
 
-use ELO::Stream::Source::CountTo;
-
 # ...
 
 package MySubscription {
@@ -101,13 +99,14 @@ package MyPublisher {
     use v5.36;
 
     use parent 'ELO::Stream::Publisher';
-    use slots;
+    use slots(
+        subscription_builder => sub { 'MySubscription' },
+    );
 }
 
 my $s = MySubscriber->new( request_size => 5 );
 my $p = MyPublisher->new(
-    source               => ELO::Stream::Source::CountTo->new( max_value => 50 ),
-    subscription_builder => 'MySubscription',
+    source => ELO::Stream::Source::CountTo->new( max_value => 50 ),
 );
 $p->subscribe( $s );
 

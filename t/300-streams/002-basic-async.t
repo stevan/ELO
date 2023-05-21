@@ -17,8 +17,6 @@ on the subscriber to signal need.
 
 use ELO::Stream;
 
-use ELO::Stream::Source::CountTo;
-
 # ...
 
 package MySubscription {
@@ -112,13 +110,15 @@ package MyPublisher {
     my $log = Test::ELO->create_logger;
 
     use parent 'ELO::Stream::Publisher';
-    use slots ( ctx => sub {} );
+    use slots (
+        ctx                  => sub {},
+        subscription_builder => sub { 'MySubscription' },
+    );
 
     sub create_subscription_for ($self, $subscriber) {
-        MySubscription->new(
-            ctx        => $self->{ctx},
-            publisher  => $self,
-            subscriber => $subscriber
+        $self->next::method(
+            $subscriber,
+            (ctx => $self->{ctx}),
         )
     }
 }
