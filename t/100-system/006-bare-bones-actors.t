@@ -6,7 +6,7 @@ use Test::More;
 use Test::Differences;
 use Test::ELO;
 
-use Data::Dump;
+use Data::Dumper;
 
 use ok 'ELO::Loop';
 
