@@ -33,6 +33,7 @@ sub typeclass ($t, $body) {
             }
         }
         elsif ( ref $table eq 'HASH' ) {
+            # TODO; verify that the table contains all the cases
             foreach my $constructor ( keys %$table ) {
                 my $handler = $table->{$constructor};
                 #warn "${tag}::${constructor}::${name} HASH";
