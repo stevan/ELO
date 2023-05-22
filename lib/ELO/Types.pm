@@ -20,6 +20,9 @@ use constant DEBUG => $ENV{TYPES_DEBUG} || 0;
 # -----------------------------------------------------------------------------
 
 my @PERL_TYPES = (
+    *Any,      # any value
+    *Scalar,   # a defined value
+
     *Bool,     # 1, 0 or ''
     *Str,      # pretty much anything
     *Num,      # any numeric value
