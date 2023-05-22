@@ -10,30 +10,67 @@ use Test::ELO;
 use Data::Dumper;
 
 use ok 'ELO::Loop';
-use ok 'ELO::Types',  qw[ :core :events ];
+use ok 'ELO::Types',  qw[ :core :events :signals ];
 use ok 'ELO::Actors', qw[ receive match setup ];
 use ok 'ELO::Timers', qw[ :timers ];
 
 my $log = Test::ELO->create_logger;
 
+protocol *Observer => sub {
+    event *OnComplete  => ();
+    event *OnNext      => ( *Scalar );
+    event *OnError     => ( *Str );
+};
+
+sub Observer (%callbacks) {
+
+    receive[*Subscription], +{
+        *OnComplete => sub ($this) {
+            $log->info( $this, '*OnComplete observed');
+            $callbacks{*OnComplete}->($this) if $callbacks{*OnComplete};
+        },
+        *OnNext => sub ($this, $value) {
+            $log->info( $this, '*OnNext observed with ('.$value.')');
+            $callbacks{*OnNext}->($this, $value) if $callbacks{*OnNext};
+
+        },
+        *OnError => sub ($this, $error) {
+            $log->info( $this, '*OnError observed with ('.$error.')');
+            $callbacks{*OnError}->($this, $error) if $callbacks{*OnError};
+        },
+    }
+}
+
 protocol *Subscription => sub {
     event *Request => (*Int);
     event *Cancel  => ();
+
+    event *OnComplete  => ();
+    event *OnNext      => ( *Scalar );
+    event *OnError     => ( *Str );
 };
 
 sub Subscription ($publisher, $subscriber) {
 
+
     receive[*Subscription], +{
         *Request => sub ($this, $num_elements) {
             $log->info( $this, '*Request called with ('.$num_elements.')');
+
+            my $observer = $this->spawn(Observer(
+                *OnComplete => sub ($this)         { $this->send( $subscriber, [ *OnComplete ]        )},
+                *OnNext     => sub ($this, $value) { $this->send( $subscriber, [ *OnNext  => $value ] )},
+                *OnError    => sub ($this, $error) { $this->send( $subscriber, [ *OnError => $error ] )},
+            ));
+
             while ($num_elements--) {
-                $this->send( $publisher, [ *GetNext => $subscriber ]);
+                $this->send( $publisher, [ *GetNext => $observer ]);
             }
         },
         *Cancel => sub ($this) {
             $log->info( $this, '*Cancel called');
             $this->send( $publisher, [ *UnSubscribe => $this ]);
-        },
+        }
     }
 }
 
@@ -44,11 +81,10 @@ protocol *Subscriber => sub {
     event *OnError     => ( *Str );
 };
 
-sub Subscriber ($request_size) {
+sub Subscriber ($request_size, $sink) {
 
     my @_buffer;
     my $_subscription;
-    my $_is_completed;
 
     receive[*Subscriber], +{
         *OnSubscribe => sub ($this, $subscription) {
@@ -58,19 +94,11 @@ sub Subscriber ($request_size) {
         },
         *OnComplete => sub ($this) {
             $log->info( $this, '*OnComplete called');
-            unless ($_is_completed) {
-                # NOTE:
-                # we will get many messages, but only
-                # call cancel once, if we wanted to
-                # get confirmation, we could use a
-                # promise (I guess)
-                $log->info( $this, '... *OnComplete calling *Cancel on subscription('.$_subscription->pid.')');
-                $this->send( $_subscription, [ *Cancel ]);
-                $_is_completed++;
-            }
         },
         *OnNext => sub ($this, $value) {
             $log->info( $this, '*OnNext called with ('.$value.')');
+
+            $sink->fill( $value );
 
             push @_buffer => $value;
             $log->info( $this, ['... *OnNext buffering: ', \@_buffer]);
@@ -114,25 +142,26 @@ sub Publisher ($source) {
         },
         *UnSubscribe => sub ($this, $subscription) {
             $log->info( $this, '*UnSubscribe called with ('.$subscription->pid.')');
-            @subscriptions = grep $_ eq $subscription, @subscriptions;
+            @subscriptions = grep $_->pid ne $subscription->pid, @subscriptions;
         },
-        *GetNext => sub ($this, $subscriber) {
-            $log->info( $this, '*GetNext called with ('.$subscriber->pid.')');
+        *GetNext => sub ($this, $subscription) {
+            $log->info( $this, '*GetNext called with ('.$subscription->pid.')');
             if ( $source->has_next ) {
 
                 my $next;
                 try {
                     $next = $source->next;
                 } catch ($e) {
-                    $this->send( $subscriber, [ *OnError => $e ]);
+                    $this->send( $subscription, [ *OnError => $e ]);
                 }
 
-                timer( $this, rand(2), sub {
-                    $this->send( $subscriber, [ *OnNext => $next ]);
-                });
+                $log->info( $this, '... *GetNext sending ('.$next.')');
+                #timer( $this, rand(5), sub {
+                    $this->send( $subscription, [ *OnNext => $next ]);
+                #});
             }
             else {
-                $this->send( $subscriber, [ *OnComplete ]);
+                $this->send( $subscription, [ *OnComplete ]);
             }
         },
     }
@@ -154,19 +183,59 @@ package Source {
     sub next     ($self) { $self->{_count}++ }
 }
 
-sub init ($this, $msg) {
+package Sink {
+    use v5.36;
+    use parent 'UNIVERSAL::Object';
+    use slots (
+        _sink => sub { +[] }
+    );
 
-    my $publisher   = $this->spawn( Publisher(Source->new( end => 30 )) );
-    my $subscriber1 = $this->spawn( Subscriber(5) );
-    my $subscriber2 = $this->spawn( Subscriber(10) );
+    sub fill ($self, $x) {
+        push $self->{_sink}->@* => $x;
+    }
 
-    $this->send( $publisher, [ *Subscribe => $subscriber1 ]);
-    $this->send( $publisher, [ *Subscribe => $subscriber2 ]);
-
-    $log->info( $this, '... starting' );
+    sub drain ($self) {
+        my @sink = $self->{_sink}->@*;
+        $self->{_sink}->@* = ();
+        return @sink;
+    }
 }
 
-ELO::Loop->run( \&init, logger => $log );
+my $sink = Sink->new;
+
+sub Init () {
+
+    setup sub ($this) {
+
+        my $publisher   = $this->spawn( Publisher(Source->new( end => 50 )) );
+        my @subscribers = (
+            $this->spawn( Subscriber(5,  $sink) ),
+            $this->spawn( Subscriber(10, $sink) ),
+            $this->spawn( Subscriber(2,  $sink) ),
+            $this->spawn( Subscriber(5,  $sink) ),
+        );
+
+        $this->trap( *SIGEXIT );
+        $this->link( $publisher );
+
+        $this->send( $publisher, [ *Subscribe => $_ ]) foreach @subscribers;
+
+        $log->info( $this, '... starting' );
+
+        receive +{
+            *SIGEXIT => sub ($this, $from) {
+                $log->warn( $this, '... got SIGEXIT from ('.$from->pid.')');
+                $log->info( $this, [ sort { $a <=> $b } $sink->drain ] );
+            }
+        }
+    }
+}
+
+ELO::Loop->run( Init(), logger => $log );
+
+my @contents = $sink->drain;
+warn join ', ' => @contents;
+warn join ', ' => sort { $a <=> $b } @contents;
 
 done_testing;
 
