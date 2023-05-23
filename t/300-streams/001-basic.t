@@ -4,7 +4,7 @@ use v5.36;
 
 use Test::More;
 
-use constant DEBUG => 1;
+use constant DEBUG => 0;
 
 =pod
 

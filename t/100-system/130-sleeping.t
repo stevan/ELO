@@ -14,6 +14,8 @@ use ok 'ELO::Timers', ':timers';
 
 my $log = Test::ELO->create_logger;
 
+diag "... sleeping takes a bit";
+
 sub LazyWorker ($this, $msg) {
     state $counter = 0;
 

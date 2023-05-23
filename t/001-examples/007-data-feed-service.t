@@ -17,6 +17,8 @@ use ok 'ELO::Actors', qw[ receive ];
 
 my $log = Test::ELO->create_logger;
 
+diag "... this one takes a while too";
+
 =pod
 
 # System Features
@@ -188,7 +190,7 @@ sub Debugger () {
 sub init ($this, $msg=[]) {
 
     my $debug = $this->spawn( Debugger() );
-    my $fdb   = $this->spawn( FeedDatabase( 250 ) );
+    my $fdb   = $this->spawn( FeedDatabase( 50 ) );
     my $feed  = $this->spawn( DataFeed() );
     my $cron  = $this->spawn( PeriodicConsumer( $feed, $fdb ) );
 
@@ -196,12 +198,12 @@ sub init ($this, $msg=[]) {
 
     my $last = $this->loop->now;
 
-    my $i1 = interval( $this, 3, sub {
+    my $i1 = interval( $this, 1, sub {
         $this->send( $fdb, [ *eQueryDataSince => $last, $debug ]);
         $last = $this->loop->now;
     });
 
-    timer( $this, 20, sub {
+    timer( $this, 15, sub {
         $this->send( $cron, [ *eStopConsumer ] );
         cancel_timer( $this, $i1 );
     });

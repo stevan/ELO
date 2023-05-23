@@ -17,6 +17,8 @@ use ok 'ELO::Timers', qw[ :timers ];
 
 my $log = Test::ELO->create_logger;
 
+diag "... this one takes a little while";
+
 sub jitter ($max, $multipler=1) { rand($max) * rand($multipler) }
 
 our $POLL_TICK_INTERVAL           = 2;

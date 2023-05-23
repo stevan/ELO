@@ -12,6 +12,8 @@ use ok 'ELO::Loop';
 
 my $log = Test::ELO->create_logger;
 
+diag "... this one takes a few seconds";
+
 sub init ($this, $msg) {
 
     my $count = 0;

@@ -108,9 +108,23 @@ subtest '... check the tagged union' => sub {
     is($tree->get_right->get_right->is_node, 0, '... the tree->right->right is not a node');
     is($tree->get_right->get_right->get_value, undef, '... the tree->right->right value is as expected');
 
+    my @out;
     $tree->traverse(sub ($arg, $depth) {
-        diag( ('  ' x $depth), $arg && "Node($arg)" // "Leaf" );
+        push @out => (('  ' x $depth).($arg && "Node($arg)" // "Leaf" ));
     });
+    is(
+        (join "\n" => @out),
+q[Node(5)
+  Node(1)
+    Leaf
+    Leaf
+  Node(3)
+    Node(4)
+      Leaf
+      Leaf
+    Leaf],
+        '... got the expected output from traverse'
+    );
 
     my $result = $tree->dump;
 

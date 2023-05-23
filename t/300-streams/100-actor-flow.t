@@ -16,6 +16,8 @@ use ok 'ELO::Timers', qw[ :timers ];
 
 my $log = Test::ELO->create_logger;
 
+diag "... this one takes a bit";
+
 # TODO:
 # Implement Refresh in the Subscription, it should
 # drive the process, not the Subscription here.
@@ -160,9 +162,9 @@ sub Publisher ($source) {
                 }
 
                 $log->info( $this, '... *GetNext sending ('.$next.')');
-                #timer( $this, rand(5), sub {
+                timer( $this, rand(2), sub {
                     $this->send( $subscription, [ *OnNext => $next ]);
-                #});
+                });
             }
             else {
                 $this->send( $subscription, [ *OnComplete ]);
@@ -237,9 +239,11 @@ sub Init () {
 
 ELO::Loop->run( Init(), logger => $log );
 
-my @contents = $sink->drain;
-warn join ', ' => @contents;
-warn join ', ' => sort { $a <=> $b } @contents;
+is_deeply(
+    [ sort { $a <=> $b } $sink->drain ],
+    [ 1 .. 50 ],
+    '... saw all exepected values'
+);
 
 done_testing;
 

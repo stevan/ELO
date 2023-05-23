@@ -13,6 +13,8 @@ use ok 'ELO::Timers', ':timers';
 
 my $log = Test::ELO->create_logger;
 
+diag "... waiting on the timers";
+
 sub Responder ($this, $msg) {
     state $counter = 0;
 
