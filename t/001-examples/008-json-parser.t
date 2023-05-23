@@ -131,10 +131,10 @@ typeclass[*JSONToken] => sub {
                 last;
             }
             else {
-                push @local => pop @$acc;
+                unshift @local => pop @$acc;
             }
         }
-        reverse @local;
+        @local;
     }
 
     method consume_token => sub ($t, $acc=[]) {
