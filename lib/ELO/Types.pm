@@ -13,6 +13,8 @@ use ELO::Core::Type::Enum;
 use ELO::Core::Type::TaggedUnion;
 use ELO::Core::Type::TaggedUnion::Constructor;
 
+use ELO::Core::Typeclass;
+
 use constant DEBUG => $ENV{TYPES_DEBUG} || 0;
 
 # -----------------------------------------------------------------------------
@@ -81,12 +83,14 @@ use Exporter 'import';
 our @EXPORT_OK = (qw[
     enum
     datatype case
+    typeclass method
 
     type
     event protocol
 
     lookup_event_type
     lookup_type
+    lookup_typeclass
 
     resolve_event_types
     resolve_types
@@ -96,10 +100,11 @@ our @EXPORT_OK = (qw[
 );
 
 our %EXPORT_TAGS = (
-    core    => [ @ALL_TYPE_GLOBS ],
-    signals => [ @ALL_SIGNAL_GLOBS ],
-    types   => [qw[ enum type datatype case lookup_type resolve_types ]],
-    events  => [qw[ event lookup_event_type resolve_event_types protocol ]],
+    core        => [ @ALL_TYPE_GLOBS ],
+    signals     => [ @ALL_SIGNAL_GLOBS ],
+    types       => [qw[ enum type datatype case lookup_type resolve_types ]],
+    events      => [qw[ event lookup_event_type resolve_event_types protocol ]],
+    typeclasses => [qw[ typeclass method lookup_typeclass ]],
 );
 
 # -----------------------------------------------------------------------------
@@ -140,6 +145,74 @@ my sub check_types ($types, $values) {
     return 1;
 }
 
+# -----------------------------------------------------------------------------
+# Tyoeclass Builders
+# -----------------------------------------------------------------------------
+
+my %TYPECLASS_REGISTRY;
+
+sub method ($, $) { die 'You cannot call `method` outside of a `typeclass`' }
+
+sub typeclass ($t, $body) {
+    my $caller = caller;
+    my $type   = lookup_type($t->[0]);
+    my $symbol = $type->symbol;
+    my %cases  = $type->cases->%*;
+
+    warn "Calling typeclass ($symbol) from $caller" if DEBUG;
+
+    my $typeclass = ELO::Core::Typeclass->new( type => $type );
+
+    my $method;
+
+    if ( $type isa ELO::Core::Type::TaggedUnion ) {
+        $method = sub ($name, $table) {
+
+            if ( ref $table eq 'CODE' ) {
+                foreach my $constructor_symbol ( keys %cases ) {
+                    no strict 'refs';
+                    #warn "[CODE] ${constructor_symbol}::${name}\n";
+                    *{"${constructor_symbol}::${name}"} = $table;
+                }
+            }
+            elsif ( ref $table eq 'HASH' ) {
+                foreach my $type_name ( keys %$table ) {
+                    my $constructor_symbol = "${symbol}::${type_name}";
+                       $constructor_symbol =~ s/main//;
+
+                    #warn "[HASH] SYMBOL: ${constructor_symbol}\n";
+
+                    my $constructor = $cases{ $constructor_symbol };
+                    ($constructor)
+                        || die "The case($constructor_symbol) is not found the type($symbol)".Dumper(\%cases);
+
+                    my $handler = $table->{$type_name};
+                    no strict 'refs';
+
+                    #warn "[HASH] &: ${constructor_symbol}::${name}\n";
+                    *{"${constructor_symbol}::${name}"} = sub ($self) { $handler->( @$self ) };
+                }
+            }
+            else {
+                die 'Unsupported method type, only CODE and HASH supported';
+            }
+
+            $typeclass->method_definitions->{ $name } = $table;
+        };
+    }
+    else {
+        die "Unsupported typeclass type($symbol), only datatype(Type::TaggedUnion) is supported";
+    }
+
+    no strict 'refs';
+    local *{"${caller}::method"} = $method;
+
+    $body->();
+
+    $TYPECLASS_REGISTRY{$symbol} = $typeclass;
+
+    return;
+}
 
 # -----------------------------------------------------------------------------
 # Tyoe Builders
@@ -302,6 +375,11 @@ sub lookup_event_type ($type) {
 sub lookup_type ( $type ) {
     warn "Looking up type($type)" if DEBUG;
     $TYPE_REGISTRY{ $type };
+}
+
+sub lookup_typeclass ($type) {
+    warn "Looking up typeclass($type)" if DEBUG;
+    $TYPECLASS_REGISTRY{ $type };
 }
 
 sub resolve_types ( $types ) {

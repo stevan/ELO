@@ -12,42 +12,8 @@ use ok 'ELO::Types',  qw[
     :core
     :events
     :types
+    :typeclasses
 ];
-
-# ...
-
-sub method ($name, $table) { die 'You cannot call `method` outside of a `typeclass`' }
-
-sub typeclass ($t, $body) {
-
-    my $type = lookup_type($t->[0]);
-
-    local *method = sub ($name, $table) {
-        my $tag = $type->symbol =~ s/main//r;
-
-        if ( ref $table eq 'CODE' ) {
-            foreach my $constructor ( keys $type->cases->%* ) {
-                #warn "${constructor}::${name} CODE";
-                no strict 'refs';
-                *{"${constructor}::${name}"} = $table;
-            }
-        }
-        elsif ( ref $table eq 'HASH' ) {
-            # TODO; verify that the table contains all the cases
-            foreach my $constructor ( keys %$table ) {
-                my $handler = $table->{$constructor};
-                #warn "${tag}::${constructor}::${name} HASH";
-                no strict 'refs';
-                *{"${tag}::${constructor}::${name}"} = sub ($self) { $handler->( @$self ) };
-            }
-        }
-        else {
-            die 'Unsupported method type, only CODE and HASH supported';
-        }
-    };
-
-    $body->();
-}
 
 # ...
 
@@ -157,6 +123,89 @@ subtest '... check the tagged union' => sub {
         '... tree->dump gave us the expected results'
     );
 };
+
+datatype *Option => sub {
+    case None => ();
+    case Some => ( *Scalar );
+};
+
+typeclass[*Option] => sub {
+
+    method get => {
+        Some => sub ($value) { $value },
+        None => sub ()       { die 'Cannot call get on None' },
+    };
+
+    method get_or_else => sub ($o, $f) {
+        match[ *Option, $o ] => {
+            Some => sub ($value) { $value },
+            None => sub ()       { $f->() },
+        }
+    };
+
+    method or_else => sub ($o, $f) {
+        match[ *Option, $o ] => {
+            Some => sub ($value) { Some($value) },
+            None => sub ()       { $f->() },
+        }
+    };
+
+    method is_defined => {
+        Some => sub ($) { 1 },
+        None => sub ()  { 0 },
+    };
+
+    method is_empty => {
+        Some => sub ($) { 0 },
+        None => sub ()  { 1 },
+    };
+
+    method map => sub ($o, $f) {
+        match[ *Option, $o ] => {
+            Some => sub ($value) { Some( $f->($value) ) },
+            None => sub ()       { None() },
+        }
+    };
+
+    method filter => sub ($o, $f) {
+        match[ *Option, $o ] => {
+            Some => sub ($value) { $f->($value) ? Some($value) : None() },
+            None => sub ()       { None() },
+        }
+    };
+
+    method foreach => sub ($o, $f) {
+        match[ *Option, $o ] => {
+            Some => sub ($value) { $f->( $value ) },
+            None => sub ()       {},
+        }
+    };
+
+};
+
+sub get ($req, $key) {
+    exists $req->{ $key } ? Some( $req->{ $key } ) : None();
+}
+
+subtest '... testing the Option type' => sub {
+
+    foreach my $name (qw[ Bob Alice Mary Stevan ], '') {
+        my $req = { name => $name };
+
+        my $upper = get($req, 'name') #/ get value from hash
+            ->map    (sub ($x) { $x =~ s/\s$//r }) #/ trim any trailing whitespace
+            ->filter (sub ($x) { length $x != 0 }) #/ ignore if length == 0
+            ->map    (sub ($x) { uc $x          }) #/ uppercase it
+        ;
+
+        is(
+            $upper->get_or_else(sub { 'FOO' }),
+            $name ? uc($name) : 'FOO',
+            '... got the result we expected'
+        );
+    }
+};
+
 
 done_testing;
 
