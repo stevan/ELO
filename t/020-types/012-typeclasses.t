@@ -10,7 +10,6 @@ use Test::Differences;
 use ok 'ELO::Actors', qw[ match ];
 use ok 'ELO::Types',  qw[
     :core
-    :events
     :types
     :typeclasses
 ];
@@ -18,7 +17,7 @@ use ok 'ELO::Types',  qw[
 # ...
 
 datatype *Tree => sub {
-    case Node => ( *Int, *Tree, *Tree );
+    case Node => ( *Scalar, *Tree, *Tree );
     case Leaf => ();
 };
 
