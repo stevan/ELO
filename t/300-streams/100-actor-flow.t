@@ -16,6 +16,10 @@ use ok 'ELO::Timers', qw[ :timers ];
 
 my $log = Test::ELO->create_logger;
 
+# TODO:
+# Implement Refresh in the Subscription, it should
+# drive the process, not the Subscription here.
+
 protocol *Observer => sub {
     event *OnComplete  => ();
     event *OnNext      => ( *Scalar );

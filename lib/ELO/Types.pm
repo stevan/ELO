@@ -7,6 +7,7 @@ use Scalar::Util qw[ looks_like_number ];
 
 use ELO::Core::Type;
 use ELO::Core::Type::Alias;
+use ELO::Core::Type::Tuple;
 use ELO::Core::Type::Event;
 use ELO::Core::Type::Event::Protocol;
 use ELO::Core::Type::Enum;
@@ -25,6 +26,7 @@ my @PERL_TYPES = (
     *Any,      # any value
     *Scalar,   # a defined value
 
+    *Undef,    # undef value
     *Bool,     # 1, 0 or ''
     *Str,      # pretty much anything
     *Num,      # any numeric value
@@ -350,6 +352,16 @@ sub type ($type, $checker) {
             checker => $checker,
         );
     }
+    elsif ( ref $checker eq 'ARRAY' ) {
+        my $definition = resolve_types( $checker );
+        $TYPE_REGISTRY{ $type } = ELO::Core::Type::Tuple->new(
+            symbol     => $type,
+            definition => $definition,
+            checker    => sub ($values) {
+                check_types( $definition, $values );
+            }
+        );
+    }
     else {
         my $alias = $TYPE_REGISTRY{ $checker }
             || die "Unable to alias type($type) to alias($checker): alias type not found";
@@ -425,6 +437,10 @@ type *Any, sub ($) { return 1 };                # anything ...
 
 type *Scalar, sub ($scalar) {
     return defined($scalar);                    # it is defined ...
+};
+
+type *Undef, sub ($undef) {
+    return !defined($undef);                    # it is not defined ...
 };
 
 type *Bool, sub ($bool) {
