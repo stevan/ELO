@@ -17,12 +17,7 @@ my $log = Test::ELO->create_logger;
 
 type *SID, sub ($sid) { (state $Int = lookup_type(*Int))->check( $sid ) && $sid < 255 };
 
-enum *Ops => (
-    *Ops::Add,
-    *Ops::Sub,
-    *Ops::Mul,
-    *Ops::Div,
-);
+enum *Ops => ( *Add, *Sub, *Mul, *Div );
 
 protocol *ServiceProtocol => sub {
     event *eServiceRequest  => ( *SID, *Ops, [ *Int, *Int ], *Process ); # sid : SID, action : Str, args : <Any>, caller : PID
@@ -63,10 +58,10 @@ sub Service ($service_name) {
                     *eServiceResponse => (
                         $sid,
                         match [ *Ops, $action ] => {
-                            *Ops::Add => sub () { $x + $y },
-                            *Ops::Sub => sub () { $x - $y },
-                            *Ops::Mul => sub () { $x * $y },
-                            *Ops::Div => sub () { $x / $y },
+                            *Add => sub () { $x + $y },
+                            *Sub => sub () { $x - $y },
+                            *Mul => sub () { $x * $y },
+                            *Div => sub () { $x / $y },
                         }
                     )
                 ]);
@@ -225,31 +220,31 @@ sub init ($this, $msg=[]) {
 
     $this->send( $client, [
         *eServiceClientRequest => (
-            'foo.example.com', *Ops::Add => [ 2, 2 ]
+            'foo.example.com', *Add => [ 2, 2 ]
         )
     ]);
 
     $this->send( $client, [
         *eServiceClientRequest => (
-            'bar.example.com', *Ops::Mul => [ 10, 2 ]
+            'bar.example.com', *Mul => [ 10, 2 ]
         )
     ]);
 
     $this->send( $client, [
         *eServiceClientRequest => (
-            'baz.example.com', *Ops::Mul => [ 10, 2 ]
+            'baz.example.com', *Mul => [ 10, 2 ]
         )
     ]);
 
     $this->send( $client, [
         *eServiceClientRequest => (
-            'bar.example.com', *Ops::Div => [ 2, 10 ]
+            'bar.example.com', *Div => [ 2, 10 ]
         )
     ]);
 
     $this->send( $client, [
         *eServiceClientRequest => (
-            'foo.example.com', *Ops::Sub => [ 2, 10 ]
+            'foo.example.com', *Sub => [ 2, 10 ]
         )
     ]);
 }

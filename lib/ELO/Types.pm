@@ -3,6 +3,7 @@ use v5.36;
 use experimental 'builtin';
 
 use builtin      qw[ blessed ];
+use Carp         qw[ confess ];
 use Scalar::Util qw[ looks_like_number ];
 
 use ELO::Core::Type;
@@ -153,7 +154,7 @@ my sub check_types ($types, $values) {
 
 my %TYPECLASS_REGISTRY;
 
-sub method ($, $) { die 'You cannot call `method` outside of a `typeclass`' }
+sub method ($, $) { confess 'You cannot call `method` outside of a `typeclass`' }
 
 sub typeclass ($t, $body) {
     my $caller = caller;
@@ -186,7 +187,7 @@ sub typeclass ($t, $body) {
 
                     my $constructor = $cases{ $constructor_symbol };
                     ($constructor)
-                        || die "The case($constructor_symbol) is not found the type($symbol)".Dumper(\%cases);
+                        || confess "The case($constructor_symbol) is not found the type($symbol)".Dumper(\%cases);
 
                     my $handler = $table->{$type_name};
                     no strict 'refs';
@@ -196,14 +197,14 @@ sub typeclass ($t, $body) {
                 }
             }
             else {
-                die 'Unsupported method type, only CODE and HASH supported';
+                confess 'Unsupported method type, only CODE and HASH supported';
             }
 
             $typeclass->method_definitions->{ $name } = $table;
         };
     }
     else {
-        die "Unsupported typeclass type($symbol), only datatype(Type::TaggedUnion) is supported";
+        confess "Unsupported typeclass type($symbol), only datatype(Type::TaggedUnion) is supported";
     }
 
     no strict 'refs';
@@ -222,7 +223,7 @@ sub typeclass ($t, $body) {
 
 my %TYPE_REGISTRY;
 
-sub case ($, @) { die 'You cannot call `case` outside of `datatype`' }
+sub case ($, @) { confess 'You cannot call `case` outside of `datatype`' }
 
 sub datatype ($symbol, $cases) {
     my $caller = caller;
@@ -246,11 +247,21 @@ sub datatype ($symbol, $cases) {
         # constructor can use a bless scalar (perhaps the constructor name)
         # and we could make them proper classes that use
         # U::O::Imuttable as a base class.
+
+        # NOTE:
+        # It should also be possible to optimize the storage
+        # type, using the smallest/smartest type for each, such as:
+        # - for constructors with no args, an empty scalar ref
+        # - for constructors with 1 arg, a ref of that value
+        # - for constructors with n args, use an ARRAY ref
+        # This will add some complexity to `typeclass` above
+        # because it assumes an ARRAY ref and just de-refs it
+        # but that is a solvable problem.
         *{"${caller}::${constructor}"} = scalar @definition == 0
             ? sub ()      { bless [] => $constructor_tag }
             : sub (@args) {
                 check_types( $definition, \@args )
-                    || die "Typecheck failed for $constructor_tag with (".(join ', ' => @args).')';
+                    || confess "Typecheck failed for $constructor_tag with (".(join ', ' => map $_//'undef', @args).')';
                 bless [ @args ] => $constructor_tag;
             };
 
@@ -266,6 +277,10 @@ sub datatype ($symbol, $cases) {
         symbol => $symbol,
         cases  => \%cases,
         checker => sub ( $instance ) {
+            # FIXME:
+            # this can be improved with a simple `isa` check
+            # against all the case classes, OR we could give
+            # them a base class instead.
             my $type = blessed($instance);
             return unless $type;
             return exists $cases{ $type };
@@ -318,15 +333,9 @@ sub event ($type, @definition) {
 
 sub enum ($enum, @values) {
     warn "Creating enum $enum" if DEBUG;
-    my $i = 0;
     my %enum_map;
-    {
-        no strict 'refs';
-        foreach my $glob (@values) {
-            *$glob = \(my $x = $i);  # assign it the value
-            $enum_map{ $glob } = $i; # note in the map
-            $i++;
-        }
+    foreach my $value (@values) {
+        $enum_map{ $value }++;
     }
 
     $TYPE_REGISTRY{ $enum } = ELO::Core::Type::Enum->new(
@@ -364,7 +373,7 @@ sub type ($type, $checker) {
     }
     else {
         my $alias = $TYPE_REGISTRY{ $checker }
-            || die "Unable to alias type($type) to alias($checker): alias type not found";
+            || confess "Unable to alias type($type) to alias($checker): alias type not found";
 
         $TYPE_REGISTRY{ $type } = ELO::Core::Type::Alias->new(
             symbol  => $type,
@@ -404,7 +413,7 @@ sub resolve_types ( $types ) {
         }
         else {
             my $type = $TYPE_REGISTRY{ $t }
-                || die "Could not resolve type($t) in registry";
+                || confess "Could not resolve type($t) in registry";
 
             push @resolved => $type;
         }
@@ -417,7 +426,7 @@ sub resolve_event_types ( $events ) {
     my @resolved;
     foreach my $e ( @$events ) {
         my $type = $TYPE_REGISTRY{ $e }
-            || die "Could not resolve event($e) in registry";
+            || confess "Could not resolve event($e) in registry";
         # TODO: make sure the type is an ELO::Core::Type::Event
         push @resolved => $type;
     }

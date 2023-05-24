@@ -30,7 +30,7 @@ protocol *Observer => sub {
 
 sub Observer (%callbacks) {
 
-    receive[*Subscription], +{
+    receive[*Observer], +{
         *OnComplete => sub ($this) {
             $log->info( $this, '*OnComplete observed');
             $callbacks{*OnComplete}->($this) if $callbacks{*OnComplete};
@@ -50,10 +50,6 @@ sub Observer (%callbacks) {
 protocol *Subscription => sub {
     event *Request => (*Int);
     event *Cancel  => ();
-
-    event *OnComplete  => ();
-    event *OnNext      => ( *Scalar );
-    event *OnError     => ( *Str );
 };
 
 sub Subscription ($publisher, $subscriber) {
@@ -70,7 +66,9 @@ sub Subscription ($publisher, $subscriber) {
             ));
 
             while ($num_elements--) {
-                $this->send( $publisher, [ *GetNext => $observer ]);
+                #timer( $this, rand(2), sub {
+                    $this->send( $publisher, [ *GetNext => $observer ]);
+                #});
             }
         },
         *Cancel => sub ($this) {

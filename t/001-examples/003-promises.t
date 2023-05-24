@@ -16,13 +16,8 @@ use ok 'ELO::Promises', qw[ promise collect ];
 
 my $log = Test::ELO->create_logger;
 
-enum *ListOps   => ( *ListOps::Sum );
-enum *ScalarOps => (
-    *ScalarOps::Add,
-    *ScalarOps::Sub,
-    *ScalarOps::Mul,
-    *ScalarOps::Div,
-);
+enum *ListOps   => ( *Sum );
+enum *ScalarOps => ( *Add, *Sub, *Mul, *Div );
 
 protocol *ServiceProtocol => sub {
     event *eServiceRequest   => ( *ScalarOps, [ *Int, *Int ], *Promise ); # action : Str, args : [Int, Int], promise
@@ -50,10 +45,10 @@ sub Service () {
                 $promise->resolve([
                     *eServiceResponse => (
                         match [ *ScalarOps, $action ] => {
-                            *ScalarOps::Add => sub () { $x + $y },
-                            *ScalarOps::Sub => sub () { $x - $y },
-                            *ScalarOps::Mul => sub () { $x * $y },
-                            *ScalarOps::Div => sub () { $x / $y },
+                            *Add => sub () { $x + $y },
+                            *Sub => sub () { $x - $y },
+                            *Mul => sub () { $x * $y },
+                            *Div => sub () { $x / $y },
                         }
                     )
                 ]);
@@ -130,11 +125,11 @@ sub init ($this, $msg=[]) {
     $this->send( $client, [
         *eServiceClientRequest => (
             $service,
-            *ListOps::Sum, [
-                [ *ScalarOps::Add, [ 2, 2 ] ],
-                [ *ScalarOps::Add, [ 3, 3 ] ],
-                [ *ScalarOps::Add, [ 4, 4 ] ],
-                [ *ScalarOps::Add, [ 5, 5 ] ],
+            *Sum, [
+                [ *Add, [ 2, 2 ] ],
+                [ *Add, [ 3, 3 ] ],
+                [ *Add, [ 4, 4 ] ],
+                [ *Add, [ 5, 5 ] ],
             ]
         )
     ]);
@@ -142,11 +137,11 @@ sub init ($this, $msg=[]) {
     $this->send( $client, [
         *eServiceClientRequest => (
             $service,
-            *ListOps::Sum, [
-                [ *ScalarOps::Add, [ 12, 12 ] ],
-                [ *ScalarOps::Add, [ 13, 13 ] ],
-                [ *ScalarOps::Add, [ 14, 14 ] ],
-                [ *ScalarOps::Add, [ 15, 15 ] ],
+            *Sum, [
+                [ *Add, [ 12, 12 ] ],
+                [ *Add, [ 13, 13 ] ],
+                [ *Add, [ 14, 14 ] ],
+                [ *Add, [ 15, 15 ] ],
             ]
         )
     ]);
