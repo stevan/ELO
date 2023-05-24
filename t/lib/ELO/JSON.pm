@@ -20,9 +20,9 @@ datatype *JSON => sub {
     case Array    => ( *ArrayRef          ); # *Item
     case Item     => ( *ArrayIndex, *JSON ); # index, JSON
 
-    case String   => ( *Str        );
-    case Int      => ( *Int        );
-    case Float    => ( *Float      );
+    case String   => ( *Str   );
+    case Int      => ( *Int   );
+    case Float    => ( *Float );
     case True     => ();
     case False    => ();
     case Null     => ();
