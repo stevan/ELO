@@ -88,38 +88,28 @@ subtest '... testing the JSON type' => sub {
 
 };
 
-type *Location => [ *Str, *Int, *Int ];
-
 datatype *JSONToken => sub {
-    case NotAvailable  => ();
-    case NoToken       => ();
+    case StartObject   => ();
+    case EndObject     => ();
 
-    case StartObject   => ( *Location );
-    case EndObject     => ( *Location );
+    case StartProperty => ( *Str ); # key
+    case EndProperty   => ();
 
-    case StartProperty => ( *Location, *Str ); # key
-    case EndProperty   => ( *Location );
+    case StartArray    => ();
+    case EndArray      => ();
 
-    case StartArray    => ( *Location );
-    case EndArray      => ( *Location );
+    case StartItem     => ( *Int ); # index
+    case EndItem       => ();
 
-    case StartItem     => ( *Location, *Int ); # index
-    case EndItem       => ( *Location );
+    case AddString     => ( *Str );
+    case AddInt        => ( *Int );
+    case AddFloat      => ( *Float );
+    case AddTrue       => ();
+    case AddFalse      => ();
+    case AddNull       => ();
 
-    case AddString     => ( *Location, *Str );
-    case AddInt        => ( *Location, *Int );
-    case AddFloat      => ( *Location, *Float );
-    case AddTrue       => ( *Location );
-    case AddFalse      => ( *Location );
-    case AddNull       => ( *Location );
-    case Error         => ( *Location, *Str ); # error
+    case Error         => ( *Str ); # error
 };
-
-
-use constant START_OBJECT   => 'START_OBJECT';
-use constant START_PROPERTY => 'START_PROPERTY';
-use constant START_ARRAY    => 'START_ARRAY';
-use constant START_ITEM     => 'START_ITEM';
 
 typeclass[*JSONToken] => sub {
 
@@ -138,47 +128,49 @@ typeclass[*JSONToken] => sub {
     }
 
     method consume_token => sub ($t, $acc=[]) {
+        state $OBJECT_MARKER   = \1;
+        state $PROPERTY_MARKER = \2;
+        state $ARRAY_MARKER    = \3;
+        state $ITEM_MARKER     = \4;
+
         #warn Dumper ref($t), $acc;
 
         match[ *JSONToken => $t ], +{
-            NotAvailable  => sub () { },
-            NoToken       => sub () { },
-
-            StartObject   => sub ( $l ) { push @$acc => START_OBJECT },
-            EndObject     => sub ( $l ) {
-                my @local = drain_until_marker( $acc, START_OBJECT );
+            StartObject   => sub () { push @$acc => $OBJECT_MARKER },
+            EndObject     => sub () {
+                my @local = drain_until_marker( $acc, $OBJECT_MARKER );
                 my $o = Object( [ @local ] );
                 push @$acc => $o;
             },
 
-            StartProperty => sub ( $l, $key ) { push @$acc => (START_PROPERTY, $key) },
-            EndProperty   => sub ( $l )       {
-                my ($key, $value) = drain_until_marker( $acc, START_PROPERTY );
+            StartProperty => sub ( $key ) { push @$acc => ($PROPERTY_MARKER, $key) },
+            EndProperty   => sub ()       {
+                my ($key, $value) = drain_until_marker( $acc, $PROPERTY_MARKER );
                 push @$acc => Property( $key, $value );
             },
 
-            StartArray    => sub ( $l ) { push @$acc => START_ARRAY },
-            EndArray      => sub ( $l ) {
-                my @local = drain_until_marker( $acc, START_ARRAY );
+            StartArray    => sub () { push @$acc => $ARRAY_MARKER },
+            EndArray      => sub () {
+                my @local = drain_until_marker( $acc, $ARRAY_MARKER );
                 my $a = Array([ @local ]);
                 push @$acc => $a;
             },
 
-            StartItem     => sub ( $l, $index ) { push @$acc => (START_ITEM, $index) },
-            EndItem       => sub ( $l )         {
-                my ($index, $item) = drain_until_marker( $acc, START_ITEM );
+            StartItem     => sub ( $index ) { push @$acc => ($ITEM_MARKER, $index) },
+            EndItem       => sub ()         {
+                my ($index, $item) = drain_until_marker( $acc, $ITEM_MARKER );
                 push @$acc => Item( $index, $item );
             },
 
-            AddString     => sub ( $l, $Str )   { push @$acc => String($Str)  },
-            AddInt        => sub ( $l, $Int )   { push @$acc => Int($Int)     },
-            AddFloat      => sub ( $l, $Float ) { push @$acc => Float($Float) },
+            AddString     => sub ( $Str )   { push @$acc => String($Str)  },
+            AddInt        => sub ( $Int )   { push @$acc => Int($Int)     },
+            AddFloat      => sub ( $Float ) { push @$acc => Float($Float) },
 
-            AddTrue       => sub ( $l ) { },
-            AddFalse      => sub ( $l ) { },
-            AddNull       => sub ( $l ) { },
+            AddTrue       => sub () { push @$acc => True()  },
+            AddFalse      => sub () { push @$acc => False() },
+            AddNull       => sub () { push @$acc => Null()  },
 
-            Error         => sub ( $l ) { },
+            Error         => sub ( $error ) { },
         };
     };
 
@@ -187,34 +179,32 @@ typeclass[*JSONToken] => sub {
 
 subtest '... testing the JSON type' => sub {
 
-    my $l = ['eval',0,0];
-
     my @tokens = (
-        StartObject( $l ),
-            StartProperty( $l, "Foo" ),
-                AddString( $l, "Bar" ),
-            EndProperty( $l ),
-            StartProperty( $l, "Baz" ),
-                StartArray( $l ),
-                    StartItem( $l, 0 ),
-                        AddInt($l, 10),
-                    EndItem( $l ),
-                    StartItem( $l, 1 ),
-                        AddFloat($l, 2.5),
-                    EndItem( $l ),
-                    StartItem( $l, 2 ),
-                        StartArray( $l ),
-                            StartItem( $l, 0 ),
-                                AddInt($l, 1 ),
-                            EndItem( $l ),
-                            StartItem( $l, 1 ),
-                                AddInt($l, 2 ),
-                            EndItem( $l ),
-                        EndArray( $l ),
-                    EndItem( $l ),
-                EndArray( $l ),
-            EndProperty( $l ),
-        EndObject( $l )
+        StartObject(),
+            StartProperty( "Foo" ),
+                AddString( "Bar" ),
+            EndProperty(),
+            StartProperty( "Baz" ),
+                StartArray(),
+                    StartItem( 0 ),
+                        AddInt( 10 ),
+                    EndItem(),
+                    StartItem( 1 ),
+                        AddFloat( 2.5 ),
+                    EndItem(),
+                    StartItem( 2 ),
+                        StartArray(),
+                            StartItem( 0 ),
+                                AddInt( 1 ),
+                            EndItem(),
+                            StartItem( 1 ),
+                                AddInt( 2 ),
+                            EndItem(),
+                        EndArray(),
+                    EndItem(),
+                EndArray(),
+            EndProperty(),
+        EndObject()
     );
 
     my $acc = [];
