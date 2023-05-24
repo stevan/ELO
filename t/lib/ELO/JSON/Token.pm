@@ -32,12 +32,54 @@ datatype *JSONToken => sub {
     case AddTrue       => ();
     case AddFalse      => ();
     case AddNull       => ();
-
-    case Error         => ( *Str ); # error
 };
 
 typeclass[*JSONToken] => sub {
-    # TODO ...
+
+    # can this token be the end of a sequence
+    method is_terminal => {
+        StartObject   => sub ( ) { 0 },
+        EndObject     => sub ( ) { 1 },
+
+        StartProperty => sub ($) { 0 },
+        EndProperty   => sub ( ) { 1 },
+
+        StartArray    => sub ( ) { 0 },
+        EndArray      => sub ( ) { 1 },
+
+        StartItem     => sub ($) { 0 },
+        EndItem       => sub ( ) { 1 },
+
+        AddString     => sub ($) { 1 },
+        AddInt        => sub ($) { 1 },
+        AddFloat      => sub ($) { 1 },
+        AddTrue       => sub ( ) { 1 },
+        AddFalse      => sub ( ) { 1 },
+        AddNull       => sub ( ) { 1 },
+    };
+
+    # can this token be the start of sequence
+    method is_start => {
+        StartObject   => sub ( ) { 1 },
+        EndObject     => sub ( ) { 0 },
+
+        StartProperty => sub ($) { 1 },
+        EndProperty   => sub ( ) { 0 },
+
+        StartArray    => sub ( ) { 1 },
+        EndArray      => sub ( ) { 0 },
+
+        StartItem     => sub ($) { 1 },
+        EndItem       => sub ( ) { 0 },
+
+        AddString     => sub ($) { 1 },
+        AddInt        => sub ($) { 1 },
+        AddFloat      => sub ($) { 1 },
+        AddTrue       => sub ( ) { 1 },
+        AddFalse      => sub ( ) { 1 },
+        AddNull       => sub ( ) { 1 },
+    };
+
 };
 
 # ...
@@ -60,10 +102,15 @@ my sub drain_until_marker ($acc, $marker) {
 sub process_tokens ($tokens) {
     state $json_type = lookup_type( *ELO::JSON::JSON );
 
+    # TODO:
+    # - verify that the start token is is_start
+    # - verify that the last token is is_terminal
+
     my $acc = [];
     foreach my $token (@$tokens) {
         process_token( $token, $acc );
     }
+
     if ( scalar @$acc == 1 && $json_type->check( $acc->[0] ) ) {
         #warn "WOOT!" . Dumper $acc->[0];
         return $acc->[0];
@@ -80,7 +127,6 @@ sub process_token ($token, $acc=[]) {
     state $ARRAY_MARKER    = \3;
     state $ITEM_MARKER     = \4;
 
-    #warn Dumper ref($t), $acc;
     try {
         match[ *JSONToken => $token ], +{
             StartObject   => sub () { push @$acc => $OBJECT_MARKER },
@@ -116,8 +162,6 @@ sub process_token ($token, $acc=[]) {
             AddTrue       => sub () { push @$acc => ELO::JSON::True()  },
             AddFalse      => sub () { push @$acc => ELO::JSON::False() },
             AddNull       => sub () { push @$acc => ELO::JSON::Null()  },
-
-            Error         => sub ( $error ) { },
         };
     } catch ($e) {
         die 'JSON token processing failed: '.$e;
