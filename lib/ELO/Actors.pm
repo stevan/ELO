@@ -5,6 +5,7 @@ use experimental 'try', 'builtin';
 use builtin    qw[ blessed ];
 use Sub::Util  qw[ set_subname ];
 use List::Util qw[ mesh ];
+use Carp       qw[ confess ];
 
 use ELO::Types qw[
     lookup_type
@@ -58,25 +59,25 @@ sub receive (@args) {
 
     if ( scalar @args == 1 ) {
         ref $args[0] eq 'HASH'
-            || die 'If you only pass one arg to receive then it must be a HASH ref';
+            || confess 'If you only pass one arg to receive then it must be a HASH ref';
         $name = (caller(1))[3];
         $name =~ s/^main\:\://; # strip off main::
         $receivers = $args[0];
     }
     else {
         ref $args[0] eq 'ARRAY' && ref $args[1] eq 'HASH'
-            || die 'If you pass two args to receive then it must be an ARRAY ref and a HASH ref';
+            || confess 'If you pass two args to receive then it must be an ARRAY ref and a HASH ref';
         $receivers = $args[1];
         if ( scalar $args[0]->@* == 2 ) {
             ($name, $protocol) = $args[0]->@*;
             $protocol = lookup_type( $protocol )
-                or die 'Could not find protocol('.$protocol.')';
+                or confess 'Could not find protocol('.$protocol.')';
 
         }
         elsif ( scalar $args[0]->@* == 1 ) {
             if ( ref \($args[0]->[0]) eq 'GLOB' ) {
                 $protocol = lookup_type( $args[0]->[0] )
-                    or die 'Could not find protocol('.$protocol.')';
+                    or confess 'Could not find protocol('.$protocol.')';
                 $name = (caller(1))[3];
                 $name =~ s/^main\:\://; # strip off main::
             }
@@ -85,7 +86,7 @@ sub receive (@args) {
             }
         }
         else {
-            die 'Too many args to receive [@args] +{}, expected 2 @args, got '.scalar $args[0]->@*;
+            confess 'Too many args to receive [@args] +{}, expected 2 @args, got '.scalar $args[0]->@*;
         }
     }
 
@@ -126,19 +127,19 @@ sub match ($target, $table) {
 
         if ( $type_checker isa ELO::Core::Type::Event ) {
             $type_checker->check( \@args )
-                or die "Event($type) failed to type check (".(join ', ' => @args).")";
+                or confess "Event($type) failed to type check (".(join ', ' => @args).")";
             $match = $table->{ $type }
-                or die "Unable to find match for Event($type)";
+                or confess "Unable to find match for Event($type)";
         }
         elsif ( $type_checker isa ELO::Core::Type::Event::Protocol ) {
 
             my ($msg) = @args;
             $type_checker->check( $msg )
-                or die "Event::Protocol($type) failed to type check msg(".(join ', ' => @$msg).")";
+                or confess "Event::Protocol($type) failed to type check msg(".(join ', ' => @$msg).")";
 
             my ($event, @_args) = @$msg;
             $match = $table->{ $event }
-                or die "Unable to find match for Event::Protocol($type) with event($event)";
+                or confess "Unable to find match for Event::Protocol($type) with event($event)";
             # fixup the args ...
             @args = @_args;
 
@@ -146,34 +147,37 @@ sub match ($target, $table) {
         elsif ( $type_checker isa ELO::Core::Type::TaggedUnion ) {
             my ($arg) = @args;
             $type_checker->check( $arg )
-                or die "TaggedUnion::Constructor($type) failed to type check instance of ($arg)";
+                or confess "TaggedUnion::Constructor($type) failed to type check instance of ($arg)";
             # TODO: check the members of table as well
             my $tag = $type_checker->cases->{ blessed( $arg ) }->symbol;
             $match = $table->{ $tag }
-                or die "Unable to find match for TaggedUnion::Constructor($type) with tag($tag)";
+                or confess "Unable to find match for TaggedUnion::Constructor($type) with tag($tag)";
             # deconstruct the args now ...
             @args = @$arg;
         }
         elsif ( $type_checker isa ELO::Core::Type::Enum ) {
             my ($enum_val) = @args;
             $type_checker->check( $enum_val )
-                or die "Enum($type) failed to type check instance of ($enum_val)";
+                or confess "Enum($type) failed to type check instance of ($enum_val)";
             # TODO: check the members of table as well
             $match = $table->{ $enum_val }
-                or die "Unable to find match for Enum($type) with value($enum_val)";
+                or confess "Unable to find match for Enum($type) with value($enum_val)";
             # clear the args now ...
             @args = ();
         }
         else {
-            die "matching on T($type_checker) is not (yet) supported";
+            confess "matching on T($type_checker) is not (yet) supported";
         }
+    }
+    else {
+        confess "Could not locate type($type), no match available";
     }
     # check other types as well ...
 
     try {
         $match->(@args);
     } catch ($e) {
-        die "Match failed because: $e";
+        confess "Match failed because: $e";
     }
 }
 
