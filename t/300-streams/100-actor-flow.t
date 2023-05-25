@@ -33,10 +33,17 @@ sub Observer ($num_elements, $subscriber) {
     receive[*Observer], +{
         *OnComplete => sub ($this) {
             $log->info( $this, '*OnComplete observed');
-            unless ($done) {
-                $log->info( $this, '*OnComplete circuit breaker tripped sending *OnComplete to ('.$subscriber->pid.')');
-                $this->send( $subscriber, [ *OnComplete ] );
+
+            if (!$done) {
+                $log->info( $this, '*OnComplete circuit breaker tripped');
                 $done = 1;
+            }
+
+            $seen++;
+            if ( $num_elements <= $seen ) {
+                $log->info( $this, '*OnComplete observed seen('.$seen.') of ('.$num_elements.') sending *OnComplete to ('.$subscriber->pid.')');
+                $this->send( $subscriber, [ *OnComplete ] );
+                $seen = 0;
             }
         },
         *OnNext => sub ($this, $value) {
@@ -45,8 +52,6 @@ sub Observer ($num_elements, $subscriber) {
             $seen++;
             if ( $num_elements <= $seen ) {
                 $log->info( $this, '*OnNext observed seen('.$seen.') of ('.$num_elements.') sending *OnRequestComplete to ('.$subscriber->pid.')');
-                # FIXME:
-                # Should this be in the next tick?
                 $this->send( $subscriber, [ *OnRequestComplete ] );
                 $seen = 0;
                 $done = 1;
@@ -132,7 +137,9 @@ sub Subscription ($publisher, $subscriber) {
             $observer->trap( *SIGEXIT );
 
             while ($num_elements--) {
-                $this->send( $publisher, [ *GetNext => $observer ]);
+                timer( $this, rand(3), sub {
+                    $this->send( $publisher, [ *GetNext => $observer ]);
+                });
             }
         },
         *Cancel => sub ($this) {
@@ -199,7 +206,9 @@ sub Publisher ($source) {
 
             if ( $next ) {
                 $log->info( $this, '... *GetNext sending ('.$next.')');
-                $this->send( $observer, [ *OnNext => $next ]);
+                timer( $this, rand(3), sub {
+                    $this->send( $observer, [ *OnNext => $next ]);
+                });
             }
             else {
                 $this->send( $observer, [ *OnComplete ]);
@@ -244,11 +253,13 @@ package Sink {
     );
 
     sub drip ($self, $x) {
+        #warn "---------------------------------> DRIP($x)\n";
         return if $self->{_done}; # the real thing should do more ...
         push $self->{_sink}->@* => $x;
     }
 
     sub done ($self) {
+        #warn "---------------------------------> DONE\n";
         $self->{_done} = 1;
     }
 
@@ -259,8 +270,18 @@ package Sink {
     }
 }
 
-my $Sink   = Sink->new;
-my $Source = Source->new( end => 50 );
+# ...
+
+my $MAX_ITEMS = 25;
+
+my $Source = Source->new( end => $MAX_ITEMS );
+my @Sinks = (
+    Sink->new,
+    Sink->new,
+    Sink->new,
+);
+
+# ...
 
 sub Init () {
 
@@ -268,8 +289,9 @@ sub Init () {
 
         my $publisher   = $this->spawn( Publisher( $Source ) );
         my @subscribers = (
-            $this->spawn( Subscriber( 5,  $Sink ) ),
-            $this->spawn( Subscriber( 10, $Sink ) ),
+            $this->spawn( Subscriber( 5,  $Sinks[0] ) ),
+            $this->spawn( Subscriber( 10, $Sinks[1] ) ),
+            $this->spawn( Subscriber( 2,  $Sinks[2] ) ),
         );
 
         # trap exits for all
@@ -297,11 +319,15 @@ sub Init () {
 
 ELO::Loop->run( Init(), logger => $log );
 
+my @results = sort { $a <=> $b } map $_->drain, @Sinks;
+
 is_deeply(
-    [ sort { $a <=> $b } $Sink->drain ],
-    [ 1 .. 50 ],
+    [ @results ],
+    [ 1 .. $MAX_ITEMS ],
     '... saw all exepected values'
 );
+
+#warn Dumper \@results;
 
 done_testing;
 

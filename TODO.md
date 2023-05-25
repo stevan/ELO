@@ -29,6 +29,29 @@
 
 - implement Conways Game of Life for a good example
 
+- calculate `fibonacci` async-ly
+
+```perl
+sub fibonacci ($number) {
+    state %calculated;
+
+    if (exists $calculated{$number}) {
+        print '<SKIP>';
+        return $calculated{$number} ;
+    }
+
+    if ($number < 2) { # base case
+        return $calculated{$number} = $number;
+    }
+    print "-";
+    return $calculated{$number} = (fibonacci($number-1) + fibonacci($number-2));
+}
+
+print (fibonacci($_),"\n") foreach (1 .. 10);
+
+print (fibonacci(int(rand(175))),"\n") foreach (1 .. 175);
+```
+
 - See `EVENTS.md`
     - consider supporting (but ignoring) fieldnames in
       the events
