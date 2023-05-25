@@ -73,10 +73,10 @@ for values.
               :
               :              +-------------(3)------------+--(3a.)--<spawn>-->[Subscription]
               :              |                            |
-[ Source ]----:-------> [Publisher]                    (3b.)
+[ Source ]----:-------> [Publisher]                     (3b.)
               :              ^                            |
               :              |                            |
-              :   {*Subscribe, $subscriber}   {*OnSubscribe, $subscription}
+              :  {*Subscribe, $subscriber}   {*OnSubscribe, $subscription}
               :              |                            |
               :             (2)                           |
               :              |                            |
@@ -85,11 +85,11 @@ for values.
               :
               :
 Legend:
+ :  - async boundary
 ( ) - Step
 [ ] - Actor
 { } - Event
 < > - action
- :  - async boundary
 
 ```
 
@@ -139,6 +139,10 @@ Legend:
 
 ### Status
 
+This represents on request cycle for a `Subscriber`, where `$n` values can be requested
+and then subsequently delivered. At this point the `Subscriber` must choose to singal for
+more need or not.
+
 ```
 
                                   {*OnNext, $val}
@@ -146,20 +150,20 @@ Legend:
       |                           {*OnError,  $e}                                     |
       |                                                                              (4)
       V                                                                               |
-[Subscriber]--(1)--{*Request, $n}--> [Subscription]---(2)--+--(2a.)--<spawns>--> [Observer] <-----+
-      |                                                    |                                      |
-     (5)                                                 (2b.)                                    |
-      |                                                    |                                      |
-    <drip>                                            <repeat $n>                                 |
-      |                                                    |                                {*OnNext, $val}
-      V                                           {*GetNext, $observer}                     {*OnComplete, }
-    [Sink]                                                 |                                {*OnError,  $e}
-                                                           V                                      |
-                                                       [Publisher]                                |
-                                                           |                                      |
-                                                          (3)--+--(3.a)--<get_next>->[Source]     |
-                                                               |                                  |
-                                                             (3.b)--------------------------------+
+[Subscriber]--(1)--{*Request, $n}--> [Subscription]--(2)--+--(2a.)--<spawns>--> [Observer] <--+
+      |                                                   |                                   |
+     (5)                                                (2b.)                                 |
+      |                                                   |                                   |
+    <drip>                                           <repeat $n>                              |
+      |                                                   |                             {*OnNext, $val}
+      V                                          {*GetNext, $observer}                  {*OnComplete, }
+    [Sink]                                                |                             {*OnError,  $e}
+                                                          V                                   |
+                                                      [Publisher]                             |
+                                                          |                                   |
+                                                         (3)--(3.a)--<get_next>-->[Source]    |
+                                                          |                                   |
+                                                          +---(3.b)---------------------------+
 
 Legend:
 () - Step
@@ -170,7 +174,7 @@ Legend:
 ```
 
 <!-------------------------------------------------------->
-## Phase 3 - COMPLETE
+## Phase 3 - REFRESH
 <!-------------------------------------------------------->
 
 
