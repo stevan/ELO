@@ -192,15 +192,16 @@ sub Publisher ($source) {
         },
         *GetNext => sub ($this, $observer) {
             $log->info( $this, '*GetNext called with ('.$observer->pid.')');
-            if ( $source->has_next ) {
 
-                my $next;
-                try {
-                    $next = $source->next;
-                } catch ($e) {
-                    $this->send( $observer, [ *OnError => $e ]);
-                }
+            my $next;
+            try {
+                $next = $source->get_next;
+            } catch ($e) {
+                $this->send( $observer, [ *OnError => $e ]);
+                return;
+            }
 
+            if ( $next ) {
                 $log->info( $this, '... *GetNext sending ('.$next.')');
                 $this->send( $observer, [ *OnNext => $next ]);
             }
@@ -219,7 +220,7 @@ package Source {
     use v5.36;
     use parent 'UNIVERSAL::Object';
     use slots (
-        start => sub { 1 },
+        start => sub { 0 },
         end   => sub { 10 },
         # ...
         _count => sub {},
@@ -227,8 +228,15 @@ package Source {
 
     sub BUILD ($self, $) { $self->{_count} = $self->{start} }
 
-    sub has_next ($self) { $self->{_count} <= $self->{end} }
-    sub next     ($self) { $self->{_count}++ }
+    sub get_next ($self) {
+        $self->{_count}++;
+        if ( $self->{_count} <= $self->{end} ) {
+            return $self->{_count};
+        }
+        else {
+            return;
+        }
+    }
 }
 
 package Sink {
@@ -269,14 +277,14 @@ sub Init () {
         );
 
         # trap exits for all
-        $this->trap( *SIGEXIT );
-        $publisher->trap( *SIGEXIT );
-        $_->trap( *SIGEXIT ) foreach @subscribers;
+        $_->trap( *SIGEXIT )
+            foreach ($this, $publisher, @subscribers);
 
         # link this to the publisher
         $this->link( $publisher );
         # and the publisher to the subsribers
         $publisher->link( $_ ) foreach @subscribers;
+
 
         $this->send( $publisher, [ *Subscribe => $_ ]) foreach @subscribers;
 

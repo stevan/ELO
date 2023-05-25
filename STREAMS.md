@@ -228,6 +228,14 @@ Legend:
 
 ### Status
 
+At this point the system has shutdown, all except the `Publisher` and `Subscriber`
+both of which are not owned by this flow.
+
+> NOTE:
+> It is possible that there are still inflight events so we
+> are relying on these messags to be handled correctly.
+
+
 ```
 
             :
@@ -263,49 +271,6 @@ Legend:
 <>  - action
 [/] - circuit breaker
 
-```
-
-### Appendix
-
-### Step 7.
-
-- `Publisher`
-    - if `*GetNext` is called and:
-        - the `Observer` process is not alive
-            - throw error??
-        - otherwise, send `*OnError` to `Observer`
-        - all subsequent calls will be ignored because of a circuit breaker
-
-```
-
-            :
-            :               |
-            :       <in flight request>
-            :               |
-            :      {*GetNext, $observer}
-            :               |
-            :               V
-            :          [Publisher]
-            :               |
-            :              (7)[/]---<ignore>-->*
-            :               |
-            :      <is_alive $observer>
-            :         |            |
-            :       <YES>         <NO>
-            :         |            |
-            :    {*OnError}     <ignore>
-            :         |
-            :         V
-            :    [$observer]
-            :
-
-Legend:
-:   - async boundary
-()  - Step
-[]  - Actor
-{}  - Event
-<>  - action
-[/] - circuit breaker
 ```
 
 <!-------------------------------------------------------->
