@@ -37,6 +37,10 @@ my @PERL_TYPES = (
     *ArrayRef, # an ARRAY reference
     *HashRef,  # a HASH reference
 
+    # NOT SERIALIZABLE:
+
+    *CodeRef,  # a CODE reference
+
     # TODO: we need an object type
     # *Blessed is too simple, but might
     # work for now, but then again it
@@ -492,6 +496,11 @@ type *ArrayRef, sub ($array_ref) {
 type *HashRef, sub ($hash_ref) {
     return defined($hash_ref)                   # it is defined ...
         && ref($hash_ref) eq 'HASH'             # and it is a HASH reference
+};
+
+type *CodeRef, sub ($code_ref) {
+    return defined($code_ref)                   # it is defined ...
+        && ref($code_ref) eq 'CODE'             # and it is a CODE reference
 };
 
 # -----------------------------------------------------------------------------

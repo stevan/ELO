@@ -17,6 +17,25 @@ use ok 'ELO::Actors', qw[ match ];
 
 use ELO::JSON;
 use ELO::JSON::Token;
+use ELO::JSON::Token::Source;
+
+
+subtest '... testing the JSON Token Source type' => sub {
+    my $from_list = ELO::JSON::Token::Source::FromList([ 1 .. 10 ]);
+    my $from_gen  = ELO::JSON::Token::Source::FromGenerator(sub { state $x = 1; $x <= 10 ? $x++ : undef });
+
+    foreach (1 .. 10) {
+        is($from_list->get_next, $_, '... got the expected value from FromList');
+        is($from_gen->get_next, $_, '... got the expected value from FromGenerator');
+    }
+
+    ok(! defined $from_list->get_next, '... got the expected value (undef) from FromList');
+    ok(! defined $from_gen->get_next, '... got the expected value (undef) from FromGenerator');
+
+    ok(! defined $from_list->get_next, '... got the expected value (undef) from FromList');
+    ok(! defined $from_gen->get_next, '... got the expected value (undef) from FromGenerator');
+};
+
 
 subtest '... testing the JSON type' => sub {
 
@@ -30,6 +49,9 @@ subtest '... testing the JSON type' => sub {
     ]);
 
     ok( lookup_type(*ELO::JSON::JSON)->check( $json ), '... the JSON object type checked correctly' );
+
+    isa_ok($json, 'ELO::JSON::JSON::Object');
+    isa_ok($json, '*ELO::JSON::JSON::Object');
 
     is_deeply(
         $json->to_perl,
@@ -75,10 +97,24 @@ subtest '... testing the JSON type' => sub {
         ELO::JSON::Token::EndObject()
     );
 
+    my $source = ELO::JSON::Token::Source::FromList( [ @tokens ] );
+
     my $acc = [];
     foreach my $token (@tokens) {
         ok( lookup_type(*ELO::JSON::Token::JSONToken)->check( $token ), '... the JSONToken object type checked correctly' );
         ELO::JSON::Token::process_token( $token, $acc );
+    }
+
+    try {
+        ELO::JSON::Token::process_token( $_, $acc ) foreach (
+            ELO::JSON::Token::StartObject(),
+                ELO::JSON::Token::StartProperty( "Foo" ),
+                    ELO::JSON::Token::AddString( "Bar" ),
+            ELO::JSON::Token::EndObject()
+        );
+        fail('... this should have thrown an exception');
+    } catch ($e) {
+        like($e, qr/marker\(OBJECT\) but got marker\(PROPERTY\)/, '... got the expected error');
     }
 
     #warn Dumper \@tokens;
@@ -86,7 +122,14 @@ subtest '... testing the JSON type' => sub {
     my ($json1) = @$acc;
     my $json2 = ELO::JSON::Token::process_tokens( \@tokens );
 
-    foreach my $json ($json1, $json2) {
+    my $_acc = [];
+    my $t;
+    while ($t = $source->get_next) {
+        ELO::JSON::Token::process_token( $t, $_acc );
+    }
+    my ($json3) = @$_acc;
+
+    foreach my $json ($json1, $json2, $json3) {
         isa_ok($json, '*ELO::JSON::JSON::Object');
 
         is_deeply(
@@ -115,6 +158,55 @@ subtest '... testing the JSON type' => sub {
     } catch ($e) {
         like( $e, qr/^JSON token processing failed/, '... this throws an expection');
     }
+};
+
+subtest '... testing the JSON Source type' => sub {
+    my $source = ELO::JSON::Token::Source::FromGenerator(sub {
+        state $counter = 1;
+        state @buffer  = (ELO::JSON::Token::StartArray());
+
+        unless (@buffer) {
+            if ($counter <= 10) {
+                #warn "BEGIN $counter";
+                @buffer = (
+                    ELO::JSON::Token::StartItem( $counter ),
+                        ELO::JSON::Token::AddInt( $counter++ ),
+                    ELO::JSON::Token::EndItem(),
+                );
+
+                if ($counter % 2 == 0) {
+                    #warn "START $counter";
+                    unshift @buffer => ELO::JSON::Token::StartArray();
+                }
+                elsif ($counter > 0) {
+                    #warn "END $counter";
+                    push @buffer => ELO::JSON::Token::EndArray();
+                }
+
+                if ($counter > 10) {
+                    #warn "ENDALL $counter";
+                    push @buffer => ELO::JSON::Token::EndArray();
+                }
+            }
+        }
+
+        #warn Dumper \@buffer;
+        shift @buffer;
+    });
+
+    my $acc = [];
+    my $t;
+    while ($t = $source->get_next) {
+        ELO::JSON::Token::process_token( $t, $acc );
+    }
+    my ($json) = @$acc;
+
+    is(
+        $json->to_string,
+        '[[1, 2], [3, 4], [5, 6], [7, 8], [9, 10]]',
+        '... encode works'
+    );
+
 };
 
 done_testing;

@@ -82,22 +82,10 @@ typeclass[*JSONToken] => sub {
 
 };
 
-# ...
-
-my sub drain_until_marker ($acc, $marker) {
-    my @local;
-    while (@$acc) {
-        if ( $acc->[-1] eq $marker ) {
-            pop @$acc;
-            last;
-        }
-        else {
-            unshift @local => pop @$acc;
-        }
-    }
-    @local;
-}
-
+# -----------------------------------------------------------------------------
+# TODO: Move this to a sub-module, myabe Token::Util
+# -----------------------------------------------------------------------------
+# ...  processing tokens into JSON...
 
 sub process_tokens ($tokens) {
     state $json_type = lookup_type( *ELO::JSON::JSON );
@@ -121,12 +109,36 @@ sub process_tokens ($tokens) {
     return $acc;
 }
 
-sub process_token ($token, $acc=[]) {
-    state $OBJECT_MARKER   = \1;
-    state $PROPERTY_MARKER = \2;
-    state $ARRAY_MARKER    = \3;
-    state $ITEM_MARKER     = \4;
+my $OBJECT_MARKER   = \'OBJECT';
+my $PROPERTY_MARKER = \'PROPERTY';
+my $ARRAY_MARKER    = \'ARRAY';
+my $ITEM_MARKER     = \'ITEM';
 
+my %MARKERS = map { $_ => 1 } (
+    $OBJECT_MARKER,
+    $PROPERTY_MARKER,
+    $ARRAY_MARKER,
+    $ITEM_MARKER,
+);
+
+my sub drain_until_marker ($acc, $marker) {
+    my @local;
+    while (@$acc) {
+        if ( $MARKERS{$acc->[-1]} && $acc->[-1] eq $marker ) {
+            pop @$acc;
+            last;
+        }
+        elsif ( $MARKERS{$acc->[-1]} ) {
+            die 'Expected marker('.$marker->$*.') but got marker('.$acc->[-1]->$*.') instead';
+        }
+        else {
+            unshift @local => pop @$acc;
+        }
+    }
+    @local;
+}
+
+sub process_token ($token, $acc=[]) {
     try {
         match[ *JSONToken => $token ], +{
             StartObject   => sub () { push @$acc => $OBJECT_MARKER },
@@ -166,6 +178,8 @@ sub process_token ($token, $acc=[]) {
     } catch ($e) {
         die 'JSON token processing failed: '.$e;
     };
+
+    return;
 }
 
 1;

@@ -40,8 +40,8 @@ typeclass[*JSON] => sub {
         String   => sub ( $Str        ) { $Str   },
         Int      => sub ( $Int        ) { $Int   },
         Float    => sub ( $Float      ) { $Float },
-        True     => sub ()              { !!1    },
-        False    => sub ()              { !!0    },
+        True     => sub ()              { 1      },
+        False    => sub ()              { 0      },
         Null     => sub ()              { undef  },
     };
 
