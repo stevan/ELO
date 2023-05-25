@@ -2,6 +2,8 @@
 # ELO Streams
 <!-------------------------------------------------------->
 
+## Concepts
+
 - `Source`
     - this is a syncronous component
     - provides a feed of values via a `next` method
@@ -13,6 +15,7 @@
     - this captures a feed of values via `drip` method
         - typically from a `Subscriber`
     - these values can be accessed via a `drain` method
+
 
 - `Publisher`
     - this is a asyncronous component
@@ -29,7 +32,6 @@
 - `Observer`
     - this is a asyncronous component
     - This serves as a bridge between a `Publisher` and `Subscriber`
-
 
 <!-------------------------------------------------------->
 ## Phase 1 - Connect
@@ -67,24 +69,27 @@ for values.
 
 ```
 
-
-                        +------------ (3)------------+--(3a.)--<spawn>-->[Subscription]
-                        |                            |
-[ Source ] --(1)--> [Publisher]                    (3b.)
-                        ^                            |
-                        |                            |
-             {*Subscribe, $subscriber}   {*OnSubscribe, $subscription}
-                        |                            |
-                       (2)                           |
-                        |                            |
-  [ Sink ] --(1)--> [Subscriber] <-------------------+
-
-
+              :
+              :
+              :              +-------------(3)------------+--(3a.)--<spawn>-->[Subscription]
+              :              |                            |
+[ Source ]----:-------> [Publisher]                    (3b.)
+              :              ^                            |
+              :              |                            |
+              :   {*Subscribe, $subscriber}   {*OnSubscribe, $subscription}
+              :              |                            |
+              :             (2)                           |
+              :              |                            |
+  [ Sink ]----:-------> [Subscriber] <--------------------+
+              :
+              :
+              :
 Legend:
-() - Step
-[] - Actor
-{} - Event
-<> - action
+( ) - Step
+[ ] - Actor
+{ } - Event
+< > - action
+ :  - async boundary
 
 ```
 
@@ -141,21 +146,20 @@ Legend:
       |                           {*OnError,  $e}                                     |
       |                                                                              (4)
       V                                                                               |
-[Subscriber] --(1)--{*Request, $n}--> [Subscription] --(2)--+--(2a.)--<spawns>--> [Observer] <-----+
-      |                                                     |                                      |
-     (5)                                                  (2b.)                                    |
-      |                                                     |                                      |
-    <drip>                                             <repeat $n>                                 |
-      |                                                     |                                {*OnNext, $val}
-      V                                            {*GetNext, $observer}                     {*OnComplete, }
-    [Sink]                                                  |                                {*OnError,  $e}
-                                                            V                                      |
-                                                        [Publisher]                                |
-                                                            |                                      |
-                                                           (3)--+--(3.a)--<get_next>->[Source]     |
-                                                                |                                  |
-                                                              (3.b)--------------------------------+
-
+[Subscriber]--(1)--{*Request, $n}--> [Subscription]---(2)--+--(2a.)--<spawns>--> [Observer] <-----+
+      |                                                    |                                      |
+     (5)                                                 (2b.)                                    |
+      |                                                    |                                      |
+    <drip>                                            <repeat $n>                                 |
+      |                                                    |                                {*OnNext, $val}
+      V                                           {*GetNext, $observer}                     {*OnComplete, }
+    [Sink]                                                 |                                {*OnError,  $e}
+                                                           V                                      |
+                                                       [Publisher]                                |
+                                                           |                                      |
+                                                          (3)--+--(3.a)--<get_next>->[Source]     |
+                                                               |                                  |
+                                                             (3.b)--------------------------------+
 
 Legend:
 () - Step

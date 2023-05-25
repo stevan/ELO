@@ -9,6 +9,7 @@ use Test::ELO;
 
 use Data::Dumper;
 
+use Sub::Util  ();
 use Hash::Util qw[fieldhash];
 
 use ok 'ELO::Loop';
@@ -38,7 +39,9 @@ my $log = Test::ELO->create_logger;
 #   - given a Souce, this can publish the contents of it
 # -----------------------------------------------------------------------------
 
-sub CreateObserver ($symbol, $T) {
+sub observer ($symbol, $types) {
+    my $T = shift @$types;
+
     protocol $symbol => sub {
         event *OnComplete  => ();
         event *OnNext      => ( $T );
@@ -48,8 +51,7 @@ sub CreateObserver ($symbol, $T) {
     my $actor = "$symbol";
        $actor =~ s/^\*//;
 
-    no strict 'refs';
-    *{$actor} = sub (%callbacks) {
+    *$symbol = Sub::Util::set_subname($actor, sub (%callbacks) {
 
         receive[$symbol], +{
             *OnComplete => sub ($this) {
@@ -66,10 +68,10 @@ sub CreateObserver ($symbol, $T) {
                 $callbacks{*OnError}->($this, $error) if $callbacks{*OnError};
             },
         }
-    };
+    });
 }
 
-CreateObserver( *JSONTokenObserver, *ELO::JSON::Token::JSONToken );
+observer *JSONTokenObserver => [ *ELO::JSON::Token::JSONToken ];
 
 # protocol *JSONTokenObserver => sub {
 #     event *OnComplete  => ();
