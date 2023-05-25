@@ -32,9 +32,12 @@
 - `Observer`
     - this is a asyncronous component
     - This serves as a bridge between a `Publisher` and `Subscriber`
+    - it watches for a specific amount of requests from a `Publisher`
+        - and forwards to a `Subscriber`
+        - an event is sent to the `Subscriber` when all requests have been seen
 
 <!-------------------------------------------------------->
-## Phase 1 - Connect
+## Phase 1 - CONNECT
 <!-------------------------------------------------------->
 
 ### Step 1.
@@ -71,9 +74,9 @@ for values.
 
               :
               :
-              :              +-------------(3)------------+--(3a.)--<spawn>-->[Subscription]
+              :              +-------------(3)------------+--(3.a)--<spawn>-->[Subscription]
               :              |                            |
-[ Source ]----:-------> [Publisher]                     (3b.)
+[ Source ]----:-------> [Publisher]                     (3.b)
               :              ^                            |
               :              |                            |
               :  {*Subscribe, $subscriber}   {*OnSubscribe, $subscription}
@@ -84,6 +87,7 @@ for values.
               :
               :
               :
+
 Legend:
  :  - async boundary
 ( ) - Step
@@ -112,6 +116,7 @@ Legend:
 - `Subscription`
     - receives the `*Request` event
         - spawns a new `Observer` that is connected the `Subscriber`
+            - the observer watches for a specific number of requests
         - sends the requested amount of `*GetNext` events to the `Publisher`
             - with the `Observer` as the return address
 
@@ -130,6 +135,7 @@ Legend:
 - `Observer`
     - receives the `*OnNext`, `*OnComplete` & `*OnError` events response from `Publisher`
         - forwards event to `Subscriber`
+        - if `Observer` has seen all requests it sends `*OnRequestComplete` to `Subscriber`
 
 ### Step 5.
 
@@ -140,32 +146,37 @@ Legend:
 ### Status
 
 This represents on request cycle for a `Subscriber`, where `$n` values can be requested
-and then subsequently delivered. At this point the `Subscriber` must choose to singal for
-more need or not.
+from the `Publisher` which are then subsequently delivered to the `Observer`. When all
+values are delivered to the `Observer` it will signal the `Subscriber` accordingly. At
+this point the `Subscriber` must choose if it wants to singal for more need.
 
 ```
 
-                                  {*OnNext, $val}
-      +---------------------------{*OnComplete, }-------------------------------------+
-      |                           {*OnError,  $e}                                     |
-      |                                                                              (4)
-      V                                                                               |
-[Subscriber]--(1)--{*Request, $n}--> [Subscription]--(2)--+--(2a.)--<spawns>--> [Observer] <--+
-      |                                                   |                                   |
-     (5)                                                (2b.)                                 |
-      |                                                   |                                   |
-    <drip>                                           <repeat $n>                              |
-      |                                                   |                             {*OnNext, $val}
-      V                                          {*GetNext, $observer}                  {*OnComplete, }
-    [Sink]                                                |                             {*OnError,  $e}
-                                                          V                                   |
-                                                      [Publisher]                             |
-                                                          |                                   |
-                                                         (3)--(3.a)--<get_next>-->[Source]    |
-                                                          |                                   |
-                                                          +---(3.b)---------------------------+
+                :            +------------------{*OnRequestComplete}----<if $n seen>----(4.b)--+
+                :            |                                                                 |
+                :            |                  {*OnNext,      $val}                           |
+                :            |   +--------------{*OnComplete       }--------------------(4.a)--+
+                :            |   |              {*OnError,       $e}                           |
+                :            |   |                                                            (4)
+                :            V   V                                                             |
+  [Sink] <---<drip>--(5)--[Subscriber]     [Subscription]--(2)--(2.a)--<spawns>--> [Observer]--+
+                :              |                  ^         |                          ^
+                :             (1)                 |       (2.b)                        |
+                :              |                  |         |                          |
+                :              +--{*Request, $n}--+    <repeat $n>                     |
+                :                                           |                   {*OnNext, $next}
+                :                                  {*GetNext, $observer}        {*OnComplete   }
+                :                                           |                   {*OnError,   $e}
+                :                                           V                          |
+                :                                       [Publisher]                    |
+                :                                           |                          |
+[Source] <--<get_next>------------------------------(3.a)--(3)--(3.b)------------------+
+                :
+                :
+
 
 Legend:
+:  - async boundary
 () - Step
 [] - Actor
 {} - Event
@@ -174,9 +185,89 @@ Legend:
 ```
 
 <!-------------------------------------------------------->
-## Phase 3 - REFRESH
+## Phase 3 - COMPLETE
 <!-------------------------------------------------------->
 
+### Step 1.
+
+- `Publisher`
+    - sends an `*OnComplete` to the `Observer`
+
+### Step 2.
+
+- `Observer`
+    - forwards the `*OnComplete` to the `Subscriber`
+        - trips a circuit breaker in `Observer` to only send this once
+
+### Step 3.
+
+- `Subscriber`
+    - receievs the `*OnComplete` event
+        - sends syncronous `done` call to `Sink` to let it know its done
+        - sends `*Cancel` to `Subscription`
+
+### Step 4.
+
+- `Subscription`
+    - receives the `*Cancel` event from the `Subscriber`
+        - sends `*Unsubscribe` event to the `Publisher`
+
+### Step 5.
+
+- `Publisher`
+    - receives the `*Unsubscribe` event from the `Subscription`
+        - sends `*OnUnsubscribe` signal to `Subscription`
+
+### Step 6.
+
+- `Subscription`
+    - receives the `*Unsubscribe` event from the `Publisher`
+        - sends `*OnUnsubscribe` signal to `Subscriber`
+        - sends `*SIGEXIT` to `Observer`
+        - exits()
+
+### Status
+
+```
+
+            :
+            :       +----------------------{*SIGEXIT}---------------------------+
+            :       |                                                           |
+            :       |        (5)--------{*OnUnsubscribe}---------------------+  |
+            :       |         |                                              |  |
+            :       |    [Publisher] <---------------------------+           |  |
+            :       |         |                                  |           |  |
+            :       |        (1)                                 |           |  |
+            :       |         |                                  |           |  |
+            :       |   {*OnComplete}                            |           |  |
+            :       |         |                                  |           |  |
+            :       |         V                                  |           |  |
+            :       +---> [Observer]                             |           |  |
+            :                 |                                  |           |  |
+            :               (2)[/]                         {*Unsubscribe}    |  |
+            :                 |                                  |           |  |
+            :           {*OnComplete}                           (4)          |  |
+            :                 |                                  |           |  |
+            :                 V                                  |           |  |
+[Sink] <--<done>--(3.a)--[Subscriber]--(3.b)--{*Cancel}--> [Subscription] <--+  |
+            :                 ^                                  |              |
+            :                 |                                  |              |
+            :                 +-------{*OnUnsubscribe}---(6.a)--(6)--(6.b)------+
+            :
+
+Legend:
+:   - async boundary
+()  - Step
+[]  - Actor
+{}  - Event
+<>  - action
+[/] - circuit breaker
+
+```
+
+<!-------------------------------------------------------->
+## Phase 4 - ERROR
+<!-------------------------------------------------------->
 
 
 

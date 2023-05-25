@@ -28,21 +28,30 @@ protocol *Observer => sub {
     event *OnError     => ( *Str );
 };
 
-sub Observer (%callbacks) {
+sub Observer ($num_elements, $subscriber) {
+
+    my $_seen = 0;
 
     receive[*Observer], +{
         *OnComplete => sub ($this) {
             $log->info( $this, '*OnComplete observed');
-            $callbacks{*OnComplete}->($this) if $callbacks{*OnComplete};
+            $this->send( $subscriber, [ *OnComplete ] );
         },
         *OnNext => sub ($this, $value) {
             $log->info( $this, '*OnNext observed with ('.$value.')');
-            $callbacks{*OnNext}->($this, $value) if $callbacks{*OnNext};
-
+            $this->send( $subscriber, [ *OnNext => $value ] );
+            $_seen++;
+            if ( $num_elements <= $_seen ) {
+                $log->info( $this, '*OnNext observed seen('.$_seen.') of ('.$num_elements.') sending *OnRequestComplete to ('.$subscriber->pid.')');
+                # FIXME:
+                # Should this be in the next tick?
+                $this->send( $subscriber, [ *OnRequestComplete ] );
+                $_seen = 0;
+            }
         },
         *OnError => sub ($this, $error) {
             $log->info( $this, '*OnError observed with ('.$error.')');
-            $callbacks{*OnError}->($this, $error) if $callbacks{*OnError};
+            $this->send( $subscriber, [ *OnError => $error ] );
         },
     }
 }
@@ -59,16 +68,10 @@ sub Subscription ($publisher, $subscriber) {
         *Request => sub ($this, $num_elements) {
             $log->info( $this, '*Request called with ('.$num_elements.')');
 
-            my $observer = $this->spawn(Observer(
-                *OnComplete => sub ($this)         { $this->send( $subscriber, [ *OnComplete ]        )},
-                *OnNext     => sub ($this, $value) { $this->send( $subscriber, [ *OnNext  => $value ] )},
-                *OnError    => sub ($this, $error) { $this->send( $subscriber, [ *OnError => $error ] )},
-            ));
+            my $observer = $this->spawn(Observer( $num_elements, $subscriber ));
 
             while ($num_elements--) {
-                #timer( $this, rand(2), sub {
-                    $this->send( $publisher, [ *GetNext => $observer ]);
-                #});
+                $this->send( $publisher, [ *GetNext => $observer ]);
             }
         },
         *Cancel => sub ($this) {
@@ -79,15 +82,15 @@ sub Subscription ($publisher, $subscriber) {
 }
 
 protocol *Subscriber => sub {
-    event *OnSubscribe => ( *Process );
-    event *OnComplete  => ();
-    event *OnNext      => ( *Scalar );
-    event *OnError     => ( *Str );
+    event *OnSubscribe       => ( *Process );
+    event *OnComplete        => ();
+    event *OnRequestComplete => ();
+    event *OnNext            => ( *Scalar );
+    event *OnError           => ( *Str );
 };
 
 sub Subscriber ($request_size, $sink) {
 
-    my @_buffer;
     my $_subscription;
 
     receive[*Subscriber], +{
@@ -99,24 +102,13 @@ sub Subscriber ($request_size, $sink) {
         *OnComplete => sub ($this) {
             $log->info( $this, '*OnComplete called');
         },
+        *OnRequestComplete => sub ($this) {
+            $log->info( $this, '*OnRequestComplete called');
+            $this->send( $_subscription, [ *Request => $request_size ]);
+        },
         *OnNext => sub ($this, $value) {
             $log->info( $this, '*OnNext called with ('.$value.')');
-
-            $sink->fill( $value );
-
-            push @_buffer => $value;
-            $log->info( $this, ['... *OnNext buffering: ', \@_buffer]);
-
-            if ( scalar(@_buffer) == $request_size ) {
-                # NOTE:
-                # We refresh when the buffer is full
-                @_buffer = sort { $a <=> $b } @_buffer;
-                $log->info( $this, ['... *OnNext buffer is full: ', [$request_size, scalar(@_buffer)], \@_buffer]);
-                @_buffer = ();
-                $log->info( $this, '... *OnNext requesting more from subscription('.$_subscription->pid.')');
-                $this->send( $_subscription, [ *Request => $request_size ]);
-            }
-
+            $sink->drip( $value );
         },
         *OnError => sub ($this, $error) {
             $log->info( $this, '*OnError called with ('.$error.')');
@@ -148,24 +140,22 @@ sub Publisher ($source) {
             $log->info( $this, '*UnSubscribe called with ('.$subscription->pid.')');
             @subscriptions = grep $_->pid ne $subscription->pid, @subscriptions;
         },
-        *GetNext => sub ($this, $subscription) {
-            $log->info( $this, '*GetNext called with ('.$subscription->pid.')');
+        *GetNext => sub ($this, $observer) {
+            $log->info( $this, '*GetNext called with ('.$observer->pid.')');
             if ( $source->has_next ) {
 
                 my $next;
                 try {
                     $next = $source->next;
                 } catch ($e) {
-                    $this->send( $subscription, [ *OnError => $e ]);
+                    $this->send( $observer, [ *OnError => $e ]);
                 }
 
                 $log->info( $this, '... *GetNext sending ('.$next.')');
-                timer( $this, rand(2), sub {
-                    $this->send( $subscription, [ *OnNext => $next ]);
-                });
+                $this->send( $observer, [ *OnNext => $next ]);
             }
             else {
-                $this->send( $subscription, [ *OnComplete ]);
+                $this->send( $observer, [ *OnComplete ]);
             }
         },
     }
@@ -194,7 +184,7 @@ package Sink {
         _sink => sub { +[] }
     );
 
-    sub fill ($self, $x) {
+    sub drip ($self, $x) {
         push $self->{_sink}->@* => $x;
     }
 
@@ -215,8 +205,8 @@ sub Init () {
         my @subscribers = (
             $this->spawn( Subscriber(5,  $sink) ),
             $this->spawn( Subscriber(10, $sink) ),
-            $this->spawn( Subscriber(2,  $sink) ),
-            $this->spawn( Subscriber(5,  $sink) ),
+            #$this->spawn( Subscriber(2,  $sink) ),
+            #$this->spawn( Subscriber(5,  $sink) ),
         );
 
         $this->trap( *SIGEXIT );
