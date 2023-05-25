@@ -13,6 +13,7 @@ use ok 'ELO::Loop';
 use ok 'ELO::Types',  qw[ :core :events :signals ];
 use ok 'ELO::Actors', qw[ receive match setup ];
 use ok 'ELO::Timers', qw[ :timers ];
+use ok 'ELO::Types',  qw[ *SIGEXIT ];
 
 my $log = Test::ELO->create_logger;
 
@@ -31,11 +32,16 @@ protocol *Observer => sub {
 sub Observer ($num_elements, $subscriber) {
 
     my $_seen = 0;
+    my $_done = 0;
 
     receive[*Observer], +{
         *OnComplete => sub ($this) {
             $log->info( $this, '*OnComplete observed');
-            $this->send( $subscriber, [ *OnComplete ] );
+            unless ($_done) {
+                $log->info( $this, '*OnComplete circuit breaker tripped sending *OnComplete to ('.$subscriber->pid.')');
+                $this->send( $subscriber, [ *OnComplete ] );
+                $_done = 1;
+            }
         },
         *OnNext => sub ($this, $value) {
             $log->info( $this, '*OnNext observed with ('.$value.')');
@@ -47,42 +53,24 @@ sub Observer ($num_elements, $subscriber) {
                 # Should this be in the next tick?
                 $this->send( $subscriber, [ *OnRequestComplete ] );
                 $_seen = 0;
+                $_done = 1;
             }
         },
         *OnError => sub ($this, $error) {
             $log->info( $this, '*OnError observed with ('.$error.')');
             $this->send( $subscriber, [ *OnError => $error ] );
         },
-    }
-}
-
-protocol *Subscription => sub {
-    event *Request => (*Int);
-    event *Cancel  => ();
-};
-
-sub Subscription ($publisher, $subscriber) {
-
-
-    receive[*Subscription], +{
-        *Request => sub ($this, $num_elements) {
-            $log->info( $this, '*Request called with ('.$num_elements.')');
-
-            my $observer = $this->spawn(Observer( $num_elements, $subscriber ));
-
-            while ($num_elements--) {
-                $this->send( $publisher, [ *GetNext => $observer ]);
-            }
-        },
-        *Cancel => sub ($this) {
-            $log->info( $this, '*Cancel called');
-            $this->send( $publisher, [ *UnSubscribe => $this ]);
+        *SIGEXIT => sub ($this, $from) {
+            $log->warn( $this, '... got SIGEXIT from ('.$from->pid.')');
+            $this->exit(0)
         }
     }
 }
 
+
 protocol *Subscriber => sub {
     event *OnSubscribe       => ( *Process );
+    event *OnUnsubscribe     => ();
     event *OnComplete        => ();
     event *OnRequestComplete => ();
     event *OnNext            => ( *Scalar );
@@ -99,8 +87,13 @@ sub Subscriber ($request_size, $sink) {
             $_subscription = $subscription;
             $this->send( $_subscription, [ *Request => $request_size ]);
         },
+        *OnUnsubscribe => sub ($this) {
+            $log->info( $this, '*OnUnsubscribe called');
+        },
         *OnComplete => sub ($this) {
             $log->info( $this, '*OnComplete called');
+            $sink->done;
+            $this->send( $_subscription, [ *Cancel ] );
         },
         *OnRequestComplete => sub ($this) {
             $log->info( $this, '*OnRequestComplete called');
@@ -112,14 +105,60 @@ sub Subscriber ($request_size, $sink) {
         },
         *OnError => sub ($this, $error) {
             $log->info( $this, '*OnError called with ('.$error.')');
-
         },
+        *SIGEXIT => sub ($this, $from) {
+            $log->warn( $this, '... got SIGEXIT from ('.$from->pid.')');
+            $this->exit(0);
+        }
+    }
+}
+
+protocol *Subscription => sub {
+    event *Request       => (*Int);
+    event *Cancel        => ();
+    event *OnUnsubscribe => ();
+};
+
+sub Subscription ($publisher, $subscriber) {
+
+    my $_observer;
+
+    receive[*Subscription], +{
+        *Request => sub ($this, $num_elements) {
+            $log->info( $this, '*Request called with ('.$num_elements.')');
+
+            if ( $_observer ) {
+                $log->info( $this, '*Request called, killing old observer ('.$_observer->pid.')');
+                $this->kill( $_observer );
+            }
+
+            $_observer = $this->spawn(Observer( $num_elements, $subscriber ));
+            $_observer->trap( *SIGEXIT );
+
+            while ($num_elements--) {
+                $this->send( $publisher, [ *GetNext => $_observer ]);
+            }
+        },
+        *Cancel => sub ($this) {
+            $log->info( $this, '*Cancel called');
+            $this->send( $publisher, [ *Unsubscribe => $this ]);
+        },
+        *OnUnsubscribe => sub ($this) {
+            $log->info( $this, '*OnUnsubscribe called');
+            $this->send( $subscriber, [ *OnUnsubscribe ]);
+            $this->kill( $_observer );
+            $this->exit(0);
+        },
+        *SIGEXIT => sub ($this, $from) {
+            $log->warn( $this, '... got SIGEXIT from ('.$from->pid.')');
+            $this->exit(0);
+        }
     }
 }
 
 protocol *Publisher => sub {
     event *Subscribe   => ( *Process );
-    event *UnSubscribe => ( *Process );
+    event *Unsubscribe => ( *Process );
 
     event *GetNext => ( *Process );
 };
@@ -127,18 +166,29 @@ protocol *Publisher => sub {
 sub Publisher ($source) {
 
     my @subscriptions;
+    my %unsubscribed;
 
     receive[*Publisher], +{
         *Subscribe => sub ($this, $subscriber) {
             $log->info( $this, '*Subscribe called with ('.$subscriber->pid.')');
 
             my $subscription = $this->spawn( Subscription( $this, $subscriber ) );
+            $subscriber->trap( *SIGEXIT );
+
             push @subscriptions => $subscription;
             $this->send( $subscriber, [ *OnSubscribe => $subscription ]);
         },
-        *UnSubscribe => sub ($this, $subscription) {
-            $log->info( $this, '*UnSubscribe called with ('.$subscription->pid.')');
+        *Unsubscribe => sub ($this, $subscription) {
+            $log->info( $this, '*Unsubscribe called with ('.$subscription->pid.')');
             @subscriptions = grep $_->pid ne $subscription->pid, @subscriptions;
+            $this->send( $subscription, [ *OnUnsubscribe ]);
+
+            if (scalar @subscriptions == 0) {
+                $log->info( $this, '*Unsubscribe called and no more subscrptions, exiting');
+                # TODO: this should be more graceful, sending
+                # a shutdown message or something, **shrug**
+                $this->exit(0);
+            }
         },
         *GetNext => sub ($this, $observer) {
             $log->info( $this, '*GetNext called with ('.$observer->pid.')');
@@ -158,6 +208,10 @@ sub Publisher ($source) {
                 $this->send( $observer, [ *OnComplete ]);
             }
         },
+        *SIGEXIT => sub ($this, $from) {
+            $log->warn( $this, '... got SIGEXIT from ('.$from->pid.')');
+            $this->exit(0);
+        }
     }
 }
 
@@ -181,11 +235,17 @@ package Sink {
     use v5.36;
     use parent 'UNIVERSAL::Object';
     use slots (
-        _sink => sub { +[] }
+        _sink => sub { +[] },
+        _done => sub {  0  },
     );
 
     sub drip ($self, $x) {
+        return if $self->{_done}; # the real thing should do more ...
         push $self->{_sink}->@* => $x;
+    }
+
+    sub done ($self) {
+        $self->{_done} = 1;
     }
 
     sub drain ($self) {
@@ -195,22 +255,28 @@ package Sink {
     }
 }
 
-my $sink = Sink->new;
+my $Sink   = Sink->new;
+my $Source = Source->new( end => 50 );
 
 sub Init () {
 
     setup sub ($this) {
 
-        my $publisher   = $this->spawn( Publisher(Source->new( end => 50 )) );
+        my $publisher   = $this->spawn( Publisher( $Source ) );
         my @subscribers = (
-            $this->spawn( Subscriber(5,  $sink) ),
-            $this->spawn( Subscriber(10, $sink) ),
-            #$this->spawn( Subscriber(2,  $sink) ),
-            #$this->spawn( Subscriber(5,  $sink) ),
+            $this->spawn( Subscriber( 5,  $Sink ) ),
+            $this->spawn( Subscriber( 10, $Sink ) ),
         );
 
+        # trap exits for all
         $this->trap( *SIGEXIT );
+        $publisher->trap( *SIGEXIT );
+        $_->trap( *SIGEXIT ) foreach @subscribers;
+
+        # link this to the publisher
         $this->link( $publisher );
+        # and the publisher to the subsribers
+        $publisher->link( $_ ) foreach @subscribers;
 
         $this->send( $publisher, [ *Subscribe => $_ ]) foreach @subscribers;
 
@@ -219,7 +285,7 @@ sub Init () {
         receive +{
             *SIGEXIT => sub ($this, $from) {
                 $log->warn( $this, '... got SIGEXIT from ('.$from->pid.')');
-                $log->info( $this, [ sort { $a <=> $b } $sink->drain ] );
+                $this->exit(0);
             }
         }
     }
@@ -228,7 +294,7 @@ sub Init () {
 ELO::Loop->run( Init(), logger => $log );
 
 is_deeply(
-    [ sort { $a <=> $b } $sink->drain ],
+    [ sort { $a <=> $b } $Sink->drain ],
     [ 1 .. 50 ],
     '... saw all exepected values'
 );

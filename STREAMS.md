@@ -210,13 +210,13 @@ Legend:
 
 - `Subscription`
     - receives the `*Cancel` event from the `Subscriber`
-        - sends `*Unsubscribe` event to the `Publisher`
+        - sends `*Unsubscribe` event to the `Publisher` with itself as the payload
 
 ### Step 5.
 
 - `Publisher`
     - receives the `*Unsubscribe` event from the `Subscription`
-        - sends `*OnUnsubscribe` signal to `Subscription`
+        - sends `*OnUnsubscribe` event to `Subscription`
 
 ### Step 6.
 
@@ -231,28 +231,28 @@ Legend:
 ```
 
             :
-            :       +----------------------{*SIGEXIT}---------------------------+
-            :       |                                                           |
-            :       |        (5)--------{*OnUnsubscribe}---------------------+  |
-            :       |         |                                              |  |
-            :       |    [Publisher] <---------------------------+           |  |
-            :       |         |                                  |           |  |
-            :       |        (1)                                 |           |  |
-            :       |         |                                  |           |  |
-            :       |   {*OnComplete}                            |           |  |
-            :       |         |                                  |           |  |
-            :       |         V                                  |           |  |
-            :       +---> [Observer]                             |           |  |
-            :                 |                                  |           |  |
-            :               (2)[/]                         {*Unsubscribe}    |  |
-            :                 |                                  |           |  |
-            :           {*OnComplete}                           (4)          |  |
-            :                 |                                  |           |  |
-            :                 V                                  |           |  |
-[Sink] <--<done>--(3.a)--[Subscriber]--(3.b)--{*Cancel}--> [Subscription] <--+  |
-            :                 ^                                  |              |
-            :                 |                                  |              |
-            :                 +-------{*OnUnsubscribe}---(6.a)--(6)--(6.b)------+
+            :       +----------------------{*SIGEXIT}-------------------------------+
+            :       |                                                               |
+            :       |        (5)--------{*OnUnsubscribe}-------------------------+  |
+            :       |         |                                                  |  |
+            :       |    [Publisher] <---------------------------+               |  |
+            :       |         |                                  |               |  |
+            :       |        (1)                                 |               |  |
+            :       |         |                                  |               |  |
+            :       |   {*OnComplete}                            |               |  |
+            :       |         |                                  |               |  |
+            :       |         V                                  |               |  |
+            :       +---> [Observer]                             |               |  |
+            :                 |                                  |               |  |
+            :               (2)[/]                 {*Unsubscribe, $subscription} |  |
+            :                 |                                  |               |  |
+            :           {*OnComplete}                           (4)              |  |
+            :                 |                                  |               |  |
+            :                 V                                  |               |  |
+[Sink] <--<done>--(3.a)--[Subscriber]--(3.b)--{*Cancel}--> [Subscription] <------+  |
+            :                 ^                                  |                  |
+            :                 |                                  |                  |
+            :                 +-------{*OnUnsubscribe}---(6.a)--(6)--(6.b)----------+
             :
 
 Legend:
@@ -263,6 +263,49 @@ Legend:
 <>  - action
 [/] - circuit breaker
 
+```
+
+### Appendix
+
+### Step 7.
+
+- `Publisher`
+    - if `*GetNext` is called and:
+        - the `Observer` process is not alive
+            - throw error??
+        - otherwise, send `*OnError` to `Observer`
+        - all subsequent calls will be ignored because of a circuit breaker
+
+```
+
+            :
+            :               |
+            :       <in flight request>
+            :               |
+            :      {*GetNext, $observer}
+            :               |
+            :               V
+            :          [Publisher]
+            :               |
+            :              (7)[/]---<ignore>-->*
+            :               |
+            :      <is_alive $observer>
+            :         |            |
+            :       <YES>         <NO>
+            :         |            |
+            :    {*OnError}     <ignore>
+            :         |
+            :         V
+            :    [$observer]
+            :
+
+Legend:
+:   - async boundary
+()  - Step
+[]  - Actor
+{}  - Event
+<>  - action
+[/] - circuit breaker
 ```
 
 <!-------------------------------------------------------->
