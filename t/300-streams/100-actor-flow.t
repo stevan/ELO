@@ -19,10 +19,6 @@ my $log = Test::ELO->create_logger;
 
 diag "... this one takes a bit";
 
-# TODO:
-# Implement Refresh in the Subscription, it should
-# drive the process, not the Subscription here.
-
 protocol *Observer => sub {
     event *OnComplete  => ();
     event *OnNext      => ( *Scalar );
@@ -31,29 +27,29 @@ protocol *Observer => sub {
 
 sub Observer ($num_elements, $subscriber) {
 
-    my $_seen = 0;
-    my $_done = 0;
+    my $seen = 0;
+    my $done = 0;
 
     receive[*Observer], +{
         *OnComplete => sub ($this) {
             $log->info( $this, '*OnComplete observed');
-            unless ($_done) {
+            unless ($done) {
                 $log->info( $this, '*OnComplete circuit breaker tripped sending *OnComplete to ('.$subscriber->pid.')');
                 $this->send( $subscriber, [ *OnComplete ] );
-                $_done = 1;
+                $done = 1;
             }
         },
         *OnNext => sub ($this, $value) {
             $log->info( $this, '*OnNext observed with ('.$value.')');
             $this->send( $subscriber, [ *OnNext => $value ] );
-            $_seen++;
-            if ( $num_elements <= $_seen ) {
-                $log->info( $this, '*OnNext observed seen('.$_seen.') of ('.$num_elements.') sending *OnRequestComplete to ('.$subscriber->pid.')');
+            $seen++;
+            if ( $num_elements <= $seen ) {
+                $log->info( $this, '*OnNext observed seen('.$seen.') of ('.$num_elements.') sending *OnRequestComplete to ('.$subscriber->pid.')');
                 # FIXME:
                 # Should this be in the next tick?
                 $this->send( $subscriber, [ *OnRequestComplete ] );
-                $_seen = 0;
-                $_done = 1;
+                $seen = 0;
+                $done = 1;
             }
         },
         *OnError => sub ($this, $error) {
@@ -79,13 +75,13 @@ protocol *Subscriber => sub {
 
 sub Subscriber ($request_size, $sink) {
 
-    my $_subscription;
+    my $subscription;
 
     receive[*Subscriber], +{
-        *OnSubscribe => sub ($this, $subscription) {
-            $log->info( $this, '*OnSubscribe called with ('.$subscription->pid.')');
-            $_subscription = $subscription;
-            $this->send( $_subscription, [ *Request => $request_size ]);
+        *OnSubscribe => sub ($this, $s) {
+            $log->info( $this, '*OnSubscribe called with ('.$s->pid.')');
+            $subscription = $s;
+            $this->send( $subscription, [ *Request => $request_size ]);
         },
         *OnUnsubscribe => sub ($this) {
             $log->info( $this, '*OnUnsubscribe called');
@@ -93,11 +89,11 @@ sub Subscriber ($request_size, $sink) {
         *OnComplete => sub ($this) {
             $log->info( $this, '*OnComplete called');
             $sink->done;
-            $this->send( $_subscription, [ *Cancel ] );
+            $this->send( $subscription, [ *Cancel ] );
         },
         *OnRequestComplete => sub ($this) {
             $log->info( $this, '*OnRequestComplete called');
-            $this->send( $_subscription, [ *Request => $request_size ]);
+            $this->send( $subscription, [ *Request => $request_size ]);
         },
         *OnNext => sub ($this, $value) {
             $log->info( $this, '*OnNext called with ('.$value.')');
@@ -121,22 +117,22 @@ protocol *Subscription => sub {
 
 sub Subscription ($publisher, $subscriber) {
 
-    my $_observer;
+    my $observer;
 
     receive[*Subscription], +{
         *Request => sub ($this, $num_elements) {
             $log->info( $this, '*Request called with ('.$num_elements.')');
 
-            if ( $_observer ) {
-                $log->info( $this, '*Request called, killing old observer ('.$_observer->pid.')');
-                $this->kill( $_observer );
+            if ( $observer ) {
+                $log->info( $this, '*Request called, killing old observer ('.$observer->pid.')');
+                $this->kill( $observer );
             }
 
-            $_observer = $this->spawn(Observer( $num_elements, $subscriber ));
-            $_observer->trap( *SIGEXIT );
+            $observer = $this->spawn(Observer( $num_elements, $subscriber ));
+            $observer->trap( *SIGEXIT );
 
             while ($num_elements--) {
-                $this->send( $publisher, [ *GetNext => $_observer ]);
+                $this->send( $publisher, [ *GetNext => $observer ]);
             }
         },
         *Cancel => sub ($this) {
@@ -146,7 +142,7 @@ sub Subscription ($publisher, $subscriber) {
         *OnUnsubscribe => sub ($this) {
             $log->info( $this, '*OnUnsubscribe called');
             $this->send( $subscriber, [ *OnUnsubscribe ]);
-            $this->kill( $_observer );
+            $this->kill( $observer );
             $this->exit(0);
         },
         *SIGEXIT => sub ($this, $from) {
