@@ -2,6 +2,8 @@
 
 use v5.36;
 
+srand(226725618);
+
 use Test::More;
 use Test::Differences;
 use Test::ELO;
@@ -99,7 +101,7 @@ sub Fibonacci () {
         *SIGEXIT => sub ($this, $from) {
             $log->warn( $this, '... got SIGEXIT from ('.$from->pid.')');
             $log->warn( $this,
-                join "\n" => 'CACHE:', map {
+                join "\n" => 'CACHE:', 'SEED: '.srand(), map {
                     sprintf '%9s = [%d] = (%s)' => (
                         $_,
                         sum( map { $_//0 } $stats{$_}->@* ),
@@ -112,29 +114,7 @@ sub Fibonacci () {
     };
 }
 
-## Perl
-
-sub fibonacci ($number) {
-    if ($number < 2) { # base case
-        return $number;
-    }
-    return fibonacci($number-1) + fibonacci($number-2);
-}
-
-sub cached_fibonacci ($number) {
-    state %calculated;
-
-    if (exists $calculated{$number}) {
-        return $calculated{$number} ;
-    }
-
-    if ($number < 2) { # base case
-        return $calculated{$number} = $number;
-    }
-    return $calculated{$number} = (cached_fibonacci($number-1) + cached_fibonacci($number-2));
-}
-
-my $num = 16;
+my $num = 12;
 
 sub Init () {
 
@@ -166,6 +146,15 @@ sub Init () {
 }
 
 ELO::Loop->run( Init(), logger => $log );
+
+# Perl
+
+sub fibonacci ($number) {
+    if ($number < 2) { # base case
+        return $number;
+    }
+    return fibonacci($number-1) + fibonacci($number-2);
+}
 
 my $start = time;
 say(join ' = ', $_, fibonacci($_)) foreach ($num);
