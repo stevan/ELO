@@ -10,31 +10,81 @@
         - typically to a `Publisher`
     - the feed is over when `undef` is returned
         - FIXME: This should be an `Option` type
+    - this is not owned by the system
 - `Sink`
     - this is a syncronous component
     - this captures a feed of values via `drip` method
         - typically from a `Subscriber`
     - these values can be accessed via a `drain` method
+    - this is not owned by the system
 
 
 - `Publisher`
     - this is a asyncronous component
     - given a `Source` publish values via a `Subscription` to a `Subscriber`
     - will passively wait until need is signalled
+    - this is not owned by the system
 - `Subscriber`
     - this is a asyncronous component
     - given a `Subscription` can request values from a `Publisher` and pass them onto a `Sink`
     - this must signal for need to accommodate back-pressure
+    - this is not owned by the system
 - `Subscription`
     - this is a asyncronous component
     - given a `Subscriber` and `Publisher` can handle manage the flow via an `Observer`
     - this is the engine of this system, it drives the flow
+    - this is owned by the `Publisher` for each time `*Subscribe` is called
 - `Observer`
     - this is a asyncronous component
     - This serves as a bridge between a `Publisher` and `Subscriber`
     - it watches for a specific amount of requests from a `Publisher`
         - and forwards to a `Subscriber`
         - an event is sent to the `Subscriber` when all requests have been seen
+    - this is owned by the `Subscription` for each time `*Request` is called
+
+## ARRAGEMENT
+
+In the syncronous world, we have the following:
+
+- `Source` which has been connected to a `Publisher`
+- `Sink` which has been connected to a `Subscriber`
+
+In the asyncronous world, we have the following:
+
+- `Publishers` manages a set of `Subscription` objects
+    - one for each `Subscriber` passed with a `*Subscribe` event
+    - they are destroyed when an `*Unsubscribe` event received
+    - `Subscriptions` have a 1-to-1 relation with `Subscriber`
+
+- `Subscriptions` creates an `Observer` for each `*Request` sent
+    - `Observer` has a `Subscriber` to whom it it forwards events.
+    - after a `*Request` has completed, the `Observer` is destroyed
+
+
+```
+
+----------------------------------------------------------------------------------
+                                                                      Self-Managed
+       [Source]                              [Sink]
+          |                                    |
+..........V....................................Λ..................[async boundary]
+          |                                    |
+     [Publisher]<------{*Subscribe}------>[Subscriber]
+          Λ                                  |   |
+          |                                  |   |
+::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+          |                                  |   |          Subscription Lifecycle
+          |                                  |   |
+          +--->[Subscription]<---------------+   |
+                     |                           |
+==================================================================================
+                     |                           |               Request Lifecycle
+                     V                           |
+                [Observer]-----------------------+
+
+----------------------------------------------------------------------------------
+
+```
 
 <!-------------------------------------------------------->
 ## Phase 1 - CONNECT
@@ -64,7 +114,7 @@
         - spawns a new `Subscription`
         - sends `*OnSubscribe` to `Subscriber` with newly spawned `Subscription`
 
-### Status
+### End Status
 
 At this point the `Publisher` and `Subscriber` are both connected via the
 `Subscription` all that is left is for the `Subscriber` to signal a need
@@ -77,7 +127,7 @@ for values.
               :              +-------------(3)------------+--(3.a)--<spawn>-->[Subscription]
               :              |                            |
 [ Source ]----:-------> [Publisher]                     (3.b)
-              :              ^                            |
+              :              Λ                            |
               :              |                            |
               :  {*Subscribe, $subscriber}   {*OnSubscribe, $subscription}
               :              |                            |
@@ -143,7 +193,7 @@ Legend:
     - receives the `*OnNext`, `*OnComplete` & `*OnError` events response from `Observer`
         - `drip` values into the `Sink`
 
-### Status
+### End Status
 
 This represents on request cycle for a `Subscriber`, where `$n` values can be requested
 from the `Publisher` which are then subsequently delivered to the `Observer`. When all
@@ -160,7 +210,7 @@ this point the `Subscriber` must choose if it wants to singal for more need.
                 :            |   |                                                            (4)
                 :            V   V                                                             |
   [Sink] <---<drip>--(5)--[Subscriber]     [Subscription]--(2)--(2.a)--<spawns>--> [Observer]--+
-                :              |                  ^         |                          ^
+                :              |                  Λ         |                          Λ
                 :             (1)                 |       (2.b)                        |
                 :              |                  |         |                          |
                 :              +--{*Request, $n}--+    <repeat $n>                     |
@@ -196,8 +246,9 @@ Legend:
 ### Step 2.
 
 - `Observer`
-    - forwards the `*OnComplete` to the `Subscriber`
-        - trips a circuit breaker in `Observer` to only send this once
+    - trips a circuit breaker in `Observer` and does not forward to the `Subscriber` yet
+    - once the `Observer` has seen all request, it forwards the `*OnComplete` to the `Subscriber`
+
 
 ### Step 3.
 
@@ -226,7 +277,14 @@ Legend:
         - sends `*SIGEXIT` to `Observer`
         - exits()
 
-### Status
+### Notes
+
+During this flow, several assumptions can be made:
+
+1. The `Subscriber` will only be sent `*OnComplete` once, the `Observer` will buffer them.
+2. This means there are no more in-flight requests to `Observer` and therefore nothing to stop.
+
+### End Status
 
 At this point the system has shutdown, all except the `Publisher` and `Subscriber`
 both of which are not owned by this flow.
@@ -258,7 +316,7 @@ both of which are not owned by this flow.
             :                 |                                  |               |  |
             :                 V                                  |               |  |
 [Sink] <--<done>--(3.a)--[Subscriber]--(3.b)--{*Cancel}--> [Subscription] <------+  |
-            :                 ^                                  |                  |
+            :                 Λ                                  |                  |
             :                 |                                  |                  |
             :                 +-------{*OnUnsubscribe}---(6.a)--(6)--(6.b)----------+
             :
