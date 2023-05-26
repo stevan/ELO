@@ -65,6 +65,8 @@ my sub dump_msg ($msg) {
     local $Data::Dump::INDENT    = '    ';
     local $Data::Dump::LINEWIDTH = $MAX_DUMP_WIDTH;
 
+    return $msg unless ref $msg;
+
     my $out;
     try {
         $out = Data::Dump::dumpf( $msg, sub ($ctx, $obj) {
@@ -108,7 +110,10 @@ my sub colored_pid ($pid) {
 
     $pid = $pid->pid if $pid isa ELO::Core::Process;
 
-    $pid_colors_cache{$pid} //= 'on_ansi'.int($pid =~ s/^(\d+)\:.*$/$1/r);
+    my $number = int($pid =~ s/^(\d+)\:.*$/$1/r);
+    $number %= 255; # loop around if needed
+
+    $pid_colors_cache{$pid} //= 'on_ansi'.$number;
 
     lpad( colored( pad($pid), $pid_colors_cache{$pid} ) );
 }
