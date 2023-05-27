@@ -167,8 +167,14 @@ sub add_timer ($self, $timeout, $f) {
 
     # Timer = [ $time, $f ]
     push $self->{_timers}->@* => [ $self->now + $timeout, $f, $tid ];
-    # ... always keep them sorted
-    $self->{_timers}->@* = sort { $a->[0] <=> $b->[0] } $self->{_timers}->@*;
+
+    my $num_timers = $self->{_timers}->$#*;
+    # ... keep the timers sorted
+    $self->{_timers}->@* = sort { $a->[0] <=> $b->[0] } $self->{_timers}->@*
+        if $num_timers >= 2
+        # but only if we have to, meaning the one we just added is not sorted
+        && $self->{_timers}->[$num_timers]->[0] <= $self->{_timers}->[$num_timers-1]->[0];
+
     return $tid;
 }
 
@@ -262,6 +268,7 @@ sub TICK ($self) {
     # fire /after/ the time specified
     my $now    = $self->now;
     my $timers = $self->{_timers};
+
     while (@$timers && $timers->[0]->[0] <= $now) {
         my $timer = shift @$timers;
         next if ${$timer->[2]}; # skip if the timer has been cancelled
@@ -358,6 +365,9 @@ sub _poll_queues ($self) {
     $self->{_message_queue}->@*
 }
 
+# ...
+our $WAIT_PRECISION = 0.001;
+
 sub LOOP ($self, $logger=undef) {
     $self->_init_time;
 
@@ -391,6 +401,8 @@ sub LOOP ($self, $logger=undef) {
 
             my $timers     = $self->{_timers};
             my $next_timer = $timers->[0];
+            #warn "looping ... for timers ".(scalar $self->{_timers}->@*)."\n";
+
             # if the timer is no active ...
             while ( $next_timer && ${$next_timer->[2]} ) {
                 shift @$timers; # get rid of it
@@ -399,33 +411,45 @@ sub LOOP ($self, $logger=undef) {
             }
 
             if ( $next_timer ) {
-                my $now        = $self->now;
-                my $wait       = $next_timer->[0] - $now;
+                my $now     = $self->now;
+                my $wait    = $next_timer->[0] - $now;
+                my $rounded = $wait - $WAIT_PRECISION;
+
                 # do not wait for negative values ...
                 # typically this is timeouts of 0 being
                 # set in the previous tick, which means
                 # that the timer is essentially already
                 # late.
-                if ($wait > 0) {
+                if ($rounded > 0) {
+                    #warn "waiting ...";
                     $early_timers++;
                     # XXX - should have some kind of max-timeout here
-                    $logger->log_tick_wait( $logger->INFO, $self, sprintf 'WAITING(%f)' => $wait ) if $logger;
-                    $self->sleep( $wait );
-                    $total_waited += $wait;
-                    $waited = $wait;
+                    $logger->log_tick_wait( $logger->INFO, $self, sprintf 'WAITING(%f)' => $rounded ) if $logger;
+                    $self->sleep( $rounded );
+                    $total_waited += $rounded;
+                    $waited = $rounded;
                 }
                 else {
-                    # XXX - should we fire the timers if we
-                    # find they're late? or let the next loop
-                    # handle it? I am inclinded towards the
-                    # next loop as it should at least be in
-                    # the next tick if it is a timeout of 0
-                    # but if it was just a long running tick
-                    # then maybe we should run them. Hmmm??
-                    $late_timers++;
-                    #warn "next-timer: $next_timer now: $now wait: $wait\n";
-                    #use Data::Dumper;
-                    #warn $self->{_timers}->[0]->[1];
+                #   # if the timer was actually late, then
+                #    # we shold execute it
+                #
+                #    $now += $WAIT_PRECISION;
+                #
+                #   # ... keep the timers sorted
+                #    $timers->@* = sort { $a->[0] <=> $b->[0] } $timers->@* if @$timers;
+                #LATE_TIMERS:
+                #    while (@$timers && $timers->[0] <= $now) {
+                #        my $timer = shift @$timers;
+                #        next LATE_TIMERS
+                #            if ${$timer->[2]}; # skip if the timer has been cancelled
+                #        try {
+                #            $timer->[1]->();
+                #            $TIMERS_RUN++;
+                            $late_timers++;
+                #        } catch ($e) {
+                #            die "Timer callback failed ($timer) because: $e";
+                #        }
+                #    }
                 }
             }
         }
@@ -485,6 +509,13 @@ sub LOOP ($self, $logger=undef) {
 
     if ( $ENV{ELO_LOOP_DUMP_STATS} ) {
         my $format = join "\n" =>
+                            'LOOP:',
+                            '    ticks     : %d',
+                            '    processes : %d',
+                            '    timers    : %d',
+                            '    callbacks : %d',
+                            '    signals   : %d',
+                            '    messages  : %d',
                             'TOTALS:',
                             '    timers_run         : %d  (early: %d, late: %d = loss: ~%0.3f%%)',
                             '    callbacks_run      : %d',
@@ -499,6 +530,12 @@ sub LOOP ($self, $logger=undef) {
 
                                  ;
         warn sprintf $format => (
+            $self->tick,
+            scalar(keys $self->{_process_table}->%*),
+            scalar($self->{_timers}->@*),
+            scalar($self->{_message_queue}->@*),
+            scalar($self->{_signal_queue}->@*),
+            scalar($self->{_callback_queue}->@*),
             $TIMERS_RUN,
                 $early_timers,
                 $late_timers,

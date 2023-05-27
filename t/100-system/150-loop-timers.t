@@ -52,11 +52,11 @@ sub init ($this, $msg) {
         $log->info( $this, '... after 6 seconds' );
     });
 
-    my $t3 = $this->loop->add_timer( 3, sub {
-        is($count, 3, '... timer after 3 seconds (counter = 3)');
+    my $t3 = $this->loop->add_timer( 2.5, sub {
+        is($count, 3, '... timer after 2.5 seconds (counter = 3)');
         $log->info( $this, '... canceling timer for timer(5)' );
         $this->loop->cancel_timer( $t5 );
-        $log->info( $this, '... after 3 seconds' );
+        $log->info( $this, '... after 2.5 seconds' );
         $count++;
     });
 
