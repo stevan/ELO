@@ -122,6 +122,7 @@ my @good_seeds = (
     869318942,
     903645731,
     1617973718,
+    3089290199,
 );
 
 if ($ARGV[1]) {
@@ -165,11 +166,26 @@ ELO::Loop->run( Init(), logger => $log );
 
 # Perl
 
-sub fibonacci ($number) {
+sub fibonacci2 ($number) {
     if ($number < 2) { # base case
         return $number;
     }
     return fibonacci($number-1) + fibonacci($number-2);
+}
+
+sub fibonacci ($number) {
+    state %calculated;
+
+    if (exists $calculated{$number}) {
+        #print '<SKIP>';
+        return $calculated{$number} ;
+    }
+
+    if ($number < 2) { # base case
+        return $calculated{$number} = $number;
+    }
+    #print "-";
+    return $calculated{$number} = (fibonacci($number-1) + fibonacci($number-2));
 }
 
 my $start = time;
