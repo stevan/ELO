@@ -24,16 +24,17 @@ say "Got Request for $NUM_ACTORS, will pause $PAUSE_FOR seconds before exiting."
 sub Actor ($id) {
     setup sub ($this) {
 
+        # we want this to start when the
+        # real loop starts, not here, which
+        # is technically in the startup phase
+        # and not really the actor lifetime
         $this->loop->next_tick(sub {
-            #$log->info( $this, "Starting timer ..." );
             $this->loop->add_timer( $PAUSE_FOR, sub { $this->exit(0) });
         });
 
         receive +{};
     };
 }
-
-my $exit_start;
 
 sub Init () {
 
@@ -54,8 +55,5 @@ sub Init () {
 }
 
 ELO::Loop->run( Init(), logger => $log );
-
-#my $duration = scalar time - $exit_start;
-#say "\nExiting took $duration seconds";
 
 1;
