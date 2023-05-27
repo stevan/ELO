@@ -14,6 +14,7 @@ use slots (
 sub name ($self) { $self->{name} }
 
 sub apply ($self, $this, $event) {
+    return unless keys $self->{receivers}->%*;
 
     # allow SIGEXIT to be an exception
     # FIXME: this could be done better

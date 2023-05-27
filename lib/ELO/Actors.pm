@@ -27,6 +27,8 @@ our @EXPORT_OK = qw[
 
     setup
     receive
+
+    IGNORE
 ];
 
 sub build_actor ($name, $f) {
@@ -106,6 +108,8 @@ sub receive (@args) {
         protocol  => $protocol,
     );
 }
+
+sub IGNORE () { state $r //= receive +{} }
 
 # This shoud be moved to ELO::Types
 sub match ($target, $table) {

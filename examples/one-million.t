@@ -10,7 +10,7 @@ use Time::HiRes qw[ time ];
 use ELO::Loop;
 use ELO::Types  qw[ :signals ];
 use ELO::Timers qw[ :timers ];
-use ELO::Actors qw[ setup receive ];
+use ELO::Actors qw[ setup receive IGNORE ];
 
 use ELO::Util::Logger;
 
@@ -22,6 +22,7 @@ my $PAUSE_FOR   = $ARGV[1] // 10;
 say "Got Request for $NUM_ACTORS, will pause $PAUSE_FOR seconds before exiting.";
 
 sub Actor ($id) {
+
     setup sub ($this) {
 
         # we want this to start when the
@@ -32,7 +33,9 @@ sub Actor ($id) {
             $this->loop->add_timer( $PAUSE_FOR, sub { $this->exit(0) });
         });
 
-        receive +{};
+        # we have no message to map, so
+        # why waste an instance here
+        IGNORE;
     };
 }
 
@@ -50,7 +53,7 @@ sub Init () {
         my $duration = scalar time - $start;
         $log->info( $this, "($count) actors created in $duration seconds" );
 
-        receive +{};
+        IGNORE;
     };
 }
 
