@@ -495,24 +495,24 @@ sub LOOP ($self, $logger=undef) {
                             '    %6s = (%f) %5.2f%%',
                             '    %6s = (%f) %5.2f%%',
                             '    %6s = (%f) %5.2f%%',
-                            '    %6s = (%f) %5.2f%%';
+                            '    %6s = (%f) %5.2f%%','';
 
                                  ;
         warn sprintf $format => (
             $TIMERS_RUN,
                 $early_timers,
                 $late_timers,
-                (($late_timers / $TIMERS_RUN) * 100),
+                (($late_timers / ($TIMERS_RUN || 1)) * 100),
             $CALLBACKS_RUN,
             $SIGNALS_HANDLED,
             $MESSAGES_PROCESSED,
             total => $elapsed,
             map  { $_->@* }
             sort { $b->[-1] <=> $a->[-1] }
-            [ system => $total_system,  (($total_system  / $elapsed) * 100) ],
-            [ user   => $total_elapsed, (($total_elapsed / $elapsed) * 100) ],
-            [ slept  => $total_slept,   (($total_slept   / $elapsed) * 100) ],
-            [ waited => $total_waited,  (($total_waited  / $elapsed) * 100) ],
+            [ system => $total_system,  (($total_system  / ($elapsed || 1)) * 100) ],
+            [ user   => $total_elapsed, (($total_elapsed / ($elapsed || 1)) * 100) ],
+            [ slept  => $total_slept,   (($total_slept   / ($elapsed || 1)) * 100) ],
+            [ waited => $total_waited,  (($total_waited  / ($elapsed || 1)) * 100) ],
         );
     }
 
