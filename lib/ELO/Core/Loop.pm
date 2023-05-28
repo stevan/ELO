@@ -57,17 +57,13 @@ sub create_process ($self, @args) {
         parent   => $parent,
     );
 
-    # NOTE:
-    # we are not calling ->pid here to save time
-    $self->{_process_table}->{ $process->{_pid} } = $process;
+    $self->{_process_table}->{ $process->pid } = $process;
     return $process;
 }
 
 sub destroy_process ($self, $process) {
 
-    # NOTE:
-    # we are not calling ->pid here to save time
-    my $pid = $process->{_pid};
+    my $pid = $process->pid;
 
     # Clean up my stuff ...
 

@@ -38,6 +38,11 @@ sub Actor ($id) {
         # the `spawn` calls, but only by the callbacks
         # setting up the timers. To be honest, I think
         # this approach is better, and more honest.
+        # This also does a LOT to optimize the runtime,
+        # which alone might justify, but now that it's
+        # original purpose (to run the `add_timer` during
+        # loop execution (in a `tick`)) is not needed
+        # doing this is perfectly legal :)
         $loop->add_timer( $PAUSE_FOR, sub { $this->exit(0) });
 
         # we have no message to map, so
