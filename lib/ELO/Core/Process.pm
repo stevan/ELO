@@ -20,18 +20,16 @@ use overload (
     }
 );
 
-use parent 'UNIVERSAL::Object::Immutable';
-use slots (
-    behavior => sub { die 'A `behavior` is required' },
-    loop     => sub { die 'A `loop` is required' },
-    parent   => sub {},
-    # ...
-    _pid       => sub {},
-    _flags     => sub {},
-    _msg_inbox => sub {},
-);
+sub new ($class, %args) {
 
-sub BUILD ($self, $params) {
+    my $self = {};
+
+    $self->{behavior} = $args{behavior} // confess 'A `behavior` is required';
+    $self->{loop}     = $args{loop}     // confess 'A `loop` is required';
+    $self->{parent}   = $args{parent}   // undef;
+
+    bless $self => $class;
+
     $self->{_msg_inbox} = [];
     $self->{_flags}     = { trap_signals => {}, sleep_timer => undef, status => 1 };
     $self->{_pid}       = sprintf '%03d:%s' => ++$PIDS, $self->{behavior}->name;
@@ -39,6 +37,8 @@ sub BUILD ($self, $params) {
     if ( $self->{behavior} isa ELO::Core::Behavior::Setup ) {
         $self->{behavior} = $self->{behavior}->setup( $self );
     }
+
+    return $self;
 }
 
 # ...

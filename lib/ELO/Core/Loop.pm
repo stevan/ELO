@@ -5,6 +5,7 @@ use builtin 'blessed';
 
 use Carp         'confess';
 use List::Util   'uniq';
+use Sub::Util    'set_subname';
 use Time::HiRes  ();
 
 use ELO::Core::Process;
@@ -30,7 +31,7 @@ use slots (
 sub create_process ($self, @args) {
 
     my ($behavior, $parent);
-    if ( blessed $args[0] && $args[0]->roles::DOES('ELO::Core::Behavior') ) {
+    if ( $args[0] isa ELO::Core::Behavior ) {
         $behavior = shift @args;
     }
     else {
@@ -55,13 +56,18 @@ sub create_process ($self, @args) {
         loop     => $self,
         parent   => $parent,
     );
-    $self->{_process_table}->{ $process->pid } = $process;
+
+    # NOTE:
+    # we are not calling ->pid here to save time
+    $self->{_process_table}->{ $process->{_pid} } = $process;
     return $process;
 }
 
 sub destroy_process ($self, $process) {
 
-    my $pid = $process->pid;
+    # NOTE:
+    # we are not calling ->pid here to save time
+    my $pid = $process->{_pid};
 
     # Clean up my stuff ...
 
@@ -160,7 +166,10 @@ sub unlink_process ($self, $to_process, $from_process) {
 # ...
 
 sub next_tick ($self, $f) {
-    # F = sub () -> ();
+
+    # TODO: maybe encode caller locaton info??
+    #set_subname( 'ELO_next_tick_callback' => $f );
+
     push $self->{_callback_queue}->@* => $f;
     return;
 }
@@ -177,10 +186,17 @@ sub add_timer ($self, $timeout, $f) {
     my $timers = $self->{_timers};
 
     # flatten the timer
+    #my $timer_end = $self->now + $timeout;
     my $timer_end = $self->now + $timeout;
+
     #warn "TIMER: $timer_end";
     $timer_end = int($timer_end * $TIMER_PRECISION_INT) * $TIMER_PRECISION_DECIMAL;
     #warn "TIMER: $timer_end flattened";
+
+    # TODO: add meta info into the timer name
+    # something like 'timer_$timeout__$timer_end__TID_refaddr($tid)'
+    # or maybe that is too much, think on it.
+    #set_subname( 'ELO_timer_callback' => $f );
 
     if ( scalar @$timers == 0 ) {
         # fast track the first one ...
@@ -250,6 +266,9 @@ my $MESSAGES_PROCESSED = 0;
 
 sub TICK ($self) {
 
+    # update the now time ...
+    my $now = $self->now;
+
     # Signals are handled first, as they
     # are meant to be async interrupts
     # (ala unix signals) but we wont
@@ -263,38 +282,40 @@ sub TICK ($self) {
     # then the message is enqueued and
     # will be handled as a normal message
     # during this tick
-    my @sig_queue = $self->{_signal_queue}->@*;
-    $self->{_signal_queue}->@* = ();
+    if ( scalar $self->{_signal_queue}->@* ) {
+        my @sig_queue = $self->{_signal_queue}->@*;
+        $self->{_signal_queue}->@* = ();
 
-    while (@sig_queue) {
-        my $sig = shift @sig_queue;
-        my ($to_proc, $signal, $event) = @$sig;
+        while (@sig_queue) {
+            my $sig = shift @sig_queue;
+            my ($to_proc, $signal, $event) = @$sig;
 
-        $to_proc = $self->lookup_active_process( $to_proc );
+            $to_proc = $self->lookup_active_process( $to_proc );
 
-        # if the process is not active, ignore all signals
-        # XXX - maybe add a dead signal queue here
-        next unless $to_proc;
+            # if the process is not active, ignore all signals
+            # XXX - maybe add a dead signal queue here
+            next unless $to_proc;
 
-        $SIGNALS_HANDLED++;
+            $SIGNALS_HANDLED++;
 
-        # is the signal trapped?
-        if ( $to_proc->is_trapping( $signal ) ) {
-            # then convert this into a message
-            $self->enqueue_msg( [ $to_proc, [ $signal, @$event ]] );
-        }
-        else {
-            # run the immediate handlers
-            # XXX - this should be done better, but works for now
-            if ( $signal eq *SIGEXIT ) {
-                # exit is a terminal signal,
-                $to_proc->exit(1);
+            # is the signal trapped?
+            if ( $to_proc->is_trapping( $signal ) ) {
+                # then convert this into a message
+                $self->enqueue_msg( [ $to_proc, [ $signal, @$event ]] );
             }
             else {
-                # everything else would be ignore
+                # run the immediate handlers
+                # XXX - this should be done better, but works for now
+                if ( $signal eq *SIGEXIT ) {
+                    # exit is a terminal signal,
+                    $to_proc->exit(1);
+                }
+                else {
+                    # everything else would be ignore
+                }
             }
-        }
 
+        }
     }
 
     # next thing we do is process the timers
@@ -302,48 +323,45 @@ sub TICK ($self) {
     # cannot guarentee that they will fire
     # at the exact time, only that they will
     # fire /after/ the time specified
-    my $now    = $self->now;
-    my $timers = $self->{_timers};
+    if ( scalar $self->{_timers}->@* ) {
+        my $timers = $self->{_timers};
 
-#warn "RUNING TIMERS ".scalar $timers->@*;
-#use Data::Dumper; warn Dumper $timers;
-    while (@$timers && $timers->[0]->[0] <= $now) {
-#        warn "RUNING TIMERS FOR (".$timers->[0]->[0].") at ($now) ..".scalar $timers->[0]->[1]->@*;
-        my $timer = shift @$timers;
-
-#        if (not defined $timers->[0]->[0]) {
-#            use Data::Dumper;
-#            die Dumper $timers;
-#        }
-
-        while ( $timer->[1]->@* ) {
-            my $t = shift $timer->[1]->@*;
-            next if ${$t->[1]}; # skip if the timer has been cancelled
-            try {
-                $t->[0]->();
-                $TIMERS_RUN++;
-            } catch ($e) {
-                die "Timer callback failed ($timer) because: $e";
+        #warn "RUNING TIMERS ".scalar $timers->@*;
+        #use Data::Dumper; warn Dumper $timers;
+        while (@$timers && $timers->[0]->[0] <= $now) {
+            #warn "RUNING TIMERS FOR (".$timers->[0]->[0].") at ($now) ..".scalar $timers->[0]->[1]->@*;
+            my $timer = shift @$timers;
+            while ( $timer->[1]->@* ) {
+                my $t = shift $timer->[1]->@*;
+                next if ${$t->[1]}; # skip if the timer has been cancelled
+                try {
+                    $t->[0]->();
+                    $TIMERS_RUN++;
+                } catch ($e) {
+                    die "Timer callback failed ($timer) because: $e";
+                }
             }
         }
+        #warn "ENDING TIMERS ".scalar $timers->@*;
     }
-#warn "ENDING TIMERS ".scalar $timers->@*;
 
     # next comes the Callback queue, these are
     # meant to be kind of internal events, and
     # so they need some priority, though not as
     # much as the signals, hence their place in
     # this ordering.
-    my @cb_queue = $self->{_callback_queue}->@*;
-    $self->{_callback_queue}->@* = ();
+    if ( $self->{_callback_queue}->@* ) {
+        my @cb_queue = $self->{_callback_queue}->@*;
+        $self->{_callback_queue}->@* = ();
 
-    while (@cb_queue) {
-        my $f = shift @cb_queue;
-        try {
-            $f->();
-            $CALLBACKS_RUN++
-        } catch ($e) {
-            die "Callback failed ($f) because: $e";
+        while (@cb_queue) {
+            my $f = shift @cb_queue;
+            try {
+                $f->();
+                $CALLBACKS_RUN++
+            } catch ($e) {
+                die "Callback failed ($f) because: $e";
+            }
         }
     }
 
@@ -353,29 +371,30 @@ sub TICK ($self) {
     # previous phases of this tick. The prime example
     # being signals, which can be turned into
     # messages that are executed in this same tick.
+    if ( $self->{_message_queue}->@* ) {
+        my @msg_queue = $self->{_message_queue}->@*;
+        $self->{_message_queue}->@* = ();
 
-    my @msg_queue = $self->{_message_queue}->@*;
-    $self->{_message_queue}->@* = ();
+        while (@msg_queue) {
+            my $msg = shift @msg_queue;
+            my ($to_proc, $event) = @$msg;
 
-    while (@msg_queue) {
-        my $msg = shift @msg_queue;
-        my ($to_proc, $event) = @$msg;
+            $to_proc = $self->lookup_active_process( $to_proc );
 
-        $to_proc = $self->lookup_active_process( $to_proc );
+            # if the process is not active, ignore all messages
+            # XXX - maybe add a dead letter queue here
+            next unless $to_proc;
 
-        # if the process is not active, ignore all messages
-        # XXX - maybe add a dead letter queue here
-        next unless $to_proc;
+            $MESSAGES_PROCESSED++;
 
-        $MESSAGES_PROCESSED++;
-
-        try {
-            $to_proc->accept( $event );
-            $to_proc->tick;
-        } catch ($e) {
-            #use Data::Dumper;
-            #warn Dumper { msg => $msg, queue => \@msg_queue };
-            die "Message to (".$to_proc->pid.") failed with msg(".(join ', ' => @{ $event // []}).") because: $e";
+            try {
+                $to_proc->accept( $event );
+                $to_proc->tick;
+            } catch ($e) {
+                #use Data::Dumper;
+                #warn Dumper { msg => $msg, queue => \@msg_queue };
+                die "Message to (".$to_proc->pid.") failed with msg(".(join ', ' => @{ $event // []}).") because: $e";
+            }
         }
     }
 
@@ -400,7 +419,9 @@ sub _update_clock ($self) {
 }
 
 sub tick ($self) { $self->{_time}->[0]  }
-sub now  ($self) { $self->_update_clock } # always stay up to date ...
+sub now  ($self) {
+    $self->_update_clock;  # always stay up to date ...
+}
 
 sub sleep ($self, $wait) { Time::HiRes::sleep( $wait ) }
 

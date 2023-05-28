@@ -1,12 +1,18 @@
 package ELO::Core::Behavior::Setup;
 use v5.36;
 
-use parent 'UNIVERSAL::Object::Immutable';
-use roles  'ELO::Core::Behavior';
-use slots (
-    name     => sub { die 'A `name` is required' },
-    setup    => sub { die 'A `setup` is required' },
-);
+use Carp 'confess';
+
+use parent 'ELO::Core::Behavior';
+
+sub new ($class, %args) {
+    my $self = {};
+
+    $self->{name}  = $args{name}  // confess 'A `name` must be provided';
+    $self->{setup} = $args{setup} // confess 'A `setup` must be provided';
+
+    return bless $self => $class;
+}
 
 sub name ($self) { $self->{name} }
 

@@ -1,15 +1,21 @@
 package ELO::Core::Behavior::Receive;
 use v5.36;
 
+use Carp 'confess';
+
 use ELO::Types qw[ *SIGEXIT ];
 
-use parent 'UNIVERSAL::Object::Immutable';
-use roles  'ELO::Core::Behavior';
-use slots (
-    name      => sub { die 'A `name` is required' },
-    receivers => sub { die 'A `receivers` is required' },
-    protocol  => sub { die 'A `protocol` is required' },
-);
+use parent 'ELO::Core::Behavior';
+
+sub new ($class, %args) {
+    my $self = {};
+
+    $self->{name}      = $args{name}      // confess 'A `name` must be provided';
+    $self->{receivers} = $args{receivers} // confess 'A `receivers` must be provided';
+    $self->{protocol}  = $args{protocol}  // confess 'A `protocol` must be provided';
+
+    return bless $self => $class;
+}
 
 sub name ($self) { $self->{name} }
 

@@ -1,5 +1,10 @@
 # ELO TODO
 
+## FIXME:
+
+Fix all the Init() that use setup, they call the setup too early.
+
+
 <!-------------------------------------------------------->
 ## General
 <!-------------------------------------------------------->

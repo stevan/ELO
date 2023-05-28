@@ -1,12 +1,18 @@
 package ELO::Core::Behavior::FunctionWrapper;
 use v5.36;
 
-use parent 'UNIVERSAL::Object::Immutable';
-use roles  'ELO::Core::Behavior';
-use slots (
-    name   => sub { die 'A `name` is required' },
-    func   => sub { die 'A `func` is required' },
-);
+use Carp 'confess';
+
+use parent 'ELO::Core::Behavior';
+
+sub new ($class, %args) {
+    my $self = {};
+
+    $self->{name} = $args{name} // confess 'A `name` must be provided';
+    $self->{func} = $args{func} // confess 'A `func` must be provided';
+
+    return bless $self => $class;
+}
 
 sub name ($self) { $self->{name} }
 sub func ($self) { $self->{func} }

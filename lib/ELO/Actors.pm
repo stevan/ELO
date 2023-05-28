@@ -16,6 +16,7 @@ use ELO::Core::Type::Event::Protocol;
 
 use ELO::Core::Behavior::Receive;
 use ELO::Core::Behavior::Setup;
+use ELO::Core::Behavior::Ignore;
 
 use constant DEBUG => $ENV{ACTORS_DEBUG} || 0;
 
@@ -31,6 +32,8 @@ our @EXPORT_OK = qw[
     IGNORE
 ];
 
+use constant IGNORE => ELO::Core::Behavior::Ignore->new;
+
 sub build_actor ($name, $f) {
     state %counters;
     my $caller = (caller(1))[3];
@@ -43,12 +46,14 @@ sub setup (@args) {
 
     if ( scalar @args == 1 ) {
         $name = (caller(1))[3];
-        $name =~ s/^main\:\://; # strip off main::
+        #$name =~ s/^main\:\://; # strip off main::
         $setup = $args[0];
     }
     else {
         ($name, $setup) = @args;
     }
+
+    #set_subname( "${name}::setup" => $setup );
 
     ELO::Core::Behavior::Setup->new(
         name  => $name,
@@ -63,7 +68,7 @@ sub receive (@args) {
         ref $args[0] eq 'HASH'
             || confess 'If you only pass one arg to receive then it must be a HASH ref';
         $name = (caller(1))[3];
-        $name =~ s/^main\:\://; # strip off main::
+        #$name =~ s/^main\:\://; # strip off main::
         $receivers = $args[0];
     }
     else {
@@ -81,7 +86,7 @@ sub receive (@args) {
                 $protocol = lookup_type( $args[0]->[0] )
                     or confess 'Could not find protocol('.$protocol.')';
                 $name = (caller(1))[3];
-                $name =~ s/^main\:\://; # strip off main::
+                #$name =~ s/^main\:\://; # strip off main::
             }
             else {
                 $name = $args[0]->[0];
@@ -102,14 +107,16 @@ sub receive (@args) {
         );
     }
 
+    foreach my $key ( keys %$receivers ) {
+        set_subname( "${name}::${key}" => $receivers->{ $key } );
+    }
+
     ELO::Core::Behavior::Receive->new(
         name      => $name,
         receivers => $receivers,
         protocol  => $protocol,
     );
 }
-
-sub IGNORE () { state $r //= receive +{} }
 
 # This shoud be moved to ELO::Types
 sub match ($target, $table) {
