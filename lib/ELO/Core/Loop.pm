@@ -245,7 +245,7 @@ sub enqueue_msg ($self, $msg) {
 # ...
 
 sub is_process_alive ($self, $proc) {
-    $self->lookup_active_process( $proc ) ? 1 : 0;
+    exists $self->{_process_table}->{ blessed $proc ? $proc->pid : $proc } ? 1 : 0;
 }
 
 sub lookup_active_process ($self, $to_proc) {

@@ -7,6 +7,14 @@
 - Remove all UNIVERSAL::Object usage
     - it is not really necessary and adds to the runtime
 
+- put all the $log calls and stats collection inside `Loop` behind a constant
+    - so that it can be constant folded out
+
+- linked processes are arrays
+    - the `grep` and `uniq` are clever, but not optimal, use HASHes
+
+- consolidate the rounding behaviors in Loop
+    - and make sure we are not doing stupid math
 
 <!-------------------------------------------------------->
 ## General
