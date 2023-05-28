@@ -182,8 +182,7 @@ sub add_timer ($self, $timeout, $f) {
     my $timers = $self->{_timers};
 
     # flatten the timer
-    #my $timer_end = $self->now + $timeout;
-    my $timer_end = $self->now + $timeout;
+    my $timer_end = $self->_update_clock + $timeout;
 
     #warn "TIMER: $timer_end";
     $timer_end = int($timer_end * $TIMER_PRECISION_INT) * $TIMER_PRECISION_DECIMAL;
@@ -263,7 +262,7 @@ my $MESSAGES_PROCESSED = 0;
 sub TICK ($self) {
 
     # update the now time ...
-    my $now = $self->now;
+    my $now = $self->_update_clock;
 
     # Signals are handled first, as they
     # are meant to be async interrupts
@@ -411,7 +410,8 @@ sub _init_time ($self) {
 
 sub _update_tick  ($self) { ++$self->{_time}->[0] }
 sub _update_clock ($self) {
-    $self->{_time}->[1] = Time::HiRes::clock_gettime( Time::HiRes::CLOCK_MONOTONIC() )
+    state $MONOTONIC = Time::HiRes::CLOCK_MONOTONIC();
+    $self->{_time}->[1] = Time::HiRes::clock_gettime( $MONOTONIC )
 }
 
 sub tick ($self) { $self->{_time}->[0]  }
@@ -437,7 +437,7 @@ sub LOOP ($self, $logger=undef) {
     $self->_init_time;
 
     my $tick       = $self->tick;
-    my $start_loop = $self->now;
+    my $start_loop = $self->_update_clock;
 
     $logger->log_tick( $logger->INFO, $self, $tick, 'START' ) if $logger;
 
@@ -452,12 +452,12 @@ sub LOOP ($self, $logger=undef) {
     while ( $self->_poll ){
         $tick = $self->_update_tick;
 
-        my $start_tick = $self->now;
+        my $start_tick = $self->_update_clock;
         $logger->log_tick( $logger->INFO, $self, $tick ) if $logger;
 
         $self->TICK;
 
-        my $elapsed = $self->now - $start_tick;
+        my $elapsed = $self->_update_clock - $start_tick;
         $logger->log_tick_stat( $logger->DEBUG, $self, sprintf 'elapsed  = %f' => $elapsed ) if $logger;
 
         my $waited = 0;
@@ -468,7 +468,7 @@ sub LOOP ($self, $logger=undef) {
             my $next_timer = $self->{_timers}->[0];
 
             if ( $next_timer && $next_timer->[1]->@* ) {
-                my $now     = $self->now;
+                my $now     = $self->_update_clock;
                 my $wait    = ($next_timer->[0] - $now);
 
                 # do not wait for negative values ...
@@ -506,7 +506,7 @@ sub LOOP ($self, $logger=undef) {
     }
 
     $self->_update_tick;
-    my $elapsed      = $self->now - $start_loop;
+    my $elapsed      = $self->_update_clock - $start_loop;
     my $total_system = ($elapsed - ($total_elapsed + $total_slept + $total_waited));
 
     if ($logger) {

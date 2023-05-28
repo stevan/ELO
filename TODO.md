@@ -2,7 +2,10 @@
 
 ## FIXME:
 
-Fix all the Init() that use setup, they call the setup too early.
+- Fix all the Init() that use setup, they call the setup too early.
+
+- Remove all UNIVERSAL::Object usage
+    - it is not really necessary and adds to the runtime
 
 
 <!-------------------------------------------------------->
