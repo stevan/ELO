@@ -53,6 +53,8 @@ sub BUILD ($self, $) {
     $ENV{ANSI_COLORS_DISABLED} = 1 unless -t $self->{filehandle};
 }
 
+sub max_line_width ($self) { $MAX_LINE_WIDTH }
+
 # ...
 
 my sub pad    ($string) { " $string " }

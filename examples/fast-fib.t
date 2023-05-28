@@ -8,8 +8,9 @@ use Test::ELO;
 
 use Data::Dumper;
 
+use Term::ANSIColor 'colored';
 use Time::HiRes 'time';
-use List::Util 'sum';
+use List::Util 'sum', 'min', 'max';
 
 use constant FIB_DEBUG => $ENV{FIB_DEBUG} // 0;
 
@@ -57,13 +58,15 @@ sub Adder ($respondant, $sequence_number, $target) {
 protocol *Fibonacci => sub {
     event *Calculate => ( *Int, *Process );
     event *Return    => ( *Int, *Int, *Process );
+    event *DumpStats => ( *HashRef );
 };
+
+my %stats = ( hits => [], misses => [] );
 
 sub Fibonacci () {
 
     my %breakers;
     my @cache;
-    my %stats = ( hits => [], misses => [] );
 
     receive[*Fibonacci] => +{
         *Calculate => sub ( $this, $number, $respondant ) {
@@ -102,21 +105,14 @@ sub Fibonacci () {
         },
         *SIGEXIT => sub ($this, $from) {
             $log->warn( $this, '... got SIGEXIT from ('.$from->pid.')');
-            $log->warn( $this,
-                join "\n" => 'CACHE:', ('SEED: '.$SEED), map {
-                    sprintf '%9s = [%d] = (%s)' => (
-                        $_,
-                        sum( map { $_//0 } $stats{$_}->@* ),
-                        (join ', ' => map { $_//'~' } $stats{$_}->@*),
-                    )
-                } sort { $a cmp $b } keys %stats
-             );
+            $this->send( $from, [ *DumpStats => \%stats ]);
             $this->exit(0);
         }
     };
 }
 
-my $num = $ARGV[0] // 10;
+my $num   = $ARGV[0] // 10;
+my $SCALE = $ENV{SCALE} // 2;
 
 my @good_seeds = (
     869318942,
@@ -134,7 +130,17 @@ else {
     $SEED = srand;
 }
 warn "GOT SEED: $SEED";
-#die;
+
+
+my sub scale_value_to_range ($val, $max, $min) {
+    my ($old_max, $old_min) = (1000, 0);
+    my $scaled    = $val * 1000;
+
+    my $old_range = ($old_max - $old_min);
+    my $new_range = ($max - $min);
+
+    return int(((($scaled - $old_min) * $new_range) / $old_range) + $min);
+}
 
 sub Init () {
 
@@ -143,7 +149,7 @@ sub Init () {
         my $fib = $this->spawn( Fibonacci() );
 
         $fib->trap( *SIGEXIT );
-        $fib->link( $this );
+        #$fib->link( $this );
 
         $this->send( $fib, [ *Calculate => $num, $this ] );
 
@@ -154,6 +160,68 @@ sub Init () {
             *Result => sub ($this, $result) {
                 $log->info( $this, '*Result received for result('.$result.')' );
                 $this->kill( $fib );
+            },
+            *DumpStats => sub ($this, $stats) {
+                $log->info( $this, '*DumpStats received' );
+
+                my $hits   = $stats{hits};
+                my $misses = $stats{misses};
+
+                my $total_hits   = sum( map { $_//0 } $hits->@* );
+                my $total_misses = sum( map { $_//0 } $misses->@* );
+
+                say(('SEED  : '.$SEED));
+                say(('SCALE : '.$SCALE));
+
+                my $hit_color  = 'blue';
+                my $miss_color = 'red';
+
+                my $term_width = $log->max_line_width - 15;
+
+                say('           |'.join '|' => map { (join '' => ('-' x 9)) } (1 .. int($term_width / 10)));
+                say('           |'.join '|' => map { (join '' => (sprintf '%9d' => ($_ * 10 * $SCALE))) } (1 .. int($term_width / 10)));
+                say(colored(' hit ', 'black on_'.$hit_color)
+                   .colored(' miss ', 'black on_'.$miss_color)
+                             .'|'.join '|' => map { (join '' => ('-' x 9)) } (1 .. int($term_width / 10)));
+
+                my sub scale ($x) {
+                    my $size = int($x / $SCALE);
+                       $size = 0 if $size < 1;
+                       $size;
+                }
+
+                #say('HITS ['.$total_hits.']');
+                foreach my $i ( 0 .. max( $hits->$#*, $misses->$#* ) ) {
+                    my $hit  = $hits  ->[$i] // 0;
+                    my $miss = $misses->[$i] // 0;
+
+                    my $hit_size  = scale($hit);
+                    my $miss_size = scale($miss);
+
+                    my @out;
+                    foreach my $x ( 0 .. max( $hit_size, $miss_size )) {
+                        my $mark = '▄';
+                        my ($fg_color, $bg_color);
+
+                        if ($x <= $hit_size) {
+                            $fg_color = 'black';
+                            $bg_color = 'on_'.$hit_color;
+                        }
+
+                        if ($x <= $miss_size) {
+                            $fg_color = $miss_color;
+                            $bg_color //= 'on_black';
+                        }
+
+                        push @out => colored($mark, "$fg_color $bg_color");
+
+                        last if $x == $term_width;
+                    }
+                    say((sprintf ' %4d %4d' => ($hit, $miss)).' |'.join '' => @out);
+
+                }
+
+                $this->exit(0);
             },
             *SIGEXIT => sub ($this, $from) {
                 $log->warn( $this, '... got SIGEXIT from ('.$from->pid.')');
@@ -193,6 +261,4 @@ say(join ' = ', $_, fibonacci($_)) foreach ($num);
 say("took: ".(scalar(time)- $start));
 
 done_testing;
-
-
 
