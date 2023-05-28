@@ -1,28 +1,41 @@
+<!-------------------------------------------------------->
 # ELO TODO
+<!-------------------------------------------------------->
 
+<!-------------------------------------------------------->
 ## FIXME:
+<!-------------------------------------------------------->
+
+### High
 
 - Fix all the Init() that use setup, they call the setup too early.
 
 - Remove all UNIVERSAL::Object usage
     - it is not really necessary and adds to the runtime
 
+### Low
+
 - put all the $log calls and stats collection inside `Loop` behind a constant
     - so that it can be constant folded out
+    - NOTE: might be better done when we re-haul the debugging environment
 
 - linked processes are arrays
     - the `grep` and `uniq` are clever, but not optimal, use HASHes
-
-- consolidate the rounding behaviors in Loop
-    - and make sure we are not doing stupid math
+        - only a problem with many linked things
 
 <!-------------------------------------------------------->
 ## General
 <!-------------------------------------------------------->
 
+- fast-fix example:
+    - print out the fib sequence we got
+    - also print out the order in which we generated them
+        - and maybe some call metrics as well
+
 ### Examples to Make
 
 - implement Conways Game of Life for a good example
+- implement the monto-carlo simulation to approx. PI
 
 ### Tools to Make
 
@@ -36,14 +49,27 @@
 
 ### Debugging
 
+- process tree display
+
+- tracing "spans"
+
 - add probes for Behavior objects
     - can inspect the state by peeking at the closed_over variables
 
 - set subnames where appropriate
-    - the Behavior has a name, but the dispatchable subs do not
-        - they should use a combination of
-            - the behavior name
-            - the event name
+    - the Behavior receivers have a name, it might not be optimal
+    - timers & next_tick callbacks could use a name
+
+<!-------------------------------------------------------->
+## Timers
+<!-------------------------------------------------------->
+
+- consolidate the rounding behaviors in Loop
+    - and make sure we are not doing stupid math
+
+- consider this advice related to timers
+    - https://metacpan.org/dist/AnyEvent/source/lib/AnyEvent/Loop.pm#L178
+    - and consider making `_update_clock` into a function that takes $loop as arg
 
 <!-------------------------------------------------------->
 ## Actors
