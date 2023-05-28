@@ -63,6 +63,8 @@ sub destroy_process ($self, $process) {
 
     my $pid = $process->pid;
 
+    # Clean up my stuff ...
+
     # tell everyone bye
     $self->notify_links( $process )
         # and remove the process links as well ..
@@ -73,6 +75,8 @@ sub destroy_process ($self, $process) {
     # remove self from the process table ...
     delete $self->{_process_table}->{ $pid };
 
+    # Clean up everything else ...
+
     # remove any other references to
     # the process in other links
     foreach my $links ( values $self->{_process_links}->%* ) {
@@ -82,12 +86,14 @@ sub destroy_process ($self, $process) {
     # remove signals for this process currently in the queue
     $self->{_signal_queue}->@* = grep {
         (blessed $_->[0] ?  $_->[0]->pid : $_->[0]) ne $pid
-    } $self->{_signal_queue}->@*;
+    } $self->{_signal_queue}->@*
+        if $self->{_signal_queue}->@*;
 
     # remove messages for this process currently in the queue
     $self->{_message_queue}->@* = grep {
         (blessed $_->[0] ?  $_->[0]->pid : $_->[0]) ne $pid
-    } $self->{_message_queue}->@*;
+    } $self->{_message_queue}->@*
+        if $self->{_message_queue}->@*;
 }
 
 sub notify_links ($self, $process) {

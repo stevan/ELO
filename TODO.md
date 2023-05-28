@@ -4,11 +4,11 @@
 ## General
 <!-------------------------------------------------------->
 
-- improve the term library to handle "windows"
-    - always put the cursor back in a sensible position
-      if possible
-    - make it aware of the logger so that we can make a
-      log "window" where needed
+### Examples to Make
+
+- implement Conways Game of Life for a good example
+
+### Tools to Make
 
 - make a repl
     - use term library to make a "console.log" style interface
@@ -17,6 +17,8 @@
 - implement some test utilities
     - first thing is a timer/interval with a variable amount
        of jitter
+
+### Debugging
 
 - add probes for Behavior objects
     - can inspect the state by peeking at the closed_over variables
@@ -27,30 +29,16 @@
             - the behavior name
             - the event name
 
-- implement Conways Game of Life for a good example
+<!-------------------------------------------------------->
+## Actors
+<!-------------------------------------------------------->
 
-- calculate `fibonacci` async-ly
+- add Akka style `become` to allow for state machines
+    - see `003-producer.t` example
 
-```perl
-sub fibonacci ($number) {
-    state %calculated;
-
-    if (exists $calculated{$number}) {
-        print '<SKIP>';
-        return $calculated{$number} ;
-    }
-
-    if ($number < 2) { # base case
-        return $calculated{$number} = $number;
-    }
-    print "-";
-    return $calculated{$number} = (fibonacci($number-1) + fibonacci($number-2));
-}
-
-print (fibonacci($_),"\n") foreach (1 .. 10);
-
-print (fibonacci(int(rand(175))),"\n") foreach (1 .. 175);
-```
+<!-------------------------------------------------------->
+## Types
+<!-------------------------------------------------------->
 
 - See `EVENTS.md`
     - consider supporting (but ignoring) fieldnames in
@@ -66,15 +54,7 @@ print (fibonacci(int(rand(175))),"\n") foreach (1 .. 175);
             - this means we can't control performance :(
 
     - should we add some kind of generics?
-
-- See `PROMISES.md`
-
-- add Akka style `become` to allow for state machines
-    - see `200-actors/002-fp-examples/003-producer.t`
-
-- Is it possible to change the Perl runloop to become
-  the ELO runloop? What would move to C, etc.
-  - or to somehow take advantage of interpreter threads?
+        - see example in `t/999-ideas/`
 
 <!-------------------------------------------------------->
 ## Loop
@@ -90,6 +70,10 @@ print (fibonacci(int(rand(175))),"\n") foreach (1 .. 175);
 - should we add `idle` callbacks?
     - they could be done instead of/in addition to waiting when there is nothing to do
     - use the AnyEvent approach and try to consumer no more than 50% of wait time
+
+- Is it possible to change the Perl runloop to become
+  the ELO runloop? What would move to C, etc.
+  - or to somehow take advantage of interpreter threads?
 
 <!-------------------------------------------------------->
 ## Process
@@ -130,6 +114,8 @@ print (fibonacci(int(rand(175))),"\n") foreach (1 .. 175);
 ## Promises
 <!-------------------------------------------------------->
 
+- See `PROMISES.md`
+
 - improve the loop/promises integration
     - the ELO::Promise::LOOP is not great since it is global
         - though how often do you have two loops in a single process?
@@ -140,10 +126,6 @@ print (fibonacci(int(rand(175))),"\n") foreach (1 .. 175);
     - if so, where should this live?
         - ELO::Process?
         - ELO::Promise?
-
-<!-------------------------------------------------------->
-## Actors
-<!-------------------------------------------------------->
 
 <!-------------------------------------------------------->
 ## Links
