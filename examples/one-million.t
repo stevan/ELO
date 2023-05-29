@@ -12,6 +12,8 @@ use ELO::Types  qw[ :signals ];
 use ELO::Timers qw[ :timers ];
 use ELO::Actors qw[ setup receive IGNORE ];
 
+# https://pkolaczk.github.io/memory-consumption-of-async/
+
 use ELO::Util::Logger;
 
 my $log = ELO::Util::Logger->new;

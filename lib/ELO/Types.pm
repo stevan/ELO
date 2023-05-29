@@ -382,7 +382,13 @@ sub type ($type, $checker) {
         $TYPE_REGISTRY{ $type } = ELO::Core::Type::Alias->new(
             symbol  => $type,
             alias   => $alias,
-            checker => sub ($value) { $alias->check( $value ) }
+            checker => sub ($value) {
+                # TODO:
+                # wrap this in try/catch and wrap the
+                # error message accordingly, this should
+                # cascade down the tree accordingly
+                $alias->check( $value );
+            }
         );
     }
 }
