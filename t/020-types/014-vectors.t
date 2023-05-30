@@ -183,6 +183,13 @@ typeclass[*Vector] => sub {
 
 # ...
 
+# TODO:
+# Make this into an example
+#
+# Also make a Matrix Actor which can call some of the
+# methods as messages, which will also allow us to type
+# check the args via events :)
+
 subtest '... testing the Coord2D * Matrix2D types' => sub {
 
     my $term = ELO::Util::TermDisplay->new;
