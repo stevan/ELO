@@ -19,6 +19,8 @@ use ok 'ELO::Types',  qw[
     :typeclasses
 ];
 
+use ELO::Util::TermDisplay;
+
 # ...
 
 type *Height => *Int;
@@ -30,6 +32,29 @@ type *Space  => *ArrayRef;
 datatype *Matrix => sub {
     case Matrix2D => ( *Height, *Width, *Space )
 };
+
+# IDEA:
+# What about something like this??
+#
+# signature[ *Matrix => *T ] => sub {
+#
+#     method alloc => [ *T ] => [ *Matrix ];
+#
+#     method height => [] => [ *Height ];
+#     method width  => [] => [ *Width  ];
+#
+#     method get => [ *Coord ]       => [ *Any ];
+#
+#     method map  => [ *CodeRef ]      => [ *Matrix ];
+#     method set  => [ *Coord,  *Any ] => [ *Matrix ];
+#     method plot => [ *Vector, *Any ] => [ *Matrix ];
+#
+#     method to_string => [] => [ *Str ];
+#     method to_graph  => [] => [ *Str ];
+# };
+#
+# to (at a minimum) add typechecking to the
+# functions.
 
 typeclass[*Matrix] => sub {
 
@@ -59,7 +84,8 @@ typeclass[*Matrix] => sub {
     method get => sub ($m, $coord) { # *Coord2D -> *Any
         match [*Matrix, $m ] => {
             Matrix2D => sub ($, $, $s) {
-                return $s->[$coord->x]->[$coord->y];
+                my ($x, $y) = $coord->flatten;
+                return $s->[$x]->[$y];
             }
         }
     };
@@ -67,7 +93,6 @@ typeclass[*Matrix] => sub {
     method set => sub ($m, $coord, $value) { # *Coord2D, *Any
         match [*Matrix, $m ] => {
             Matrix2D => sub ($, $, $s) {
-                my ($x, $y) = @$coord;
                 $s->[$coord->x]->[$coord->y] = $value;
             }
         };
@@ -81,6 +106,7 @@ typeclass[*Matrix] => sub {
 
         match [*Matrix, $m ] => {
             Matrix2D => sub ($h, $w, $s) {
+
                 my $mag = $vector->magnitude;
                 my $dir = $vector->direction;
 
@@ -94,32 +120,31 @@ typeclass[*Matrix] => sub {
                     $s->[$x]->[$y] = $value;
 
                     $y++;
+
+                    # ohh, stripey :)
+                    # $y += 5 if $y % 5 == 0;
                 }
             }
         };
-
+        return $m;
     };
 
-    method to_string => sub ($m) {
-        match [*Matrix, $m ] => {
-            Matrix2D => sub ($h, $w, $s) {
-                join "\n" => (map { join '' => map { $_//'u' } @$_ } reverse @$s);
-            }
+    method to_string => {
+        Matrix2D => sub ($h, $w, $s) {
+            join "\n" => (map { join '' => map { $_//' ' } @$_ } reverse @$s);
         }
     };
 
-    method to_graph => sub ($m) {
-        match [*Matrix, $m ] => {
-            Matrix2D => sub ($h, $w, $s) {
-                my $marker2 = colored('|_', 'dark cyan');
-                my $marker1 = colored('_', 'dark cyan');
+    method to_graph => {
+        Matrix2D => sub ($h, $w, $s) {
+            my $marker2 = colored('|_', 'dark blue');
+            my $marker1 = colored('_', 'dark blue');
 
-                join "\n" => map {
-                    join '' => map {
-                        defined $_ ? ($_.$marker1) : $marker2
-                    } @$_
-                } reverse @$s;
-            }
+            join "\n" => map {
+                join '' => map {
+                    defined $_ ? ($_.$_) : $marker2
+                } @$_
+            } reverse @$s;
         }
     };
 };
@@ -136,6 +161,8 @@ datatype *Coord => sub {
 typeclass[*Coord] => sub {
     method x => { Coord2D => sub ($x, $) { $x } };
     method y => { Coord2D => sub ($, $y) { $y } };
+
+    method flatten => { Coord2D => sub ($x, $y) { $x, $y } };
 };
 
 # ...
@@ -156,42 +183,31 @@ typeclass[*Vector] => sub {
 
 # ...
 
-=pod
-
-
-      |
-      |---*
-      |  /|
-      |_*_|___
-     /
-    /
-
-=cut
-
 subtest '... testing the Coord2D * Matrix2D types' => sub {
 
-    my $matrix = Matrix2D( 25, 40, [] )->alloc;
+    my $term = ELO::Util::TermDisplay->new;
 
+    my $height = $term->term_height - 10;
+    my $width  = $term->term_width;
 
-    my @vectors = (
-        [ Vector2D( 2, 10 ), colored( '=', 'ansi210' ) ],
-        [ Vector2D( 3,  5 ), colored( '◼︎', 'ansi35' ) ],
-        [ Vector2D( 16, 9 ), colored( '/', 'ansi169' ) ],
-        [ Vector2D( 9 ,12 ), colored( '*', 'ansi129' ) ],
-    );
+    my $marker = '●';
 
-    foreach ( @vectors ) {
-        my ($v, $marker) = @$_;
-        $matrix->plot( $v, $marker );
-        $matrix->set( $v->as_coord, colored( '@', 'red' ) );
+    my $matrix = Matrix2D( $height, $width, [] )->alloc;
+    isa_ok($matrix, '*::Matrix::Matrix2D');
+
+    foreach ( 0 .. 500 ) {
+        $matrix->plot(
+            Vector2D(
+                int(rand($matrix->height))+1,
+                int(rand($matrix->width))+1
+            ),
+            colored( $marker, 'ansi'.int(rand(255)) )
+        );
     }
 
-    $matrix->set( Coord2D(0, 0), '&' );
-
-    #say $matrix->to_string;
-    say $matrix->to_graph;
+    say $matrix->to_string;
+    #say $matrix->to_graph;
     #warn Dumper $matrix;
-
 
     ok(1, '... shhh');
 };
