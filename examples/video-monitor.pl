@@ -186,28 +186,27 @@ typeclass[*Display] => sub {
     method height => { MonochromeDisplay => sub ($m) { $m->height } };
     method width  => { MonochromeDisplay => sub ($m) { $m->width  } };
 
-    my sub run_shader ($m, $shader) {
-        my $h    = $m->height;
-        my $w    = $m->width;
-        my @rows = $m->get_all_rows;
+    my sub run_shader ($m, $rows, $shader) {
+        my $h = $m->height;
+        my $w = $m->width;
 
         my $i = 0;
         join "\n" => (
-            '    '.(join '' => 0 .. 9, '_', 1 .. 9, '_' ),
+            #'    '.(join '' => 0 .. 9, '_', 1 .. 9, '_' ),
             '   ┏'.('━' x ($w+1)).'┓',
             (map {
-                sprintf('%02d ' => $i++)
+                #sprintf('%02d ' => $i++)
                 .'┃'
                 .(join '' => map { $shader->( $_ ) } @$_)
                 .'┃'
-            } @rows),
+            } @$rows),
             '   ┗'.('━' x ($w+1)).'┛',
         );
     }
 
     method as_Str => {
         MonochromeDisplay => sub ($m) {
-            run_shader($m, sub ($x) {
+            run_shader($m, [ $m->get_all_rows ], sub ($x) {
                 colored( $BLOCK => 'on_grey'.(defined $x && $x > 23 ? 23 : ($x < 0 ? 0 : $x)))
             });
         }
