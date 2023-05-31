@@ -5,6 +5,7 @@ use experimental 'builtin';
 use builtin      qw[ blessed ];
 use Carp         qw[ confess ];
 use Scalar::Util qw[ looks_like_number ];
+use Sub::Util    qw[ set_subname ];
 
 use ELO::Core::Type;
 use ELO::Core::Type::Alias;
@@ -179,7 +180,9 @@ sub typeclass ($t, $body) {
                 foreach my $constructor_symbol ( keys %cases ) {
                     no strict 'refs';
                     #warn "[CODE] ${constructor_symbol}::${name}\n";
-                    *{"${constructor_symbol}::${name}"} = $table;
+                    *{"${constructor_symbol}::${name}"} = set_subname(
+                        "${constructor_symbol}::${name}" => $table
+                    );
                 }
             }
             elsif ( ref $table eq 'HASH' ) {
@@ -191,13 +194,15 @@ sub typeclass ($t, $body) {
 
                     my $constructor = $cases{ $constructor_symbol };
                     ($constructor)
-                        || confess "The case($constructor_symbol) is not found the type($symbol)".Dumper(\%cases);
+                        || confess "In typeclass($symbol) the case($constructor_symbol) is not found, must be one of (".(join ', ' => keys %cases).')';
 
                     my $handler = $table->{$type_name};
                     no strict 'refs';
 
                     #warn "[HASH] &: ${constructor_symbol}::${name}\n";
-                    *{"${constructor_symbol}::${name}"} = sub ($self) { $handler->( @$self ) };
+                    *{"${constructor_symbol}::${name}"} = set_subname(
+                        "${constructor_symbol}::${name}" => sub ($self) { $handler->( @$self ) }
+                    );
                 }
             }
             else {
@@ -261,13 +266,17 @@ sub datatype ($symbol, $cases) {
         # This will add some complexity to `typeclass` above
         # because it assumes an ARRAY ref and just de-refs it
         # but that is a solvable problem.
-        *{"${caller}::${constructor}"} = scalar @definition == 0
-            ? sub ()      { bless [] => $constructor_tag }
-            : sub (@args) {
-                check_types( $definition, \@args )
-                    || confess "Typecheck failed for $constructor_tag with (".(join ', ' => map $_//'undef', @args).')';
-                bless [ @args ] => $constructor_tag;
-            };
+        *{"${caller}::${constructor}"} = set_subname(
+            "${caller}::${constructor}",
+            (scalar @definition == 0
+                ? sub ()      { bless [] => $constructor_tag }
+                : sub (@args) {
+                    check_types( $definition, \@args )
+                        || confess "Typecheck failed for $constructor_tag with (".(join ', ' => map $_//'undef', @args).')';
+                    bless [ @args ] => $constructor_tag;
+                }
+            )
+        );
 
         $cases{$constructor_tag} = ELO::Core::Type::TaggedUnion::Constructor->new(
             symbol      => $constructor,
