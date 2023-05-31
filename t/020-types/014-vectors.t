@@ -153,16 +153,33 @@ typeclass[*Matrix] => sub {
 
 type *X => *Int;
 type *Y => *Int;
+type *Z => *Int;
 
 datatype *Coord => sub {
     case Coord2D => ( *X, *Y );
+    case Coord3D => ( *X, *Y, *Z );
 };
 
 typeclass[*Coord] => sub {
-    method x => { Coord2D => sub ($x, $) { $x } };
-    method y => { Coord2D => sub ($, $y) { $y } };
+    method x => {
+        Coord2D => sub ($x, $)    { $x },
+        Coord3D => sub ($x, $, $) { $x },
+    };
 
-    method flatten => { Coord2D => sub ($x, $y) { $x, $y } };
+    method y => {
+        Coord2D => sub ($, $y)    { $y },
+        Coord3D => sub ($, $y, $) { $y },
+    };
+
+    method z => {
+        Coord2D => sub ($, $)     { die "No z index for Coord2D object" },
+        Coord3D => sub ($, $, $x) { $x },
+    };
+
+    method flatten => {
+        Coord2D => sub ($x, $y)     { $x, $y     },
+        Coord3D => sub ($x, $y, $z) { $x, $y, $z },
+    };
 };
 
 # ...
@@ -182,6 +199,64 @@ typeclass[*Vector] => sub {
 };
 
 # ...
+
+sub draw_3d_point ($coord) {
+    my ($x, $y, $z) = $coord->flatten;
+
+    foreach my $i ( 0 .. $z ) {
+        my $mark = ' ';
+        my $___x = ($x - $i);
+
+        if ( $___x == 0 && $i < $z ) {
+            $mark = sprintf '* { x: %d y: %d z: %d }' => ($coord->flatten);
+            $___x = ($x + $___x);
+        }
+        elsif ( $___x >= 0 ) {
+            say '|';
+            next;
+        }
+        elsif ( $___x < 0 ) {
+            $mark = '|';
+            $___x = ($x + $___x);
+            #warn($___x." LESS THAN 0 ($x, $y, $i)\n");
+        }
+
+        my $multiplier = ($x < $z) ? 0.5 : 1;
+        my $yellow = floor(($x - $___x) * $multiplier);
+
+        say(
+            '|',
+            colored((' ' x ($y-1)), 'on_blue'),
+            colored(('+' x $yellow), 'on_yellow'),
+            (' ' x ($x - $yellow)),
+            $mark,
+            " $x, $y, $i => $___x $yellow $multiplier"
+        );
+    }
+    foreach my $i ( 0 .. $x ) {
+        my $mark = ' ';
+        my $___x = ($x - $i);
+
+        if ( $___x == $z ) {
+            $mark = sprintf '* { x: %d y: %d z: %d }' => ($coord->flatten);
+        }
+        elsif ( $___x < $z ) {
+            $mark = '|';
+        }
+        say(
+            ((' ' x $i).'\\'),
+            colored((' ' x ($y-1)), 'on_green'),
+            colored((' ' x ($___x)), 'on_red'),
+            $mark,
+            #" $i, $y, $z => ".($x - $i)
+        );
+    }
+    say(
+        (' '.(' ' x $x)),
+        ('-' x ($y)),
+    );
+    say "\n";
+}
 
 # TODO:
 # Make this into an example
@@ -211,6 +286,14 @@ subtest '... testing the Coord2D * Matrix2D types' => sub {
             colored( $marker, 'ansi'.int(rand(255)) )
         );
     }
+
+    #draw_3d_point(
+    #    Coord3D(
+    #        10, #int(rand(10)) + 2,
+    #        40, #int(rand(50)) + 2,
+    #        33, #int(rand(25)) + 2,
+    #    )
+    #) foreach ( 0 );
 
     say $matrix->to_string;
     #say $matrix->to_graph;
