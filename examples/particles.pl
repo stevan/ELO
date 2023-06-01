@@ -89,7 +89,7 @@ sub Particle ($id) {
                      ->put_string( colored( $sprite, $color ) )
                      #->go_to( $id + 2, 1 )
                      #->put_string( sprintf '%5d : %0.3f %0.3f' => $id, $x, $y )
-                     ->go_to( 0, $term_width + 100 )
+                     #->go_to( 0, $term_width + 100 )
                 unless $old_x == $x && $old_y == $y;
             }
 
@@ -117,6 +117,7 @@ sub init ($this, $msg) {
         $this->spawn( Particle( $_ ) )
     } 1 .. $NUM_PARTICLES;
 
+    $term->hide_cursor;
     $term->clear_screen;
 
     my $frame = 0;
@@ -143,6 +144,7 @@ sub init ($this, $msg) {
 
     $t1 = timer( $this, $WAIT_TIME, sub {
         cancel_timer( $this, $_ ) for $i1, $i2;
+        $term->show_cursor;
         $this->exit(0);
     });
 
@@ -152,7 +154,6 @@ sub init ($this, $msg) {
          ->put_string( sprintf '~%3d fps', $fps_marker )
          ->go_to(0, 30)
          ->put_string( sprintf 'alive: %09d' => scalar @ps );
-
 }
 
 ELO::Loop->run( \&init );

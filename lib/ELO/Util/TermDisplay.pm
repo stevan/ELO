@@ -26,7 +26,7 @@ sub BUILD ($self, $) {
     my $tc = Term::Cap->Tgetent({ TERM => undef, OSPEED => $ospeed });
 
     # require the following capabilities
-    $tc->Trequire(qw/cl cd ce cm ho DO do IC co li/);
+    $tc->Trequire(qw/cl cd ce cm ho DO do IC co li vi ve/);
 
     $self->{_term_cap}  = $tc;
     $self->{_term_size} = [ GetTerminalSize() ];
@@ -49,6 +49,18 @@ sub clear_screen ($self, %args) {
         }
     }
 
+    $self;
+}
+
+sub hide_cursor ($self) {
+    $self->{_term_cap}->Tputs('vi', 1, *STDOUT);
+    $SIG{INT} = sub { $self->show_cursor; exit(0) };
+    $self;
+}
+
+sub show_cursor ($self) {
+    $self->{_term_cap}->Tputs('ve', 1, *STDOUT);
+    #$self->{_term_cap}->Tputs('vi', 0, *STDOUT);
     $self;
 }
 
