@@ -7,7 +7,7 @@ use builtin qw[ ceil floor indexed ];
 use Data::Dumper;
 use Data::Dump;
 
-use Time::HiRes     qw[ sleep   ];
+use Time::HiRes     qw[ sleep time ];
 use Term::ANSIColor qw[ colored ];
 use List::Util      qw[ max min ];
 use Carp            qw[ confess ];
@@ -27,202 +27,6 @@ sub raise ($err) { confess $err }
 
 # ...
 
-type *Height => *Int;
-type *Width  => *Int;
-
-# ...
-
-datatype *Matrix => sub {
-    case Matrix => ( *Width, *Height, *ArrayRef )
-};
-
-typeclass[*Matrix] => sub {
-
-    method alloc => sub ($m, $init=undef) {
-        match [*Matrix, $m ] => {
-            Matrix => sub ($w, $h, $s) {
-                @$s = map [ map { $init } 0 .. $w ], 0 .. $h;
-            }
-        };
-        return $m;
-    };
-
-    method height => { Matrix => sub ($, $h, $) { $h } };
-    method width  => { Matrix => sub ($w, $, $) { $w } };
-
-    method get_all_rows => { Matrix => sub ($, $, $s) { @$s } };
-
-    method get_row => sub ($m, $x) {
-        match [*Matrix, $m ] => {
-            Matrix => sub ($w, $h, $s) {
-                raise("The value for x($x) must be a valid index between 0 and ".$h+1) if $x < 0 || $x >= $h+1;
-                return $s->[$x]->@*;
-            }
-        }
-    };
-
-    method get_col => sub ($m, $y) {
-        match [*Matrix, $m ] => {
-            Matrix => sub ($w, $h, $s) {
-                raise("The value for y($y) must be a valid index between 0 and ".$w+1) if $y < 0 || $y >= $w+1;
-                return map $_->[$y], $s->@*;
-            }
-        }
-    };
-
-    method get => sub ($m, $x, $y) {
-        match [*Matrix, $m ] => {
-            Matrix => sub ($w, $h, $s) {
-                raise("The value for x($x) must be a valid index between 0 and ".$h+1) if $x < 0 || $x >= $h+1;
-                raise("The value for y($y) must be a valid index between 0 and ".$w+1) if $y < 0 || $y >= $w+1;
-                return $s->[$x]->[$y];
-            }
-        }
-    };
-
-    method set => sub ($m, $x, $y, $value) {
-        match [*Matrix, $m ] => {
-            Matrix => sub ($w, $h, $s) {
-                raise("The value for x($x) must be a valid index between 0 and ".$h+1) if $x < 0 || $x >= $h+1;
-                raise("The value for y($y) must be a valid index between 0 and ".$w+1) if $y < 0 || $y >= $w+1;
-                $s->[$x]->[$y] = $value;
-            }
-        };
-        return $m;
-    };
-
-    method set_row => sub ($m, $x, $value) {
-        match [*Matrix, $m ] => {
-            Matrix => sub ($w, $h, $s) {
-                raise("The value for x($x) must be a valid index between 0 and ".$h+1) if $x < 0 || $x >= $h+1;
-                $s->[$x]->@* = map $value, $s->[$x]->@*;
-            }
-        };
-        return $m;
-    };
-
-    method set_row_with_list => sub ($m, $x, @values) {
-        match [*Matrix, $m ] => {
-            Matrix => sub ($w, $h, $s) {
-                raise("The value for x($x) must be a valid index between 0 and ".$h+1) if $x < 0 || $x >= $h+1;
-                raise("The `values` array must be the same width($w) as the matrix ($#values)")
-                    if $#values != $w;
-                $s->[$x]->@* = @values;
-            }
-        };
-        return $m;
-    };
-
-    method set_col => sub ($m, $y, $value) {
-        match [*Matrix, $m ] => {
-            Matrix => sub ($w, $h, $s) {
-                raise("The value for y($y) must be a valid index between 0 and ".$w+1) if $y < 0 || $y >= $w+1;
-                foreach my $i ( 0 .. $h ) {
-                    $s->[$i]->[$y] = $value;
-                }
-            }
-        };
-        return $m;
-    };
-
-    method set_col_with_list => sub ($m, $y, @values) {
-        match [*Matrix, $m ] => {
-            Matrix => sub ($w, $h, $s) {
-                raise("The value for y($y) must be a valid index between 0 and ".$w+1) if $y < 0 || $y >= $w+1;
-                raise("The `values` array must be the same height($h) as the matrix ($#values))")
-                    if $#values != $h;
-                foreach my $i ( 0 .. $h ) {
-                    $s->[$i]->[$y] = $values[$i];
-                }
-            }
-        };
-        return $m;
-    };
-
-    method map => sub ($m, $x, $y, $f) {
-        match [*Matrix, $m ] => {
-            Matrix => sub ($w, $h, $s) {
-                raise("The value for x($x) must be a valid index between 0 and ".$h+1) if $x < 0 || $x >= $h+1;
-                raise("The value for y($y) must be a valid index between 0 and ".$w+1) if $y < 0 || $y >= $w+1;
-                $s->[$x]->[$y] = $f->( $s->[$x]->[$y], $x, $y );
-            }
-        };
-        return $m;
-    };
-
-    method map_row => sub ($m, $x, $f) {
-        match [*Matrix, $m ] => {
-            Matrix => sub ($w, $h, $s) {
-                raise("The value for x($x) must be a valid index between 0 and ".$h+1) if $x < 0 || $x >= $h+1;
-                foreach my $y ( 0 .. $w ) {
-                    $s->[$x]->[$y] = $f->( $s->[$x]->[$y], $x, $y );
-                }
-            }
-        };
-        return $m;
-    };
-
-    method map_rows => sub ($m, $f) {
-        match [*Matrix, $m ] => {
-            Matrix => sub ($w, $h, $s) {
-                foreach my $x ( 0 .. $h ) {
-                    foreach my $y ( 0 .. $w ) {
-                        $s->[$x]->[$y] = $f->( $s->[$x]->[$y], $x, $y );
-                    }
-                }
-            }
-        };
-        return $m;
-    };
-
-    method map_col => sub ($m, $y, $f) {
-        match [*Matrix, $m ] => {
-            Matrix => sub ($w, $h, $s) {
-                raise("The value for y($y) must be a valid index between 0 and ".$w+1) if $y < 0 || $y >= $w+1;
-                foreach my $x ( 0 .. $h ) {
-                    $s->[$x]->[$y] = $f->( $s->[$x]->[$y], $x, $y );
-                }
-            }
-        };
-        return $m;
-    };
-
-    method map_cols => sub ($m, $f) {
-        match [*Matrix, $m ] => {
-            Matrix => sub ($w, $h, $s) {
-                foreach my $y ( 0 .. $w ) {
-                    foreach my $x ( 0 .. $h ) {
-                        $s->[$x]->[$y] = $f->( $s->[$x]->[$y], $x, $y );
-                    }
-                }
-            }
-        };
-        return $m;
-    };
-
-    method DEBUG => {
-        Matrix => sub ($w, $h, $s) {
-            #warn "h: $h, w: $w \n";
-            #warn "rows: (".($s->$#*).")\n";
-            warn "!! >> found too many rows" if $h != $s->$#*;
-            my $i = 0;
-            foreach my $row ( @$s ) {
-                #warn sprintf "row[%2d] = %d\n" => $i, $row->$#*;
-                warn "!! >> found too many columns in row($i)" if $w != $row->$#*;
-                $i++;
-            }
-            #warn Dumper [ $h, $w, $s ];
-        }
-    };
-
-
-    method as_Str => {
-        Matrix => sub ($w, $h, $s) {
-            join "\n" => (map { join '' => map { $_//' ' } @$_ } @$s);
-        }
-    };
-
-};
 
 
 # ...
@@ -239,92 +43,98 @@ my sub _init_termcap {
     $tc;
 }
 
-my $HIDE_CURSOR = (GetTerminalSize())[0] + 100;
+my sub sanitize ($x) { defined $x && $x > 23 ? 23 : ($x < 0 ? 0 : int($x)) }
 
 my $BLOCK = ' ';
 my $PIXEL = '▀';
 
-datatype *Display => sub {
-    case MonochromeDisplay => ( *Matrix );
-};
+type *Height => *Int;
+type *Width  => *Int;
 
+datatype *Display => sub {
+    case MonochromeDisplay => ( *Width, *Height );
+};
 
 typeclass[*Display] => sub {
 
-    state $tc = _init_termcap;
-
-    method height => { MonochromeDisplay => sub ($m) { $m->height } };
-    method width  => { MonochromeDisplay => sub ($m) { $m->width  } };
+    state $tc;
+    state @buffer;
 
     method turn_on => {
-        MonochromeDisplay => sub ($) {
+        MonochromeDisplay => sub ($w, $h) {
+            $tc = _init_termcap;
             $tc->Tputs('vi', 1, *STDOUT);
             $tc->Tputs('cl', 1, *STDOUT);
-            $SIG{INT} = sub {
-                $tc->Tputs('ve', 1, *STDOUT);
-                exit(0);
-            };
+
+            @buffer = ( map { ' ' x $w } 0 .. $h );
         }
     };
 
-    my sub render_frame ($m, $shader) {
-        state @last_frame;
+    method turn_off => {
+        MonochromeDisplay => sub ($w, $h) {
+            $tc->Tputs('ve', 1, *STDOUT) if $tc;
+            $tc->Tputs('cl', 1, *STDOUT) if $tc;
+        }
+    };
 
-        my @rows = $m->get_all_rows;
-        my $h    = $m->height - 1;
-        my $w    = $m->width  - 1;
+    method render_frame => sub ($d, $shader) {
 
-        my @frame;
-        foreach my ($x1, $x2) ( 0 .. $h ) {
-            my @row;
-            foreach my $y ( 0 .. $w ) {
-                push @row => colored(
-                    $PIXEL,
-                    join ' ' => (
-                        $shader->( $rows[$x1]->[$y] ),
-                        'on_'.$shader->( $rows[$x2]->[$y] )
-                    )
-                );
+        match [ *Display, $d ] => {
+            MonochromeDisplay => sub ($w, $h) {
+                my @frame;
+                foreach my ($x1, $x2) ( 0 .. $h-1 ) {
+                    my @row;
+                    foreach my $y ( 0 .. $w-1 ) {
+                        push @row => colored(
+                            $PIXEL,
+                            join ' ' => (
+                                   'grey'.sanitize($shader->( $x1, $y )),
+                                'on_grey'.sanitize($shader->( $x2, $y )),
+                            )
+                        );
+                    }
+                    push @frame => join '' => @row;
+                }
+
+                $tc->Tgoto('cm', 0, 0, *STDOUT);
+                foreach my $i ( 0 .. $#frame ) {
+                    #$tc->Tputs('ce', 1, *STDOUT);
+                    #die if $frame[$i] eq $buffer[$i];
+                    print $frame[$i]#.('-' x $i)
+                        if $frame[$i] ne $buffer[$i];
+                    $tc->Tputs('do', 1, *STDOUT);
+                }
+                #$tc->Tgoto('cm', 0, 0, *STDOUT);
+
+                @buffer = @frame;
             }
-            push @frame => join '' => @row;
-        }
-
-        #$tc->Tgoto('cm', 0, 0, *STDOUT);
-        foreach my $i ( 0 .. $#frame ) {
-            #$tc->Tputs('ce', 1, *STDOUT);
-            print $frame[$i] #.('-' x $i)
-                if @last_frame
-                && $frame[$i] ne $last_frame[$i];
-            $tc->Tputs('do', 1, *STDOUT);
-        }
-        $tc->Tgoto('cm', 0, 0, *STDOUT);
-
-        @last_frame = @frame;
-    }
-
-    method render_frame => {
-        MonochromeDisplay => sub ($m) {
-            render_frame($m, sub ($x) {
-                # needs to return an ansi color
-                'grey'.(defined $x && $x > 23 ? 23 : ($x < 0 ? 0 : int($x)))
-            });
         }
     };
 
 };
 
+my $d = MonochromeDisplay( 80, 60 );
 
+my $start = time;
+my $tick  = 0;
 
-my $m = Matrix( 120, 80, [] )->alloc(0);
-my $d = MonochromeDisplay( $m );
+sub print_stats {
+    my $duration = time - $start;
+    printf 'elapsed: %.05f frames: %05d fps: %.02f' => $duration, $tick, (($duration / $tick) * 1000);
+}
 
 $d->turn_on;
+$SIG{INT} = sub {
+    $d->turn_off;
+    print_stats;
+    exit(0);
+};
 
-my $tick = 0;
 while (++$tick) {
-    $m->map_rows(sub ($v, $x, $y) { $x * rand }); #($tick / 100) });
-    $d->render_frame;
-    sleep(0.016);
+    $d->render_frame(sub ($x, $y) { $x * ($tick / 10) });
+    print_stats;
+    #say $tick;
+    sleep(0.03);
 }
 
 1;
