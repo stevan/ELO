@@ -6,7 +6,7 @@ use experimental 'try', 'builtin', 'for_list';
 use Data::Dumper;
 use Data::Dump;
 
-package MonochromeDisplay {
+package VideoDisplay {
     use v5.36;
     use experimental 'try', 'builtin', 'for_list';
     use builtin qw[ ceil floor indexed ];
@@ -70,8 +70,6 @@ package MonochromeDisplay {
         $self;
     }
 
-    my sub sanitize ($x) { defined $x && $x > 23 ? 23 : ($x < 0 ? 0 : int($x)) }
-
     sub run_shader ($self, $shader) {
         my $fh  = $self->{fh};
         my $tc  = $self->{tc};
@@ -87,11 +85,11 @@ package MonochromeDisplay {
 
         #  fps | time in milliseconds
         # -----+---------------------
-        #  120 | 0.00833   0.0003 = 0.036 / 120
-        #  100 | 0.01000   0.0006 = 0.06 / 100
-        #   60 | 0.01667   0.0015 = 0.09 / 60
+        #  120 | 0.00833
+        #  100 | 0.01000
+        #   60 | 0.01667
         #   50 | 0.02000
-        #   30 | 0.03333   0.003  = 0.09 / 30
+        #   30 | 0.03333
         #   25 | 0.04000
         #   10 | 0.10000
 
@@ -101,10 +99,7 @@ package MonochromeDisplay {
            $bias -= ($refresh - 60) * 0.001 if $refresh > 60;
 
         my $timing  = (1 / $refresh);
-           $timing -= ($timing * $bias);
-
-        #$self->turn_off;
-        #die join ', ' => ( $refresh, (1 / $refresh), (($timing / $refresh)), ($timing - ($timing / $refresh)) );
+           $timing -= ($timing * $bias);;
 
         do {
             my ($start, $rows_rendered, $raw_dur, $dur, $raw_fps, $fps);
@@ -115,9 +110,14 @@ package MonochromeDisplay {
             my @frame;
             foreach my ($x1, $x2) ( @row_idxs ) {
                 push @frame => join '' => map {
-                    colored(PIXEL,
-                           'grey'.sanitize($shader->( $x1, $_, $ticks )).' '.
-                        'on_grey'.sanitize($shader->( $x2, $_, $ticks ))
+                    colored( PIXEL,
+                        sprintf 'r%dg%db%d on_r%dg%db%d' => map {
+                            # scale them to 255
+                            $_ > 255 ? 255 : $_ <= 0 ? 0 : int($_)
+                        } (
+                            $shader->( $x1, $_, $ticks ),
+                            $shader->( $x2, $_, $ticks )
+                        )
                     )
                 } @col_idxs;
             }
@@ -152,9 +152,25 @@ my $FPS = $ARGV[0] // 60;
 my $W   = $ARGV[1] // 120;
 my $H   = $ARGV[2] // 60;
 
-my $d = MonochromeDisplay->new( 120, 60, $FPS )
+
+#foreach my $t ( 10, 255, 300, 510, 600, 765, 812 ) {
+#    say join ', ' => map sprintf('%3d', $_), (
+#        $t,
+#        ($t % 255),
+#        int($t / 255),
+#        (int($t / 255) % 2),
+#        ((int($t / 255) % 2) == 0) ? ($t % 255) : (255 - ($t % 255)),
+#    );
+#}
+#exit;
+
+my $d = VideoDisplay->new( $W, $H, $FPS )
             ->turn_on
-            ->run_shader(sub ($x, $y, $t) { $t });
+            ->run_shader(sub ($x, $y, $t) {
+                ((int($t / 255) % 2) == 0) ? ($t % 255) : (255 - ($t % 255)),
+                $x,
+                $y,
+            });
 
 
 1;
