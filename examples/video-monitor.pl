@@ -78,7 +78,7 @@ package MonochromeDisplay {
 
         # FIXME: respect previously set singal
         # but not really urgent now
-        $SIG{INT} = sub { $self->turn_off; exit(0) };
+        local $SIG{INT} = sub { $self->turn_off; exit(0) };
 
         my $ticks    = 0;
         my @row_idxs = (0 .. ($self->{height}-1));
@@ -87,17 +87,30 @@ package MonochromeDisplay {
 
         #  fps | time in milliseconds
         # -----+---------------------
-        #  60  |  0.01667
-        #  50  |  0.02000
-        #  30  |  0.03333
-        #  25  |  0.04000
-        #  10  |  0.10000
+        #  120 | 0.00833   0.0003 = 0.036 / 120
+        #  100 | 0.01000   0.0006 = 0.06 / 100
+        #   60 | 0.01667   0.0015 = 0.09 / 60
+        #   50 | 0.02000
+        #   30 | 0.03333   0.003  = 0.09 / 30
+        #   25 | 0.04000
+        #   10 | 0.10000
 
         my $refresh = $self->{refresh};
-        my $timing  = 1 / $refresh;
+
+        my $bias  = 0.0999999999;
+           $bias -= ($refresh - 60) * 0.001 if $refresh > 60;
+
+        my $timing  = (1 / $refresh);
+           $timing -= ($timing * $bias);
+
+        #$self->turn_off;
+        #die join ', ' => ( $refresh, (1 / $refresh), (($timing / $refresh)), ($timing - ($timing / $refresh)) );
 
         do {
-            my $start = time;
+            my ($start, $rows_rendered, $raw_dur, $dur, $raw_fps, $fps);
+
+            $start         = time;
+            $rows_rendered = 0;
 
             my @frame;
             foreach my ($x1, $x2) ( @row_idxs ) {
@@ -109,7 +122,6 @@ package MonochromeDisplay {
                 } @col_idxs;
             }
 
-            my $rows_rendered = 0;
             $tc->Tgoto(CLEAR_LINE, 0, 0, *$fh);
             foreach my $i ( 0 .. $#frame ) {
                 if ( $frame[$i] ne $buffer[$i] ) {
@@ -121,21 +133,28 @@ package MonochromeDisplay {
 
             @buffer = @frame;
 
-            my $dur = time - $start;
+            $raw_dur = time - $start;
+            $raw_fps = 1 / $raw_dur;
 
-            #sleep( $timing - $dur ) if $dur < $timing;
+            sleep( $timing - $raw_dur ) if $raw_dur < $timing;
 
-            # my $fps = 1 / $timing + $dur;
-            my $fps = 1 / $dur;
-            printf 'tick: %05d | lines-drawn: %03d | fps: %.03f | time(ms): %.05f' => $ticks, $rows_rendered, $fps, $dur;
+            $dur = time - $start;
+            $fps = 1 / $dur;
+
+            printf('tick: %05d | lines-drawn: %03d | fps: %3d | raw-fps: ~%.02f | time(ms): %.05f | raw-time(ms): %.05f',
+                   $ticks, $rows_rendered, ceil($fps), $raw_fps, $dur, $raw_dur);
 
         } while ++$ticks;
     }
 }
 
-my $d = MonochromeDisplay->new( 120, 60, 120 )
+my $FPS = $ARGV[0] // 60;
+my $W   = $ARGV[1] // 120;
+my $H   = $ARGV[2] // 60;
+
+my $d = MonochromeDisplay->new( 120, 60, $FPS )
             ->turn_on
-            ->run_shader(sub ($x, $y, $t) { $x * ($t / 1000) });
+            ->run_shader(sub ($x, $y, $t) { $t });
 
 
 1;
