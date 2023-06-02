@@ -4,7 +4,6 @@ use v5.36;
 use experimental 'try', 'builtin', 'for_list';
 
 use Data::Dumper;
-use Data::Dump;
 
 # TODO:
 # Create Color types which will support
@@ -28,10 +27,14 @@ use Data::Dump;
 # Greyscale( 0 .. 255 )
 #   8 bit greyscale display
 #       using 1/2 boxes & fg+bg colors
+#   it would be possible to "tint" this display
+#       given a base RGB value, we just dark/lighten it
 #
-# RGBD( 0 .. 255, 0 .. 255, 0 .. 255 )
+# RGB( 0 .. 255, 0 .. 255, 0 .. 255 )
 #   24 bit color display
 #       using 1/2 boxes & fg+bg colors
+#       basicaly what I have below
+#   in theory we could also support lower bit-depths
 #
 # For other stuff, here is some ref:
 # https://www.w3.org/TR/xml-entity-names/025.html - Boxes
@@ -44,6 +47,34 @@ use Data::Dump;
 # ╱ ╳ ╲
 #
 
+# TODO:
+# can we be more efficient with the @buffer and @frame stuff?
+#   do we need the frame at all?
+#      can we just test and maybe replace @buffer line-by-line?
+#
+# what about evaluating each pixel?
+#   can we do substring operations?
+#      extract and compare the pixel data? (see table below)
+#   will the compare/extract be more expensive than testing the whole line?
+#      perhaps this is just a mechanism for setting pixel values?
+#      a regex would be insane, but maybe faster, hmm
+#
+# or can we figure this out before we render?
+#   we'd need to buffer the pixel objects
+#      comparing all the pixel objects might be expensive operation
+#
+# we can be more efficient as well, using `colored` adds the "reset" sequence
+# which we do not need, so we can output slightly leaner pixels (less 4 chars)
+
+# Pixel Data:
+#
+# idx | string
+# ----+-------------------------------------
+#  0  | ,[38;2; 0;0;0;   48;2; 0;1;0   m
+#  1  | ,[38;2; 0;0;1;   48;2; 0;1;1   m
+#  2  | ,[38;2; 0;0;2;   48;2; 0;1;2   m
+#  -1 | ,[38;2; 0;0;119; 48;2; 0;1;119 m
+
 
 package VideoDisplay {
     use v5.36;
@@ -52,8 +83,8 @@ package VideoDisplay {
 
     use Data::Dumper;
 
-    use Time::HiRes qw[ sleep time ];
-    use Carp        qw[ confess ];
+    use Time::HiRes     qw[ sleep time ];
+    use Term::ANSIColor qw[ color ];
 
     # ...
     use POSIX;
@@ -145,7 +176,7 @@ package VideoDisplay {
             my @frame;
             foreach my ($x1, $x2) ( @row_idxs ) {
                 push @frame => join '' => map {
-                    colored( PIXEL,
+                    color(
                         sprintf 'r%dg%db%d on_r%dg%db%d' => map {
                             # scale them to 255
                             $_ > 255 ? 255 : $_ <= 0 ? 0 : int($_)
@@ -153,7 +184,7 @@ package VideoDisplay {
                             $shader->( $x1, $_, $ticks ),
                             $shader->( $x2, $_, $ticks )
                         )
-                    )
+                    ), PIXEL
                 } @col_idxs;
             }
 
@@ -165,6 +196,7 @@ package VideoDisplay {
                 }
                 $tc->Tputs(TO_NEXT_LINE, 1, *$fh);
             }
+            print "\e[0m";
 
             @buffer = @frame;
 
@@ -179,7 +211,9 @@ package VideoDisplay {
             printf('tick: %05d | lines-drawn: %03d | fps: %3d | raw-fps: ~%.02f | time(ms): %.05f | raw-time(ms): %.05f',
                    $ticks, $rows_rendered, ceil($fps), $raw_fps, $dur, $raw_dur);
 
-        } while ++$ticks;
+        } while ++$ticks <= 300;
+
+        $self->turn_off;
     }
 }
 
