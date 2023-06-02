@@ -84,7 +84,6 @@ package VideoDisplay {
     use Data::Dumper;
 
     use Time::HiRes     qw[ sleep time ];
-    use Term::ANSIColor qw[ color ];
 
     # ...
     use POSIX;
@@ -92,6 +91,7 @@ package VideoDisplay {
 
     use constant HIDE_CURSOR  => 'vi';
     use constant SHOW_CURSOR  => 've';
+    use constant CURSOR_HOME  => 'ho';
     use constant CLEAR_SCREEN => 'cl';
     use constant CLEAR_LINE   => 'cm';
     use constant TO_NEXT_LINE => 'do';
@@ -101,7 +101,7 @@ package VideoDisplay {
     my sub _init_termcap {
         my $termios = POSIX::Termios->new; $termios->getattr;
         my $tc = Term::Cap->Tgetent({ TERM => undef, OSPEED => $termios->getospeed });
-        $tc->Trequire( HIDE_CURSOR, SHOW_CURSOR, CLEAR_SCREEN, CLEAR_LINE, TO_NEXT_LINE );
+        $tc->Trequire( HIDE_CURSOR, SHOW_CURSOR, CURSOR_HOME, CLEAR_SCREEN, CLEAR_LINE, TO_NEXT_LINE );
         $tc;
     }
 
@@ -147,7 +147,6 @@ package VideoDisplay {
         my $ticks    = 0;
         my @row_idxs = (0 .. ($self->{height}-1));
         my @col_idxs = (0 .. ($self->{width} -1));
-        my @buffer   = ( map { ' ' x $self->{width} } @row_idxs );
 
         #  fps | time in milliseconds
         # -----+---------------------
@@ -167,38 +166,29 @@ package VideoDisplay {
         my $timing  = (1 / $refresh);
            $timing -= ($timing * $bias);;
 
+        my ($start, $raw_dur, $dur, $raw_fps, $fps);
         do {
-            my ($start, $rows_rendered, $raw_dur, $dur, $raw_fps, $fps);
 
-            $start         = time;
-            $rows_rendered = 0;
 
-            my @frame;
+            $start = time;
+
+            my $frame = '';
             foreach my ($x1, $x2) ( @row_idxs ) {
-                push @frame => join '' => map {
-                    color(
-                        sprintf 'r%dg%db%d on_r%dg%db%d' => map {
-                            # scale them to 255
-                            $_ > 255 ? 255 : $_ <= 0 ? 0 : int($_)
-                        } (
-                            $shader->( $x1, $_, $ticks ),
-                            $shader->( $x2, $_, $ticks )
-                        )
-                    ), PIXEL
+                map {
+                    $frame .= sprintf "\e[38;2;%d;%d;%d;48;2;%d;%d;%d;m▀" => map {
+                        # scale them to 255
+                        $_ > 255 ? 255 : $_ <= 0 ? 0 : int($_)
+                    } (
+                        $shader->( $x1, $_, $ticks ),
+                        $shader->( $x2, $_, $ticks )
+                    );
                 } @col_idxs;
+
+                $frame .= "\n";
             }
 
-            $tc->Tgoto(CLEAR_LINE, 0, 0, *$fh);
-            foreach my $i ( 0 .. $#frame ) {
-                if ( $frame[$i] ne $buffer[$i] ) {
-                    print $frame[$i];
-                    $rows_rendered++;
-                }
-                $tc->Tputs(TO_NEXT_LINE, 1, *$fh);
-            }
-            print "\e[0m";
-
-            @buffer = @frame;
+            $tc->Tputs(CURSOR_HOME, 1, *$fh);
+            print( "$frame\e[0m\n" );
 
             $raw_dur = time - $start;
             $raw_fps = 1 / $raw_dur;
@@ -208,10 +198,10 @@ package VideoDisplay {
             $dur = time - $start;
             $fps = 1 / $dur;
 
-            printf('tick: %05d | lines-drawn: %03d | fps: %3d | raw-fps: ~%.02f | time(ms): %.05f | raw-time(ms): %.05f',
-                   $ticks, $rows_rendered, ceil($fps), $raw_fps, $dur, $raw_dur);
+            printf('tick: %05d | fps: %3d | raw-fps: ~%.02f | time(ms): %.05f | raw-time(ms): %.05f',
+                   $ticks, ceil($fps), $raw_fps, $dur, $raw_dur);
 
-        } while ++$ticks <= 300;
+        } while ++$ticks; # <= 300;
 
         $self->turn_off;
     }
