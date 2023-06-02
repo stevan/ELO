@@ -83,7 +83,9 @@ package VideoDisplay {
 
     use Data::Dumper;
 
-    use Time::HiRes     qw[ sleep time ];
+    use Time::HiRes qw[ sleep time ];
+
+    $|++;
 
     # ...
     use POSIX;
@@ -158,50 +160,46 @@ package VideoDisplay {
         #   25 | 0.04000
         #   10 | 0.10000
 
+        my $timing  = 0;
         my $refresh = $self->{refresh};
 
-        my $bias  = 0.0999999999;
-           $bias -= ($refresh - 60) * 0.001 if $refresh > 60;
+        if ($refresh) {
+            my $bias  = 0.0999999999;
+               $bias -= ($refresh - 60) * 0.001 if $refresh > 60;
 
-        my $timing  = (1 / $refresh);
-           $timing -= ($timing * $bias);;
+            $timing  = (1 / $refresh);
+            $timing -= ($timing * $bias);
+        }
 
         my ($start, $raw_dur, $dur, $raw_fps, $fps);
         do {
-
-
             $start = time;
 
-            my $frame = '';
-            foreach my ($x1, $x2) ( @row_idxs ) {
-                map {
-                    $frame .= sprintf "\e[38;2;%d;%d;%d;48;2;%d;%d;%d;m▀" => map {
-                        # scale them to 255
-                        $_ > 255 ? 255 : $_ <= 0 ? 0 : int($_)
-                    } (
-                        $shader->( $x1, $_, $ticks ),
-                        $shader->( $x2, $_, $ticks )
-                    );
-                } @col_idxs;
-
-                $frame .= "\n";
-            }
-
             $tc->Tputs(CURSOR_HOME, 1, *$fh);
-            print( "$frame\e[0m\n" );
+
+            foreach my ($x1, $x2) ( @row_idxs ) {
+                foreach my $y ( @col_idxs ) {
+                    printf "\e[38;2;%d;%d;%d;48;2;%d;%d;%d;m▀" => (
+                        $shader->( $x1, $y, $ticks ),
+                        $shader->( $x2, $y, $ticks )
+                    );
+                }
+                say '';
+            }
+            say "\e[0m";
 
             $raw_dur = time - $start;
             $raw_fps = 1 / $raw_dur;
 
-            sleep( $timing - $raw_dur ) if $raw_dur < $timing;
+            sleep( $timing - $raw_dur ) if $refresh && $raw_dur < $timing;
 
             $dur = time - $start;
             $fps = 1 / $dur;
 
             printf('tick: %05d | fps: %3d | raw-fps: ~%.02f | time(ms): %.05f | raw-time(ms): %.05f',
-                   $ticks, ceil($fps), $raw_fps, $dur, $raw_dur);
+                   $ticks, $fps, $raw_fps, $dur, $raw_dur);
 
-        } while ++$ticks; # <= 300;
+        } while ++$ticks <= 300;
 
         $self->turn_off;
     }
@@ -214,12 +212,9 @@ my $H   = $ARGV[2] // 60;
 my $d = VideoDisplay->new( $W, $H, $FPS )
             ->turn_on
             ->run_shader(sub ($x, $y, $t) {
-                my $div = $t / 255;
-                my $mod = $t % 255;
-
-                (($div % 2) == 0) ? $mod : (255 - $mod),
-                $x,
+                ((($t / 255) % 2) == 0) ? ($t % 255) : (255 - ($t % 255)),
                 $y,
+                $x,
             });
 
 
