@@ -6,23 +6,58 @@ use experimental 'try', 'builtin', 'for_list';
 use Data::Dumper;
 use Data::Dump;
 
+# TODO:
+# Create Color types which will support
+# each of the following:
+#
+# Monochrome( 1 | 0 )
+#   1 bit (monochrome) display using the following chars
+#       ▄ ▀ █ <space>
+#   or even better, use these chars and do 4x4
+#       ▖  QUADRANT LOWER LEFT
+#       ▗  QUADRANT LOWER RIGHT
+#       ▘  QUADRANT UPPER LEFT
+#       ▙  QUADRANT UPPER LEFT AND LOWER LEFT AND LOWER RIGHT
+#       ▚  QUADRANT UPPER LEFT AND LOWER RIGHT
+#       ▛  QUADRANT UPPER LEFT AND UPPER RIGHT AND LOWER LEFT
+#       ▜  QUADRANT UPPER LEFT AND UPPER RIGHT AND LOWER RIGHT
+#       ▝  QUADRANT UPPER RIGHT
+#       ▞  QUADRANT UPPER RIGHT AND LOWER LEFT
+#       ▟  QUADRANT UPPER RIGH
+#
+# Greyscale( 0 .. 255 )
+#   8 bit greyscale display
+#       using 1/2 boxes & fg+bg colors
+#
+# RGBD( 0 .. 255, 0 .. 255, 0 .. 255 )
+#   24 bit color display
+#       using 1/2 boxes & fg+bg colors
+#
+# For other stuff, here is some ref:
+# https://www.w3.org/TR/xml-entity-names/025.html - Boxes
+# https://www.w3.org/TR/xml-entity-names/022.html - some lines and stuff
+# https://www.w3.org/TR/xml-entity-names/023.html - ^^
+# https://www.w3.org/TR/xml-entity-names/024.html - numbers
+# https://www.w3.org/TR/xml-entity-names/027.html - lines, boxes, arrows
+# https://www.w3.org/TR/xml-entity-names/029.html - arrows
+# line characters??
+# ╱ ╳ ╲
+#
+
+
 package VideoDisplay {
     use v5.36;
     use experimental 'try', 'builtin', 'for_list';
-    use builtin qw[ ceil floor indexed ];
+    use builtin qw[ ceil ];
 
     use Data::Dumper;
-    use Data::Dump;
 
-    use Time::HiRes     qw[ sleep time ];
-    use Term::ANSIColor qw[ colored ];
-    use List::Util      qw[ max min ];
-    use Carp            qw[ confess ];
+    use Time::HiRes qw[ sleep time ];
+    use Carp        qw[ confess ];
 
     # ...
     use POSIX;
     use Term::Cap;
-    use Term::ReadKey qw[ GetTerminalSize ];
 
     use constant HIDE_CURSOR  => 'vi';
     use constant SHOW_CURSOR  => 've';
@@ -152,22 +187,13 @@ my $FPS = $ARGV[0] // 60;
 my $W   = $ARGV[1] // 120;
 my $H   = $ARGV[2] // 60;
 
-
-#foreach my $t ( 10, 255, 300, 510, 600, 765, 812 ) {
-#    say join ', ' => map sprintf('%3d', $_), (
-#        $t,
-#        ($t % 255),
-#        int($t / 255),
-#        (int($t / 255) % 2),
-#        ((int($t / 255) % 2) == 0) ? ($t % 255) : (255 - ($t % 255)),
-#    );
-#}
-#exit;
-
 my $d = VideoDisplay->new( $W, $H, $FPS )
             ->turn_on
             ->run_shader(sub ($x, $y, $t) {
-                ((int($t / 255) % 2) == 0) ? ($t % 255) : (255 - ($t % 255)),
+                my $div = $t / 255;
+                my $mod = $t % 255;
+
+                (($div % 2) == 0) ? $mod : (255 - $mod),
                 $x,
                 $y,
             });
