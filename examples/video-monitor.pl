@@ -186,7 +186,7 @@ package VideoDisplay {
                 }
                 say '';
             }
-            say "\e[0m";
+            print "\e[0m";
 
             $raw_dur = time - $start;
             $raw_fps = 1 / $raw_dur;
@@ -197,9 +197,9 @@ package VideoDisplay {
             $fps = 1 / $dur;
 
             printf('tick: %05d | fps: %3d | raw-fps: ~%.02f | time(ms): %.05f | raw-time(ms): %.05f',
-                   $ticks, $fps, $raw_fps, $dur, $raw_dur);
+                   $ticks, ceil($fps), $raw_fps, $dur, $raw_dur);
 
-        } while ++$ticks <= 300;
+        } while ++$ticks;
 
         $self->turn_off;
     }
@@ -209,12 +209,37 @@ my $FPS = $ARGV[0] // 60;
 my $W   = $ARGV[1] // 120;
 my $H   = $ARGV[2] // 60;
 
+
+die "Height must be a even number" if ($H % 2) != 0;
+
 my $d = VideoDisplay->new( $W, $H, $FPS )
             ->turn_on
             ->run_shader(sub ($x, $y, $t) {
-                ((($t / 255) % 2) == 0) ? ($t % 255) : (255 - ($t % 255)),
-                $y,
-                $x,
+                #return $x, $y, $t;
+
+                my $r = ((($t / 255) % 2) == 0) ? ($t % 255) : (255 - ($t % 255));
+                my $g = $x;
+                my $b = $y;
+
+                #return 0, 0, 0 if $x == 2 || $x == $H-3;
+                #return 0, 0, 0 if $y == 2 || $y == $W-3;
+
+                my $bump = 10;
+                foreach ( 6, 4, 8 ) {
+                    ($r+=$bump, $g+=$bump, $b+=$bump) if ($y % $_) == 0;
+                    ($r+=$bump, $g+=$bump, $b+=$bump) if ($x % $_) == 0;
+                    $bump += ($bump < 0) ? 10 : -5;
+                }
+
+                $r = 255 if $r > 255;
+                $g = 255 if $g > 255;
+                $b = 255 if $b > 255;
+
+                $r = 0 if $r < 0;
+                $g = 0 if $g < 0;
+                $b = 0 if $b < 0;
+
+                return $r, $g, $b;
             });
 
 
