@@ -109,7 +109,7 @@ package VideoDisplay {
     sub run_shader ($self, $shader) {
         # FIXME: respect previously set singal
         # but not really urgent now
-        local $SIG{INT} = sub { $self->turn_off; exit(0) };
+        local $SIG{INT} = sub { print "\e[0m"; $self->turn_off; exit(0) };
 
         my $ticks    = 0;
         my @row_idxs = (0 .. ($self->{height}-1));
