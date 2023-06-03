@@ -47,35 +47,6 @@ use Data::Dumper;
 # ╱ ╳ ╲
 #
 
-# TODO:
-# can we be more efficient with the @buffer and @frame stuff?
-#   do we need the frame at all?
-#      can we just test and maybe replace @buffer line-by-line?
-#
-# what about evaluating each pixel?
-#   can we do substring operations?
-#      extract and compare the pixel data? (see table below)
-#   will the compare/extract be more expensive than testing the whole line?
-#      perhaps this is just a mechanism for setting pixel values?
-#      a regex would be insane, but maybe faster, hmm
-#
-# or can we figure this out before we render?
-#   we'd need to buffer the pixel objects
-#      comparing all the pixel objects might be expensive operation
-#
-# we can be more efficient as well, using `colored` adds the "reset" sequence
-# which we do not need, so we can output slightly leaner pixels (less 4 chars)
-
-# Pixel Data:
-#
-# idx | string
-# ----+-------------------------------------
-#  0  | ,[38;2; 0;0;0;   48;2; 0;1;0   m
-#  1  | ,[38;2; 0;0;1;   48;2; 0;1;1   m
-#  2  | ,[38;2; 0;0;2;   48;2; 0;1;2   m
-#  -1 | ,[38;2; 0;0;119; 48;2; 0;1;119 m
-
-
 package VideoDisplay {
     use v5.36;
     use experimental 'try', 'builtin', 'for_list';
@@ -93,17 +64,14 @@ package VideoDisplay {
 
     use constant HIDE_CURSOR  => 'vi';
     use constant SHOW_CURSOR  => 've';
-    use constant CURSOR_HOME  => 'ho';
     use constant CLEAR_SCREEN => 'cl';
-    use constant CLEAR_LINE   => 'cm';
-    use constant TO_NEXT_LINE => 'do';
 
     use constant PIXEL => '▀';
 
     my sub _init_termcap {
         my $termios = POSIX::Termios->new; $termios->getattr;
         my $tc = Term::Cap->Tgetent({ TERM => undef, OSPEED => $termios->getospeed });
-        $tc->Trequire( HIDE_CURSOR, SHOW_CURSOR, CURSOR_HOME, CLEAR_SCREEN, CLEAR_LINE, TO_NEXT_LINE );
+        $tc->Trequire( HIDE_CURSOR, SHOW_CURSOR, CLEAR_SCREEN );
         $tc;
     }
 
@@ -139,9 +107,6 @@ package VideoDisplay {
     }
 
     sub run_shader ($self, $shader) {
-        my $fh  = $self->{fh};
-        my $tc  = $self->{tc};
-
         # FIXME: respect previously set singal
         # but not really urgent now
         local $SIG{INT} = sub { $self->turn_off; exit(0) };
@@ -171,35 +136,47 @@ package VideoDisplay {
             $timing -= ($timing * $bias);
         }
 
-        my ($start, $raw_dur, $dur, $raw_fps, $fps);
+        my ($start,
+            $dur, $dur_acc, $dur_actual_acc,
+            $fps, $avg_fps, $actual_fps) =
+            (0,
+                0,0,0,
+                0,0,0);
+
         do {
             $start = time;
 
-            $tc->Tputs(CURSOR_HOME, 1, *$fh);
-
+            print "\e[0;0H";
             foreach my ($x1, $x2) ( @row_idxs ) {
                 foreach my $y ( @col_idxs ) {
-                    printf "\e[38;2;%d;%d;%d;48;2;%d;%d;%d;m▀" => (
-                        $shader->( $x1, $y, $ticks ),
-                        $shader->( $x2, $y, $ticks )
+                    printf(
+                        ("\e[38;2;%d;%d;%d;48;2;%d;%d;%d;m".PIXEL),
+                            $shader->( $x1, $y, $ticks ),
+                            $shader->( $x2, $y, $ticks )
                     );
                 }
                 say '';
             }
             print "\e[0m";
 
-            $raw_dur = time - $start;
-            $raw_fps = 1 / $raw_dur;
+            $dur      = time - $start;
+            $fps      = 1 / $dur;
+            $dur_acc += $dur;
 
-            sleep( $timing - $raw_dur ) if $refresh && $raw_dur < $timing;
+            sleep( $timing - $dur ) if $refresh && $dur < $timing;
 
-            $dur = time - $start;
-            $fps = 1 / $dur;
+            $dur_actual_acc += time - $start;
 
-            printf('tick: %05d | fps: %3d | raw-fps: ~%.02f | time(ms): %.05f | raw-time(ms): %.05f',
-                   $ticks, ceil($fps), $raw_fps, $dur, $raw_dur);
+            (
+                ($actual_fps = (1 / ($dur_acc        / $ticks))),
+                ($avg_fps    = (1 / ($dur_actual_acc / $ticks)))
 
-        } while ++$ticks;
+            ) if $ticks && ($ticks % 10) == 0;
+
+            printf('frame: %05d | fps: %.02f | ~fps: %.02f | time(ms): %.03f | runtime(ms): %.03f | elapsed(ms): %.03f',
+                   $ticks, $avg_fps, $actual_fps, $dur, $dur_acc, $dur_actual_acc);
+
+        } while ++$ticks; # <= 300;
 
         $self->turn_off;
     }
@@ -208,7 +185,6 @@ package VideoDisplay {
 my $FPS = $ARGV[0] // 60;
 my $W   = $ARGV[1] // 120;
 my $H   = $ARGV[2] // 60;
-
 
 die "Height must be a even number" if ($H % 2) != 0;
 
