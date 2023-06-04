@@ -126,14 +126,14 @@ for values.
               :
               :              +-------------(3)------------+--(3.a)--<spawn>-->[Subscription]
               :              |                            |
-[ Source ]----:-------> [Publisher]                     (3.b)
+[ Source ]---(1)------> [Publisher]                     (3.b)
               :              Λ                            |
               :              |                            |
               :  {*Subscribe, $subscriber}   {*OnSubscribe, $subscription}
               :              |                            |
               :             (2)                           |
               :              |                            |
-  [ Sink ]----:-------> [Subscriber] <--------------------+
+  [ Sink ]---(1)------> [Subscriber] <--------------------+
               :
               :
               :
