@@ -13,14 +13,33 @@ package VideoDisplay {
 
     $|++;
 
+    # cursors
     use constant HIDE_CURSOR  => "\e[?25l";
     use constant SHOW_CURSOR  => "\e[?25h";
     use constant HOME_CURSOR  => "\e[0;0H";
-    use constant CLEAR_SCREEN => "\e[0;0H;\e[0J";
+
+    # cursor relative position
+    use constant CURSOR_UP        => "\e[A";
+    use constant CURSOR_DOWN      => "\e[B";
+    use constant CURSOR_FORWARD   => "\e[D";
+    use constant CURSOR_BACK      => "\e[D";
+
+    # cursor move and back to begining of line
+    use constant CURSOR_NEXT_LINE => "\e[E";
+    use constant CURSOR_PREV_LINE => "\e[F";
+
+    # clearing and reseting terminal attributes
+    use constant CLEAR_SCREEN => "\e[0;0H;\e[2J";
     use constant RESET        => "\e[0m";
+
+    # formats for codes with args ...
 
     use constant PIXEL        => '▀';
     use constant PIXEL_FORMAT => "\e[38;2;%d;%d;%d;48;2;%d;%d;%d;m".PIXEL;
+
+    use constant GOTO_FORMAT  => "\e[%d;%dH";
+
+    # ...
 
     sub new ($class, $width, $height, $refresh) {
         my $self = {
@@ -65,17 +84,11 @@ package VideoDisplay {
         # but not really urgent now
         local $SIG{INT} = sub { $self->turn_off; exit(0) };
 
+        my $height = $self->{height};
+        my $width  = $self->{width};
+
         my @row_idxs = $self->{_row_idxs}->@*;
         my @col_idxs = $self->{_col_idxs}->@*;
-
-        #use Data::Dumper;
-        #die Dumper [
-        #    (join ', ' => @row_idxs),
-        #    (join ', ' => @col_idxs),
-        #    '---',
-        #    (join ', ' => $self->{_row_idxs}->@*),
-        #    (join ', ' => $self->{_col_idxs}->@*),
-        #];
 
         my $ticks   = 0;
         my $refresh = $self->{refresh};
@@ -86,7 +99,10 @@ package VideoDisplay {
             $fps, $avg_fps, $actual_fps) =
             (0,0,0,0,0,0,0);
 
-        my $shader_harness = sub {
+        do {
+            $start = time;
+
+            print HOME_CURSOR;
             foreach my ($x1, $x2) ( @row_idxs ) {
                 foreach my $y ( @col_idxs ) {
                     printf( PIXEL_FORMAT,
@@ -96,15 +112,6 @@ package VideoDisplay {
                 }
                 say '';
             }
-        };
-
-        my $harness = $shader_harness;
-
-        do {
-            $start = time;
-
-            print HOME_CURSOR;
-            $harness->();
             print RESET;
 
             $dur      = time - $start;
@@ -115,12 +122,12 @@ package VideoDisplay {
 
             $dur_actual_acc += time - $start;
 
-            (
-                ($actual_fps = (1 / ($dur_acc        / $ticks))),
-                ($avg_fps    = (1 / ($dur_actual_acc / $ticks)))
+            (($actual_fps = (1 / ($dur_acc        / $ticks))),
+             ($avg_fps    = (1 / ($dur_actual_acc / $ticks))))
+                if  $ticks
+                && ($ticks % 10) == 0;
 
-            ) if $ticks && ($ticks % 10) == 0;
-
+            printf(GOTO_FORMAT, ($height/2)+2, 0);
             printf('frame: %05d | fps: %.02f | ~fps: %.02f | time(ms): %.03f | runtime(ms): %.03f | elapsed(ms): %.03f',
                    $ticks, $avg_fps, $actual_fps, $dur, $dur_acc, $dur_actual_acc);
 
@@ -146,8 +153,6 @@ my $d = VideoDisplay->new( $W, $H, $FPS )
 
                 return (0, 0, 0) if $x < 4 || $x > ($H-5);
                 return (0, 0, 0) if $y < 4 || $y > ($W-5);
-
-                #return $t, $x, $y;
 
                 my $r = ((($t / 255) % 2) == 0) ? ($t % 255) : (255 - ($t % 255));
                 my $g = $x;
