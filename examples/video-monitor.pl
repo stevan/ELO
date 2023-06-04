@@ -21,7 +21,7 @@ package VideoDisplay {
     # cursor relative position
     use constant CURSOR_UP        => "\e[A";
     use constant CURSOR_DOWN      => "\e[B";
-    use constant CURSOR_FORWARD   => "\e[D";
+    use constant CURSOR_FORWARD   => "\e[C";
     use constant CURSOR_BACK      => "\e[D";
 
     # cursor move and back to begining of line

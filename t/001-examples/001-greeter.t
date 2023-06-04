@@ -8,8 +8,6 @@ use Test::ELO;
 
 use Data::Dumper;
 
-use Hash::Util qw[fieldhash];
-
 use ok 'ELO::Loop';
 use ok 'ELO::Types',  qw[ :core :events ];
 use ok 'ELO::Timers', qw[ :tickers ];
