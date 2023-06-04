@@ -192,8 +192,53 @@ __END__
 #   25 | 0.04000
 #   10 | 0.10000
 
+
+--MISC-------------------------------------------------------------------------------------
+
 CURSOR MOVEMENTS:
     https://en.wikipedia.org/wiki/ANSI_escape_code#CSI_(Control_Sequence_Introducer)_sequences
+
+ANSI ESC SEQUENCES:
+    https://gist.github.com/fnky/458719343aabd01cfb17a3a4f7296797
+
+COLORS:
+    https://www.gaijin.at/en/infos/color-tables
+
+--BUFFERS----------------------------------------------------------------------------------
+
+- https://gist.github.com/fnky/458719343aabd01cfb17a3a4f7296797?permalink_comment_id=3878518#common-private-modes
+- https://xn--rpa.cc/irl/term.html (search for "1049" to see details)
+- https://rosettacode.org/wiki/Terminal_control/Preserve_screen
+
+
+This will allow me to switch to another screen to paint the graphics
+    and then restore the old screen afterwards
+
+--GRAPHICS---------------------------------------------------------------------------------
+
+
+ANSI GRAPHICS
+    - uses unicode block character to get 2 (4x4) pixels out of each character.
+
+SIXEL GRAPHICS
+    - control characters control six pixel strips (6x1) that can be rendered on the screen.
+
+    https://invisible-island.net/xterm/ctlseqs/ctlseqs.html#h3-Sixel-Graphics
+    https://groups.google.com/g/comp.os.vms/c/59fyp3HTEH0
+    https://juliahub.com/ui/Packages/Sixel/KtGle/0.1.2
+    https://www.digiater.nl/openvms/decus/vax90b1/krypton-nasa/all-about-sixels.text
+    https://codeberg.org/coffee/sixel-experiments
+    https://github.com/saitoha/libsixel
+
+ReGIS GRAPHICS
+    - vector drawing tools :)
+    https://en.wikipedia.org/wiki/ReGIS
+
+Images in iTerm
+    - https://iterm2.com/documentation-images.html
+    - other feartures: https://iterm2.com/documentation-escape-codes.html
+
+------------------------------------------------------------------------------------------
 
 
 # TODO:

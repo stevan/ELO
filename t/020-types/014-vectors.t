@@ -33,29 +33,6 @@ datatype *Matrix => sub {
     case Matrix2D => ( *Height, *Width, *Space )
 };
 
-# IDEA:
-# What about something like this??
-#
-# signature[ *Matrix => *T ] => sub {
-#
-#     method alloc => [ *T ] => [ *Matrix ];
-#
-#     method height => [] => [ *Height ];
-#     method width  => [] => [ *Width  ];
-#
-#     method get => [ *Coord ]       => [ *Any ];
-#
-#     method map  => [ *CodeRef ]      => [ *Matrix ];
-#     method set  => [ *Coord,  *Any ] => [ *Matrix ];
-#     method plot => [ *Vector, *Any ] => [ *Matrix ];
-#
-#     method to_string => [] => [ *Str ];
-#     method to_graph  => [] => [ *Str ];
-# };
-#
-# to (at a minimum) add typechecking to the
-# functions.
-
 typeclass[*Matrix] => sub {
 
     method alloc => sub ($m, $init=undef) {

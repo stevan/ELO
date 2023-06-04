@@ -2,7 +2,11 @@
 # ELO TODO
 <!-------------------------------------------------------->
 
+Tensors:
 https://www.youtube.com/results?search_query=what+is+a+tensor%3F+Dan+Fleisch
+
+Shaders:
+https://www.youtube.com/watch?v=f4s1h2YETNY&ab_channel=kishimisu
 
 <!-------------------------------------------------------->
 ## FIXME:
@@ -29,7 +33,7 @@ https://www.youtube.com/results?search_query=what+is+a+tensor%3F+Dan+Fleisch
 ## General
 <!-------------------------------------------------------->
 
-- fast-fix example:
+- fast-fib example:
     - print out the fib sequence we got
     - also print out the order in which we generated them
         - and maybe some call metrics as well
@@ -178,6 +182,7 @@ https://www.youtube.com/results?search_query=what+is+a+tensor%3F+Dan+Fleisch
 ### Actors
 
 https://doc.akka.io/docs/akka/2.5/actors.html#dependency
+https://ballerina.io/
 
 ### Signals
 

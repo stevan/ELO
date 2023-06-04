@@ -155,3 +155,50 @@ sub init ($this, $msg=[]) {
 
 ELO::Loop->run( \&init, with_promises => 1 );
 ```
+
+And it is fairly performant as well, here is an example creating 1_000_000 actors. On my machine this will take just under a minute, and consumer just over 1.5GB of memory. Not too bad, and according to [this very artificial benchmark](https://pkolaczk.github.io/memory-consumption-of-async/), it puts `ELO` ahead of Go, Python and Elixir ... and pretty darn close to Java.
+
+```perl
+use v5.36;
+
+use ELO::Loop;
+use ELO::Actors qw[ setup IGNORE ];
+
+sub Actor ($id) {
+    state $loop; # the loop is always the same, ....
+
+    setup sub ($this) {
+        # so we save some time and effectively
+        # turn it into a constant here ;)
+        $loop //= $this->loop;
+
+        # create a timer for sleep for 10 seconds and exit
+        $loop->add_timer( 10, sub { $this->exit(0) });
+
+        # we will have no messages to `match`, so
+        # why waste an instance here, use IGNORE
+        # so have a `receive` that does nothing
+        IGNORE;
+    };
+}
+
+sub init ($this, $) {
+    my $countdown = 1_000_000;
+    $this->spawn( Actor( $countdown-- ) ) while $countdown;
+}
+
+ELO::Loop->run( \&init );
+
+```
+
+And of course, this is perl, so we can do this all in one line. If you want to see timing info, use `/usr/bin/time` and watch the memory your preferred way. And yes, this fits in a tweet ;)
+```
+perl -Ilib -MELO::Loop -MELO::Actors=setup,IGNORE -E 'my$a=0;sub A($i){state$l;setup sub($t){print++$a,"\r";($l//=$t->loop)->add_timer(2,sub{print$a--,"\r";$t->exit(0)});IGNORE}};ELO::Loop->run(sub($t,$){say"START";my$x=10**6;$t->spawn(A($x))while$x--;say"\nEXIT"});say"\nDONE";'
+```
+
+
+
+
+
+
+
