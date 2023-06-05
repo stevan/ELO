@@ -2,6 +2,7 @@
 
 use v5.36;
 use experimental 'try', 'builtin', 'for_list';
+use builtin 'floor';
 
 use ELO::Loop;
 use ELO::Types  qw[ :core :events ];
@@ -10,6 +11,7 @@ use ELO::Actors qw[ receive ];
 
 use Data::Dumper;
 
+use List::Util  qw[ min ];
 use Time::HiRes qw[ sleep time ];
 
 $|++;
@@ -42,15 +44,25 @@ sub turn_off () {
 }
 
 sub run_shader ($h, $w, $shader) {
-    state $ticks = 1;
+    state $frame = 1;
     state $start = time;
 
+    my $height = $h-1;
+    my $width  = $w-1;
+
+    my @rows = reverse 0 .. $height;
+    my @cols =         0 .. $width;
+
+    my $time = time;
+
     print HOME_CURSOR;
-    foreach my ($x1, $x2) ( 0 .. $h-1 ) {
-        foreach my $y ( 0 .. $w-1 ) {
+    foreach my ($x1, $x2) ( @rows ) {
+        foreach my $y ( @cols ) {
             printf( PIXEL_FORMAT,
-                $shader->( $x1, $y, $ticks ),
-                $shader->( $x2, $y, $ticks ),
+                # normalize it to 0 .. 255
+                map { $_ < 0 ? 0 : min(255, int(255 * $_)) }
+                    $shader->( $x1, $y, $time ),
+                    $shader->( $x2, $y, $time ),
             );
         }
         say '';
@@ -58,13 +70,13 @@ sub run_shader ($h, $w, $shader) {
     print RESET;
 
     my $dur = time - $start;
-    my $fps = 1 / ($dur / $ticks);
+    my $fps = 1 / ($dur / $frame);
 
     printf(GOTO_FORMAT, ($h/2)+2, 0);
     printf('frame: %05d | fps: %3d | elapsed: %f',
-        $ticks, $fps, $dur);
+        $frame, $fps, $dur);
 
-    $ticks++;
+    $frame++;
 }
 
 #  fps | time in milliseconds
@@ -85,6 +97,95 @@ my $TIMEOUT = $ARGV[3] // 10;
 die "Height must be a even number, ... or reall weird stuff happens" if ($HEIGHT % 2) != 0;
 
 sub init ($this, $) {
+
+    # https://www.youtube.com/watch?v=f4s1h2YETNY&ab_channel=kishimisu
+    # this follows along with the video
+
+    my sub pallete ($t) {
+
+        state @a = (0.5, 0.5, 0.5);
+        state @b = (0.5, 0.5, 0.5);
+        state @c = (1.0, 1.0, 1.0);
+        state @d = (0.263, 0.416, 0.557);
+
+        my @r;
+        foreach my $i ( 0, 1, 2 ) {
+            my $a = $a[$i];
+            my $b = $b[$i];
+            my $c = $c[$i];
+            my $d = $d[$i];
+
+            #$r[$i] = $a[$i] + $b[$i] * cos( 6.28318 * ($c[$i] * $t + $d[$i]));
+            $r[$i] = ($a + $b * cos( 6.28318 * ($c * $t + $d )));
+        }
+
+        return @r;
+    }
+
+    my sub shader2 ($x, $y, $t) {
+        state $height = $HEIGHT-1;
+        state $width  =  $WIDTH-1;
+        state $aspect = ($height / $width);
+
+        # START COORDS
+
+        $x = $x / $height;
+        $y = $y /  $width;
+
+        # center the coordinates and
+        # shift them into the colorspace
+        $x = $x * 2.0 - 1.0;
+        $y = $y * 2.0 - 1.0;
+
+        # make sure we don't strech the canvas
+        $x *= $aspect;
+
+        # DONE COORDS
+
+        my @final_color = (0, 0, 0);
+
+        my $d0 = sqrt(($x*$x) + ($y*$y));
+
+        for( my $i = 0.0; $i < 3.0; $i++ ) {
+
+            # START REPETITION
+            $x = $x * 1.5;
+            $y = $y * 1.5;
+
+            $x = $x - floor($x);
+            $y = $y - floor($y);
+
+            $x -= 0.5;
+            $y -= 0.5;
+
+            # END REPETITION
+
+            # length
+            my $d = sqrt(($x*$x) + ($y*$y));
+
+            $d *= exp( -$d0 );
+
+            my @color = pallete($d0 + $i * 0.4 + $t * 0.4);
+
+            $d = sin($d * 8 + $t)/8;
+            $d = abs($d);
+
+            # step it ...
+            $d = $d < 0.1 ? ($d / 0.1) : 1;
+
+            #$d = 0.04 / $d;
+            $d = (0.04 / $d) ** 1.2;
+
+            $final_color[0] += $color[0] * $d;
+            $final_color[1] += $color[1] * $d;
+            $final_color[2] += $color[2] * $d;
+        }
+
+        return @final_color;
+    }
+
+    #shader2( $_, $_, $_ ) foreach 0 .. 60 * 60;
+    #die;
 
     my sub shader ($x, $y, $t) {
 
@@ -126,7 +227,7 @@ sub init ($this, $) {
 
     turn_on();
 
-    my $i0 = $this->loop->add_interval( (1 / $FPS), sub { run_shader( $HEIGHT, $WIDTH, \&shader ) });
+    my $i0 = $this->loop->add_interval( (1 / $FPS), sub { run_shader( $HEIGHT, $WIDTH, \&shader2 ) });
 
     timer( $this, $TIMEOUT, sub {
         $this->loop->cancel_timer( $i0 );
