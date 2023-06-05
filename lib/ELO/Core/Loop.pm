@@ -14,19 +14,30 @@ use ELO::Core::Behavior::FunctionWrapper;
 
 use ELO::Types qw[ *SIGEXIT ];
 
-use parent 'UNIVERSAL::Object::Immutable';
-use slots (
-    tick_delay => sub {},
-    # ...
-    _time           => sub { +[] },
-    _process_table  => sub { +{} },
-    _process_links  => sub { +{} },
 
-    _timers         => sub { +[] },
-    _message_queue  => sub { +[] },
-    _signal_queue   => sub { +[] },
-    _callback_queue => sub { +[] },
-);
+sub new ($class, %args) {
+
+    my $self = {
+        tick_delay      => ($args{tick_delay} // 0), # TODO: Deprecate this
+        # timing ...
+        _tick           => 0,
+        _time           => 0,
+        # processes ...
+        _process_table  => +{},
+        _process_links  => +{},
+        # queues ...
+        _timers         => +[],
+        _message_queue  => +[],
+        _signal_queue   => +[],
+        _callback_queue => +[],
+    };
+
+    bless $self => $class;
+
+    # XXX: do we need to initialize anything here?
+
+    return $self;
+}
 
 sub create_process ($self, @args) {
 
@@ -261,8 +272,8 @@ my $MESSAGES_PROCESSED = 0;
 
 sub TICK ($self) {
 
-    # update the now time ...
-    my $now = $self->_update_clock;
+    # get the current time ...
+    my $now = $self->_get_time;
 
     # Signals are handled first, as they
     # are meant to be async interrupts
@@ -404,17 +415,18 @@ sub TICK ($self) {
 # not a concern at the moment.
 
 sub _init_time ($self) {
-    $self->{_time}->[0] = 0;
-    $self->{_time}->[1] = 0;
+    $self->{_tick} = 0;
+    $self->{_time} = 0;
 }
 
-sub _update_tick  ($self) { ++$self->{_time}->[0] }
+sub _update_tick  ($self) { ++$self->{_tick} }
+sub _get_time     ($self) {   $self->{_time} }
 sub _update_clock ($self) {
     state $MONOTONIC = Time::HiRes::CLOCK_MONOTONIC();
-    $self->{_time}->[1] = Time::HiRes::clock_gettime( $MONOTONIC )
+    $self->{_time} = Time::HiRes::clock_gettime( $MONOTONIC )
 }
 
-sub tick ($self) { $self->{_time}->[0]  }
+sub tick ($self) { $self->{_tick}  }
 sub now  ($self) {
     $self->_update_clock;  # always stay up to date ...
 }
@@ -468,7 +480,7 @@ sub LOOP ($self, $logger=undef) {
             my $next_timer = $self->{_timers}->[0];
 
             if ( $next_timer && $next_timer->[1]->@* ) {
-                my $now     = $self->_update_clock;
+                my $now     = $self->_get_time;
                 my $wait    = ($next_timer->[0] - $now);
 
                 # do not wait for negative values ...

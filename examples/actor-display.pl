@@ -129,7 +129,7 @@ sub init ($this, $) {
     my $i0 = interval( $this, (1 / $FPS), sub { run_shader( $HEIGHT, $WIDTH, \&shader ) });
     #my $i0 = interval_ticker( $this, 1, sub { run_shader( $HEIGHT, $WIDTH, \&shader ) });
 
-    timer( $this, $TIMEOUT, sub {
+    timer( $this, 10, sub {
         cancel_timer( $this, $i0 );
         #cancel_ticker( $i0 );
         turn_off();
