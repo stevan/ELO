@@ -14,6 +14,7 @@ use ELO::Core::Behavior::FunctionWrapper;
 
 use ELO::Types qw[ *SIGEXIT ];
 
+# ...
 
 sub new ($class, %args) {
 
@@ -188,39 +189,59 @@ sub add_timer ($self, $timeout, $f) {
     # XXX - should we optimize timeout of 0 and
     # just translate it into next_tick?
 
-    my $tid = \(my $x = 0);
-
-    my $timers = $self->{_timers};
+    my $tid = bless \(my $x = 0) => '*::ELO::CORE::TimerID';
 
     # flatten the timer
     my $timer_end = $self->_update_clock + $timeout;
-
-    #warn "TIMER: $timer_end";
     $timer_end = int($timer_end * $TIMER_PRECISION_INT) * $TIMER_PRECISION_DECIMAL;
-    #warn "TIMER: $timer_end flattened";
 
-    # TODO: add meta info into the timer name
-    # something like 'timer_$timeout__$timer_end__TID_refaddr($tid)'
-    # or maybe that is too much, think on it.
     #set_subname( 'ELO_timer_callback' => $f );
+    my $timer = [ $f, $tid, $timeout ];
+
+    $self->schedule_timer( $timer_end, $timer );
+
+    return $tid;
+}
+
+sub add_interval ($self, $duration, $f) {
+    # XXX - should we optimize duration of 0 and
+    # just translate it into next_tick?
+
+    my $iid = bless \(my $x = 0) => '*::ELO::CORE::IntervalID';
+
+    # flatten the timer
+    my $timer_end = $self->_update_clock + $duration;
+    $timer_end = int($timer_end * $TIMER_PRECISION_INT) * $TIMER_PRECISION_DECIMAL;
+
+    #set_subname( 'ELO_interval_callback' => $f );
+    my $timer = [ $f, $iid, $duration ];
+
+    $self->schedule_timer( $timer_end, $timer );
+
+    return $iid;
+}
+
+sub schedule_timer ($self, $timer_end, $timer) {
+
+    my $timers = $self->{_timers};
 
     if ( scalar @$timers == 0 ) {
         # fast track the first one ...
-        push $timers->@* => [ $timer_end, [ [ $f, $tid ] ] ];
+        push $timers->@* => [ $timer_end, [ $timer ] ];
     }
     # if the last one is the same time as this one
     elsif ( $timers->[-1]->[0] == $timer_end ) {
         # then push it onto the same timer slot ...
-        push $timers->[-1]->[1]->@* => [ $f, $tid ];
+        push $timers->[-1]->[1]->@* => $timer;
     }
     # if the last one is less than this one, we add a new one
     elsif ( $timers->[-1]->[0] < $timer_end ) {
-        push $timers->@* => [ $timer_end, [ [ $f, $tid ] ] ];
+        push $timers->@* => [ $timer_end, [ $timer ] ];
     }
     elsif ( $timers->[-1]->[0] > $timer_end ) {
         $timers->@* = sort { $a->[0] <=> $b->[0] } (
             $timers->@*,
-            [ $timer_end, [ [ $f, $tid ] ] ]
+            [ $timer_end, [ $timer ] ]
         );
     }
     else {
@@ -233,7 +254,6 @@ sub add_timer ($self, $timeout, $f) {
         die "This should never happen";
     }
 
-    return $tid;
 }
 
 sub cancel_timer ($self, $tid) {
@@ -332,6 +352,7 @@ sub TICK ($self) {
     if ( scalar $self->{_timers}->@* ) {
         my $timers = $self->{_timers};
 
+        my @intervals;
         #warn "RUNING TIMERS ".scalar $timers->@*;
         #use Data::Dumper; warn Dumper $timers;
         while (@$timers && $timers->[0]->[0] <= $now) {
@@ -346,8 +367,16 @@ sub TICK ($self) {
                 } catch ($e) {
                     die "Timer callback failed ($timer) because: $e";
                 }
+                # if we have an interval,
+                # schedule it to be re-scheduled
+                push @intervals => [ $timer->[0] + $t->[2], $t ]
+                #$self->schedule_timer( $timer->[0], $t )
+                    if $t->[1] isa '*::ELO::CORE::IntervalID';
             }
         }
+
+        # schedule for at least the next tick
+        $self->schedule_timer( @$_ ) foreach @intervals;
         #warn "ENDING TIMERS ".scalar $timers->@*;
     }
 

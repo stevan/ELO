@@ -93,21 +93,21 @@ sub init ($this, $) {
         #return (55,55,55) if $x == 0 || $x == ($HEIGHT-1);
         #return (55,55,55) if $y == 0 || $y == ($WIDTH-1);
 
-        return (0, 0, 0) if ($x % 2) == 0; # || $x > ($HEIGHT-5);
-        return (0, 0, 0) if ($y % 2) == 0; # || $y > ($WIDTH-5);
+        return (0, 0, 0) if ($x % 10) == 0; # || $x > ($HEIGHT-5);
+        return (0, 0, 0) if ($y % 10) == 0; # || $y > ($WIDTH-5);
 
         my $r = ((($t / 255) % 2) == 0) ? ($t % 255) : (255 - ($t % 255));
         my $g = $x;
         my $b = $y;
 
-        return $r, $g, $b;
+        #return $r, $g, $b;
 
         # make some plaid ...
-        my $bump = 10;
+        my $bump = 25;
         foreach ( 6, 4, 8 ) {
             ($r+=$bump, $g+=$bump, $b+=$bump) if ($y % $_) == 0;
             ($r+=$bump, $g+=$bump, $b+=$bump) if ($x % $_) == 0;
-            $bump += ($bump < 0) ? 10 : -5;
+            $bump += ($bump < 0) ? 30 : -45;
         }
 
         # make sure we don't overflow ...
@@ -126,12 +126,10 @@ sub init ($this, $) {
 
     turn_on();
 
-    my $i0 = interval( $this, (1 / $FPS), sub { run_shader( $HEIGHT, $WIDTH, \&shader ) });
-    #my $i0 = interval_ticker( $this, 1, sub { run_shader( $HEIGHT, $WIDTH, \&shader ) });
+    my $i0 = $this->loop->add_interval( (1 / $FPS), sub { run_shader( $HEIGHT, $WIDTH, \&shader ) });
 
-    timer( $this, 10, sub {
-        cancel_timer( $this, $i0 );
-        #cancel_ticker( $i0 );
+    timer( $this, $TIMEOUT, sub {
+        $this->loop->cancel_timer( $i0 );
         turn_off();
         $this->exit(0);
     });
