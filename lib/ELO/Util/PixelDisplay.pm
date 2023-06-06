@@ -23,13 +23,23 @@ use constant RESET        => "\e[0m";
 
 use constant EMPTY        => ' ';
 use constant PIXEL        => '▀';
-use constant PIXEL_FORMAT => "\e[38;2;%d;%d;%d;48;2;%d;%d;%d;m".PIXEL;
-use constant EMPTY_FORMAT => "\e[48;2;%d;%d;%d;m".EMPTY;
+
+use constant FG_ANSI_FORMAT => "38;2;%d;%d;%d;";
+use constant BG_ANSI_FORMAT => "48;2;%d;%d;%d;";
+
+use constant FG_COLOR_FORMAT => "\e[".(FG_ANSI_FORMAT)."m";
+use constant BG_COLOR_FORMAT => "\e[".(BG_ANSI_FORMAT)."m";
+use constant COLOR_FORMAT    => "\e[".(FG_ANSI_FORMAT.BG_ANSI_FORMAT)."m";
+
+use constant PIXEL_FORMAT => (COLOR_FORMAT    . PIXEL);
+use constant EMPTY_FORMAT => (BG_COLOR_FORMAT . EMPTY);
 
 use constant GOTO_FORMAT  => "\e[%d;%dH";
 
 sub new ($class, %args) {
     state $singleton;
+
+    die "Height must be a even number, ... or reall weird stuff happens" if ($args{height} % 2) != 0;
 
     $singleton //= bless {
         height   => ($args{height}  // die 'You must specify a `height` parameter'),
@@ -38,8 +48,8 @@ sub new ($class, %args) {
 
         start => time,
         frame => 1,
-        rows  => [ reverse 0 .. ($args{height} - 1) ],
-        cols  => [         0 .. ($args{width}  - 1) ],
+        rows  => [ 0 .. ($args{height} - 1) ],
+        cols  => [ 0 .. ($args{width}  - 1) ],
     } => __PACKAGE__;
 }
 
@@ -103,43 +113,67 @@ sub background_color ($self, $color) {
     print HOME_CURSOR;
     foreach my ($x1, $x2) ( @rows ) {
         foreach my $y ( @cols ) {
-            printf( PIXEL_FORMAT, $color->@*, $color->@* );
+            #printf( COLOR_FORMAT.($x1 % 10), (0,0,255), $color->rgb );
+            printf( COLOR_FORMAT.($y % 10), $color->rgb, $color->rgb );
         }
         say '';
     }
     print HOME_CURSOR;
 }
 
+sub poke ($self, $x, $y, $color) {
+
+    my @bg_color        = $self->{bg_color} ? $self->{bg_color}->rgb : (0, 0, 0);
+    my ($r, $g, $b, $a) = $color->rgba;
+
+    my $_x = ceil($x / 2);
+    printf(GOTO_FORMAT, $_x, $y);
+
+    # both pixels on
+    if ( $a ) {
+        if ( ($x % 2) != 0 ) {
+            printf( PIXEL_FORMAT, ($r, $g, $b), @bg_color );
+        }
+        else {
+            printf( PIXEL_FORMAT, @bg_color, ($r, $g, $b) );
+        }
+    }
+    else {
+        printf( EMPTY_FORMAT, @bg_color );
+    }
+}
+
 sub bit_block ($self, $x, $y, $block) {
 
-    my @bg_color = ($self->{bg_color} // [ 0, 0, 0 ])->@*;
+    my @bg_color = $self->{bg_color} ? $self->{bg_color}->rgb : (0, 0, 0);
 
-    my $_x = ceil($x/2);
+    my $_x = $x == 0 ? 1 : ceil($x / 2);
     printf(GOTO_FORMAT, $_x, $y);
-    foreach my ($row1, $row2) ( $block->@* ) {
-        my $_y = $y;
-        foreach my $i ( 0 .. $row1->$#* ) {
+    foreach my ($row1, $row2) ( $block->get_all_rows ) {
 
-            my ($r1, $g1, $b1, $a1) = $row1->[$i]->@*;
-            my ($r2, $g2, $b2, $a2) = $row2->[$i]->@*;
+        foreach my $i ( 0 .. $block->width ) {
 
-            # transparent
-            if ( $a1 && $a2 ) {
-                printf( EMPTY_FORMAT, @bg_color );
-            }
-            # top pixel transparent
-            elsif ( $a1 ) {
-                printf( PIXEL_FORMAT, @bg_color, ($r2, $g2, $b2) );
-            }
-            # bottom pixel transparent
-            elsif ( $a2 ) {
-                printf( PIXEL_FORMAT, ($r1, $g1, $b1), @bg_color );
-            }
+            my ($r1, $g1, $b1, $a1) = $row1->[$i]->rgba;
+            my ($r2, $g2, $b2, $a2) = $row2->[$i]->rgba;
+
             # both pixels on
-            else {
+            if ( $a1 && $a2 ) {
                 printf( PIXEL_FORMAT, ($r1, $g1, $b1), ($r2, $g2, $b2) );
             }
+            # top pixel transparent
+            elsif ( $a1 && !$a2 ) {
+                printf( PIXEL_FORMAT, ($r1, $g1, $b1), @bg_color );
+            }
+            # bottom pixel transparent
+            elsif ( !$a1 && $a2 ) {
+                printf( PIXEL_FORMAT, @bg_color, ($r2, $g2, $b2) );
+            }
+            # both pixels off
+            else {
+                printf( EMPTY_FORMAT, @bg_color );
+            }
         }
+
         $_x++;
         printf(GOTO_FORMAT, $_x, $y);
     }
