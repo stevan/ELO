@@ -147,24 +147,27 @@ sub init ($this, $) {
 
     # https://cdn-learn.adafruit.com/assets/assets/000/074/898/original/gaming_newMarioFour02.png?1556139661
 
-    my $image_data = ImageData( $PALETTE, [
-        #'   $$$$$    ',
-        #'  $$$$$$$$$ ',
-        #'  ...@@.@   ',
-        #' .@.@@@.@@@ ',
-        #' .@..@@@.@@ ',
-        #' ..@@@@@... ',
-        #'   @@@@@@@  ',
-        #'  ..$...    ',
-        #' ...$..$... ',
-        #'....$$$$....',
-        #'@@.$@$$@$.@@',
-        #'@@@$$$$$$@@@',
-        #'@@$$$$$$$$@@',
-        #'  $$$  $$$  ',
-        #' ...    ... ',
-        #'....    ....',
-         ' ###                 ',
+    my $image1_data = ImageData( $PALETTE, [
+        '   $$$$$    ',
+        '  $$$$$$$$$ ',
+        '  ...@@.@   ',
+        ' .@.@@@.@@@ ',
+        ' .@..@@@.@@ ',
+        ' ..@@@@@... ',
+        '   @@@@@@@  ',
+        '  ..$...    ',
+        ' ...$..$... ',
+        '....$$$$....',
+        '@@.$@$$@$.@@',
+        '@@@$$$$$$@@@',
+        '@@$$$$$$$$@@',
+        '  $$$  $$$  ',
+        ' ...    ... ',
+        '....    ....',
+    ]);
+
+    my $image2_data = ImageData( $PALETTE, [
+        ' ###                 ',
          '####   $$$$$$$$      ',
          '###$$$$$$$$$$$$$     ',
          '###$$$$$$$$$$$$$     ',
@@ -188,9 +191,12 @@ sub init ($this, $) {
          '                ``   ',
     ]);
 
-    my $image = $image_data->create_image;
+    my $image1 = $image1_data->create_image;
+    my $image2 = $image2_data->create_image;
 
     $display->turn_on;
+
+    # make a background we stand out against ...
     do {
         my $x = $_;
         $display->poke(
@@ -199,47 +205,15 @@ sub init ($this, $) {
         ) for 0 .. $display->width
     } for 0 .. $display->height;
 
-    #$display->bit_block( 0, 0, $image );
-    $display->bit_block( 3, 3, $image );
-    #$display->bit_block( 2, 2, $image );
-    #$display->bit_block( 0, 5, $image );
-    $display->bit_block( 3, ($display->width - $image->width)-3, $image );
-    $display->bit_block( ($display->height - $image->height)-3, 3, $image );
-    $display->bit_block( ($display->height - $image->height)-3, ($display->width - $image->width)-3, $image );
+    $display->bit_block( 3, 3, $image1 );
+    $display->bit_block( 3, ($display->width - $image1->width)-3, $image1 );
+    $display->bit_block( ($display->height - $image1->height)-3, 3, $image1 );
+    $display->bit_block( ($display->height - $image1->height)-3, ($display->width - $image1->width)-3, $image1 );
     $display->bit_block(
-        (($display->height/2) - ($image->height/2)),
-        ($display->width  - $image->width)/2,
-        $image
+        (($display->height/2) - ($image2->height/2)),
+        ($display->width  - $image2->width)/2,
+        $image2
     );
-
-
-=pod
-    $display->bit_block( 2, 18, [
-        map { [ map { $color_map{$_} } split //, $_ ] }
-        ('####                 ',
-         '####   $$$$$$$$      ',
-         '###$$$$$$$$$$$$$     ',
-         '###$$$$$$$$$$$$$     ',
-         '..... @@`@@@___      ',
-         '.....@@@`@@@@_@_     ',
-         '.....@@@`@@@__@_     ',
-         '..@@@@__@@@@____     ',
-         '  _______@@@@@__     ',
-         '   ..@@@@@@@@@       ',
-         '     .$$....$$.....  ',
-         '     .$$....$$...... ',
-         '     .$$....$$...... ',
-         '     ......$......###',
-         ' ```  .$$$$$......###',
-         ' ``  %%$$$%%$.$$ ####',
-         ' ``$$%%$$$%%$$$$  ## ',
-         ' ``$$$$$$$$$$$$``    ',
-         ' ``$$$$$$$$$$$````   ',
-         '        $$$$$$$```   ',
-         '           $$$  ``   ',
-         '                ``   ')
-    ]);
-=cut
 
     timer( $this, $TIMEOUT, sub {
         $display->turn_off();
