@@ -16,7 +16,7 @@ use constant SHOW_CURSOR  => "\e[?25h";
 use constant HOME_CURSOR  => "\e[0;0H";
 
 # clearing and reseting terminal attributes
-use constant CLEAR_SCREEN => "\e[0;0H;\e[2J";
+use constant CLEAR_SCREEN => "\e[0;0H\e[2J";
 use constant RESET        => "\e[0m";
 
 # formats for codes with args ...
@@ -37,31 +37,36 @@ use constant EMPTY_FORMAT => (BG_COLOR_FORMAT . EMPTY);
 use constant GOTO_FORMAT  => "\e[%d;%dH";
 
 sub new ($class, %args) {
-    state $singleton;
+
+    die 'You must specify a `height` parameter' unless $args{height};
+    die 'You must specify a `width` parameter'  unless $args{width};
 
     die "Height must be a even number, ... or reall weird stuff happens" if ($args{height} % 2) != 0;
 
-    $singleton //= bless {
-        height   => ($args{height}  // die 'You must specify a `height` parameter'),
-        width    => ($args{width}   // die 'You must specify a `width` parameter'),
-        bg_color => $args{bg_color} // undef,
+    my $rows = $args{height} - 1;
+    my $cols = $args{width}  - 1;
+
+    bless {
+        height   => $rows,
+        width    => $cols,
+        bg_color => $args{bg_color},
 
         start => time,
         frame => 1,
-        rows  => [ 0 .. ($args{height} - 1) ],
-        cols  => [ 0 .. ($args{width}  - 1) ],
+        rows  => [ 0 .. $rows ],
+        cols  => [ 0 .. $cols ],
+        vram  => [ map { [ map $args{bg_color}, (0 .. $cols) ] } (0 .. $rows) ]
     } => __PACKAGE__;
 }
 
-sub reset ($self) {
-    $self->{start} = time;
-    $self->{frame} = 1;
-}
+sub height ($self) { $self->{height} }
+sub width  ($self) { $self->{width}  }
 
-sub turn_on ($) {
+sub turn_on ($self) {
     # TODO: switch buffers
     print HIDE_CURSOR;
     print CLEAR_SCREEN;
+    $self->draw_background if $self->{bg_color};
 }
 
 sub turn_off ($) {
@@ -71,12 +76,28 @@ sub turn_off ($) {
     print RESET;
 }
 
-sub run_shader ($self, $shader) {
-    state $height = $self->{height} - 1;
-    state $width  = $self->{width}  - 1;
+sub draw_background ($self) {
+    my @rows = $self->{rows}->@*;
+    my @cols = $self->{cols}->@*;
 
-    state @rows = $self->{rows}->@*;
-    state @cols = $self->{cols}->@*;
+    my @rgb = $self->{bg_color}->rgb;
+
+    print HOME_CURSOR;
+    foreach my ($x1, $x2) ( @rows ) {
+        foreach my $y ( @cols ) {
+            printf( COLOR_FORMAT.($y % 10), @rgb, @rgb );
+        }
+        say '';
+    }
+    print HOME_CURSOR;
+}
+
+sub run_shader ($self, $shader) {
+    my $height = $self->{height} - 1;
+    my $width  = $self->{width}  - 1;
+
+    my @rows = $self->{rows}->@*;
+    my @cols = $self->{cols}->@*;
 
     my $time = time;
 
@@ -104,78 +125,97 @@ sub run_shader ($self, $shader) {
     $self->{frame}++;
 }
 
-sub background_color ($self, $color) {
-    state @rows = $self->{rows}->@*;
-    state @cols = $self->{cols}->@*;
-
-    $self->{bg_color} = $color;
-
-    print HOME_CURSOR;
-    foreach my ($x1, $x2) ( @rows ) {
-        foreach my $y ( @cols ) {
-            #printf( COLOR_FORMAT.($x1 % 10), (0,0,255), $color->rgb );
-            printf( COLOR_FORMAT.($y % 10), $color->rgb, $color->rgb );
-        }
-        say '';
-    }
-    print HOME_CURSOR;
-}
-
 sub poke ($self, $x, $y, $color) {
+    my $vram = $self->{vram};
 
-    my @bg_color        = $self->{bg_color} ? $self->{bg_color}->rgb : (0, 0, 0);
     my ($r, $g, $b, $a) = $color->rgba;
 
-    my $_x = ceil($x / 2);
-    printf(GOTO_FORMAT, $_x, $y);
+    # coords are 1-based
+    my $_x = $x + 1;
+    my $_y = $y + 1;
 
-    # both pixels on
+    # and we have vertical sub-pixels
+    $_x = ceil($_x / 2);
+
+    printf(GOTO_FORMAT, $_x, $_y);
+
     if ( $a ) {
-        if ( ($x % 2) != 0 ) {
-            printf( PIXEL_FORMAT, ($r, $g, $b), @bg_color );
+        if ( ($x % 2) == 0 ) {
+            printf( PIXEL_FORMAT, ($r, $g, $b), $vram->[$x+1]->[$y]->rgb );
+
         }
         else {
-            printf( PIXEL_FORMAT, @bg_color, ($r, $g, $b) );
+            printf( PIXEL_FORMAT, $vram->[$x-1]->[$y]->rgb, ($r, $g, $b) );
         }
     }
-    else {
-        printf( EMPTY_FORMAT, @bg_color );
-    }
+
+    $vram->[$x]->[$y] = $color;
 }
 
 sub bit_block ($self, $x, $y, $block) {
+    my $vram = $self->{vram};
 
-    my @bg_color = $self->{bg_color} ? $self->{bg_color}->rgb : (0, 0, 0);
+    my @rows = map { $_ } $block->get_all_rows;
 
-    my $_x = $x == 0 ? 1 : ceil($x / 2);
-    printf(GOTO_FORMAT, $_x, $y);
-    foreach my ($row1, $row2) ( $block->get_all_rows ) {
+    if (($x % 2) != 0) {
+        $x--;
+        unshift @rows => [ $vram->[ $x ]->@[ $y .. ($block->width + $y)] ];
+    }
 
-        foreach my $i ( 0 .. $block->width ) {
+    if (($#rows % 2) == 0) {
+        push @rows => [ $vram->[ scalar(@rows) + $x ]->@[ $y .. ($block->width + $y)] ];
+    }
 
-            my ($r1, $g1, $b1, $a1) = $row1->[$i]->rgba;
-            my ($r2, $g2, $b2, $a2) = $row2->[$i]->rgba;
+    # coords are 1-based
+    my $_x = $x + 1;
+    my $_y = $y + 1;
+
+    # and we have vertical sub-pixels
+    $_x = ceil($_x / 2);
+
+    printf(GOTO_FORMAT, $_x, $_y);
+    foreach my ($i1, $i2) ( 0 .. $#rows ) {
+
+        my $row1 = $rows[ $i1 ];
+        my $row2 = $rows[ $i2 ];
+
+        my $vram1 = $vram->[ $x + $i1 ];
+        my $vram2 = $vram->[ $x + $i2 ];
+
+        foreach my $j ( 0 .. $block->width ) {
+
+            my $color1 = $row1->[$j];
+            my $color2 = $row2->[$j];
 
             # both pixels on
-            if ( $a1 && $a2 ) {
-                printf( PIXEL_FORMAT, ($r1, $g1, $b1), ($r2, $g2, $b2) );
+            if ( $color1->a && $color2->a ) {
+                printf( PIXEL_FORMAT, $color1->rgb, $color2->rgb );
+
+                $vram1->[ $y + $j ] = $color1;
+                $vram2->[ $y + $j ] = $color2;
             }
-            # top pixel transparent
-            elsif ( $a1 && !$a2 ) {
-                printf( PIXEL_FORMAT, ($r1, $g1, $b1), @bg_color );
+            # top pixel visible, bottom transparent
+            elsif ( $color1->a && !$color2->a ) {
+                printf( PIXEL_FORMAT, $color1->rgb, $vram2->[ $y + $j ]->rgb );
+                $vram1->[ $y + $j ] = $color1;
             }
-            # bottom pixel transparent
-            elsif ( !$a1 && $a2 ) {
-                printf( PIXEL_FORMAT, @bg_color, ($r2, $g2, $b2) );
+            # bottom pixel visible, top transparent
+            elsif ( !$color1->a && $color2->a ) {
+                printf( PIXEL_FORMAT, $vram1->[ $y + $j ]->rgb, $color2->rgb );
+                $vram2->[ $y + $j ] = $color2;
             }
             # both pixels off
             else {
-                printf( EMPTY_FORMAT, @bg_color );
+                printf( PIXEL_FORMAT,
+                    $vram1->[ $y + $j ]->rgb,
+                    $vram2->[ $y + $j ]->rgb,
+                );
             }
+
         }
 
         $_x++;
-        printf(GOTO_FORMAT, $_x, $y);
+        printf(GOTO_FORMAT, $_x, $_y);
     }
 }
 

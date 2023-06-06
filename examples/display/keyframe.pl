@@ -137,58 +137,78 @@ my $TIMEOUT = $ARGV[3] // 10;
 
 die "Height must be a even number, ... or reall weird stuff happens" if ($HEIGHT % 2) != 0;
 
-my $display = ELO::Util::PixelDisplay->new( height => $HEIGHT, width => $WIDTH );
+my $display = ELO::Util::PixelDisplay->new(
+    height   => $HEIGHT,
+    width    => $WIDTH,
+    bg_color => RGB( 0, 180, 255 )
+);
 
 sub init ($this, $) {
 
     # https://cdn-learn.adafruit.com/assets/assets/000/074/898/original/gaming_newMarioFour02.png?1556139661
 
     my $image_data = ImageData( $PALETTE, [
-        '   $$$$$    ',
-        '  $$$$$$$$$ ',
-        '  ...@@.@   ',
-        ' .@.@@@.@@@ ',
-        ' .@..@@@.@@@',
-        ' ..@@@@@....',
-        '   @@@@@@@  ',
-        '  ..$...    ',
-        ' ...$..$....',
-        '....$$$$....',
-        '@@.$@$$@$.@@',
-        '@@@$$$$$$@@@',
-        '@@$$$$$$$$@@',
-        '  $$$  $$$  ',
-        ' ...    ... ',
-        '....    ....',
+        #'   $$$$$    ',
+        #'  $$$$$$$$$ ',
+        #'  ...@@.@   ',
+        #' .@.@@@.@@@ ',
+        #' .@..@@@.@@ ',
+        #' ..@@@@@... ',
+        #'   @@@@@@@  ',
+        #'  ..$...    ',
+        #' ...$..$... ',
+        #'....$$$$....',
+        #'@@.$@$$@$.@@',
+        #'@@@$$$$$$@@@',
+        #'@@$$$$$$$$@@',
+        #'  $$$  $$$  ',
+        #' ...    ... ',
+        #'....    ....',
+         ' ###                 ',
+         '####   $$$$$$$$      ',
+         '###$$$$$$$$$$$$$     ',
+         '###$$$$$$$$$$$$$     ',
+         '...   @@`@@@___      ',
+         '...  @@@`@@@@_@_     ',
+         '.....@@@`@@@__@_     ',
+         '..@@@@__@@@@____     ',
+         '  _______@@@@@__     ',
+         '   ..@@@@@@@@@       ',
+         '     .$$....$$.....  ',
+         '     .$$....$$...... ',
+         '     .$$....$$...... ',
+         '     ......$.... ### ',
+         ' ```  .$$$$$.... ####',
+         ' ``  %%$$$%%$.$$ ####',
+         ' ``$$%%$$$%%$$$$  ## ',
+         ' ``$$$$$$$$$$$$``    ',
+         ' ``$$$$$$$$$$$````   ',
+         '        $$$$$$$```   ',
+         '           $$$  ``   ',
+         '                ``   ',
     ]);
-
-    #warn Dumper $image_data;
 
     my $image = $image_data->create_image;
 
-    #die join ", " => $image->height, $image->width;
+    $display->turn_on;
+    do {
+        my $x = $_;
+        $display->poke(
+            $x, $_,
+            RGB( $_, $x, $_ )
+        ) for 0 .. $display->width
+    } for 0 .. $display->height;
 
-    #my $x = 0;
-    #foreach my ($row1, $row2) ( $image->get_all_rows ) {
-    #    foreach my $i ( 0 .. $row1->$#* ) {
-    #        print "[$x, $i], ";
-    #    }
-    #    say '';
-    #    $x = ($x % 2) == 0 ? $x + 2 : $x + 1;
-    #}
-    #die;
-
-    $display->turn_on();
-    $display->background_color( RGB( 0, 180, 255 ) );
-    #$display->poke( $_, $_, $BLACK ) for 0 .. $WIDTH;
-
-    $display->bit_block( 0,                          0,                        $image );
-    $display->bit_block( 0,                          ($WIDTH - $image->width), $image );
-    $display->bit_block( ($HEIGHT - $image->height), 0,                        $image );
-    $display->bit_block( ($HEIGHT - $image->height), ($WIDTH - $image->width), $image );
+    #$display->bit_block( 0, 0, $image );
+    $display->bit_block( 3, 3, $image );
+    #$display->bit_block( 2, 2, $image );
+    #$display->bit_block( 0, 5, $image );
+    $display->bit_block( 3, ($display->width - $image->width)-3, $image );
+    $display->bit_block( ($display->height - $image->height)-3, 3, $image );
+    $display->bit_block( ($display->height - $image->height)-3, ($display->width - $image->width)-3, $image );
     $display->bit_block(
-        (($HEIGHT/2) - ($image->height/2)),
-        ($WIDTH  - $image->width)/2,
+        (($display->height/2) - ($image->height/2)),
+        ($display->width  - $image->width)/2,
         $image
     );
 

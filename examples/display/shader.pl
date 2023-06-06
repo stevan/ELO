@@ -28,7 +28,10 @@ my $TIMEOUT = $ARGV[3] // 10;
 
 die "Height must be a even number, ... or reall weird stuff happens" if ($HEIGHT % 2) != 0;
 
-my $display = ELO::Util::PixelDisplay->new( height => $HEIGHT, width => $WIDTH );
+my $display = ELO::Util::PixelDisplay->new(
+    height => $HEIGHT,
+    width  => $WIDTH,
+);
 
 # https://www.youtube.com/watch?v=f4s1h2YETNY&ab_channel=kishimisu
 # this follows along with the video
