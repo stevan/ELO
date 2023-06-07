@@ -108,7 +108,7 @@ sub shader ($x, $y, $t) {
         $d = $d < 0.1 ? ($d / 0.1) : 1;
 
         #$d = 0.04 / $d;
-        $d = (0.04 / $d) ** 1.2;
+        $d = (0.1 / $d) ** 1.2;
 
         $final_color[0] += $color[0] * $d;
         $final_color[1] += $color[1] * $d;

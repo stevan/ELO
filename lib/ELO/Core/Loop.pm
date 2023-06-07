@@ -369,7 +369,7 @@ sub TICK ($self) {
                 }
                 # if we have an interval,
                 # schedule it to be re-scheduled
-                push @intervals => [ $timer->[0] + $t->[2], $t ]
+                push @intervals => [ $now + $t->[2], $t ]
                 #$self->schedule_timer( $timer->[0], $t )
                     if $t->[1] isa '*::ELO::CORE::IntervalID';
             }
