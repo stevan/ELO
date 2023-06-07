@@ -22,9 +22,9 @@ my $term_left   = 1;
 my $term_height = $term->term_height - 3;
 my $term_width  = $term->term_width  - 3;
 
-my $NUM_PARTICLES = shift(@ARGV) // 1;
+my $NUM_PARTICLES = shift(@ARGV) // 100;
 my $WAIT_TIME     = shift(@ARGV) // 10;
-my $GRAVITY       = shift(@ARGV) // 5;
+my $GRAVITY       = shift(@ARGV) // 3;
 
 event *eTick;
 

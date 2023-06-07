@@ -80,7 +80,7 @@ sub shader ($x, $y, $t) {
 
     my $d0 = sqrt(($x*$x) + ($y*$y));
 
-    for( my $i = 0.0; $i < 3.0; $i++ ) {
+    for( my $i = 0.0; $i < 1.0; $i++ ) {
 
         # START REPETITION
         $x = $x * 1.5;

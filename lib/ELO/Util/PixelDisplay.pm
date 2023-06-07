@@ -101,6 +101,8 @@ sub run_shader ($self, $shader) {
 
     my $time = time;
 
+    $|--;
+
     print HOME_CURSOR;
     foreach my ($x1, $x2) ( @rows ) {
         foreach my $y ( @cols ) {
@@ -114,6 +116,7 @@ sub run_shader ($self, $shader) {
         say '';
     }
     print RESET;
+    say '';
 
     my $dur = time - $self->{start};
     my $fps = 1 / ($dur / $self->{frame});
@@ -123,6 +126,8 @@ sub run_shader ($self, $shader) {
         $self->{frame}, $fps, $dur);
 
     $self->{frame}++;
+
+    $|++;
 }
 
 sub poke ($self, $x, $y, $color) {
