@@ -153,32 +153,15 @@ In this snippet below we run the shader at 60 fps on a 60h x 120w pixel screen f
 
 The first thing you might notice, based on your computer of course, is that it is almost certainly
 not running at 60fps. On my laptop it tends to run around 30fps. This is due to all sorts of factors,
-but one is almost certainly Perl I/O buffering to the terminal.
+but if we give it a high FPS it will always try it's best.
 
-So we could fix this in any number of ways, but this is Perl, and we should lean into our strengths
-and go back to our roots in the shell. Since the animation is just a stream of text (as explained above)
-we can just pipe it in the shell to `cat` like so:
+But ignore that, it doesn't matter. The cool tricks are what you can do with this output.
+
+First, as mentioned above, we can pipe this to another process. The simplest one being `cat`.
 
 `perl -Ilib examples/display/shader.pl 60 60 120 10 | cat`
 
-You might notice, again depending on your computer, that it is running faster (or at least appears to be
-based on the "fps" displayed in the output). On my laptop it manages a bit more, around 40-45fps. My
-assumption here is that, from perl's point of view, writing the animation stream to a pipe is faster
-than writing data to a terminal device, and this is because ... "buffering" :)
-
-The result of this is that perl can output the animation stream faster and so from the ELO timing side,
-it appears to acheive a higher fps.
-
-To me, the overall animation appears smoother, which could be a number of things:
-
-1. The `cat` tool is printing to the screen in very large chunks, whereas `perl` is printing much smaller chucks
-2. Higher FPS will always result in a smoother animation
-    - This is especially true because our animation uses the current `time` as one of it's seeds
-    - Which means long render times result in a choppier animation
-3. My FPS calculations are total garbage, and so it is just nonsense
-    - This is a possibility, but I think I did okay with that bit, who knows.
-
-So, this is great, we managed to get an additional 10-15fps, but we actually do better than that. As mentioned above, we can use shell redirection to send the animation stream to a file. And since it is just a text file we can read it like any other file.
+As also mentioned above, we can use shell redirection to send the animation stream to a file. And since it is just a text file we can read it like any other file.
 
 For this trick, it is just easier if you create the log file first. So just make a `shader.log` file somewhere you can easily access it. Then open one terminal and run the following command:
 
@@ -190,9 +173,7 @@ Now open another terminal and run the example, redirection the output to the log
 
 As soon as the example starts running, you should see the animation playing in the first terminal. This is basically just `tail` just following the file, which results in it interpretting the animation stream.
 
-On my computer, this gets very close to the full 60 fps we are looking for. I believe, again, that this is due to I/O "buffering". Just as with the `cat` example above, from perl's point of view, the I/O to the pipe happened faster than the I/O to the terminal. It is my assumption that, again from perl's point of view, the I/O to the file is even faster than the I/O to the pipe. This is likely all down to the OS, file descriptors, polling, etc. etc. etc. Basically, ... "buffering".
-
-It is also possible that `tail` is a bit faster because it is running in a completely different shell from the instance from `perl`. Whereas with the `cat` example the shell might have some management overhead to juggle both `perl` and `cat`, with `tail` that is all handled at the OS layer via the file I/O.
+You can kind of consider this "broadcasting" the animation, since it is possible for several terminals to be `tail`ing the file at the same time.
 
 So anyway, now that we have the contents of our animation in a file, we can also do some cool stuff with that.
 
@@ -202,25 +183,39 @@ We can again use `cat` to play the animation by simply doing:
 
 The animation will go as fast as possible in this case, held back only by the speed of your computer, the terminal emulator and `cat`.
 
+> NOTE: The stuff below can get dicey because it is easy to hit a ANSI sequence causes your terminal to go all wonky. You've been warned :)
+
 Since we choose a canvas that is 60 lines, and we pack 2 pixel rows per line, we can actually see the first frame of the animation using `head`, like so:
 
 `head -30 shader.log`
 
-You can also replay just the first few seconds of the animation like so:
+And if you want to see the fps info, make it 31 lines.
 
-`head -3000 shader.log`
+`head -31 shader.log`
+
+You can also replay just the first 10 seconds of the animation like so:
+
+`head -3100 shader.log`
 
 And of course you can use `tail` again here to play the last few seconds of the animation, like so:
 
-`tail -3000 shader.log`
+`tail -3100 shader.log`
 
-And if you want to get really crazy, you can reverse the lines and ... well just run it and see.
+Another interesting way to replay at the animation is to use `grep`. Here we are splitting on the frame maker that is present into the stream (but not visible in the output) and view the previous 31 lines (animation frame + fps info).
 
-`cat temp.log | perl -e 'print reverse <>'`
+`grep -B 31 "ELO-FRAME-MARKER" temp.log`
 
-> NOTE: This stuff can get dicey because it is easy to hit a ANSI sequence causes your terminal to go all wonky. You've been warned :)
+And if you want to get silly, you can also pass this to `perl` and pause between painting lines, resulting in a wipe effect as each frame is progressively drawn.
 
+`grep -B 31 "ELO-FRAME-MARKER" temp.log | perl -MTime::HiRes=sleep -e 'print, sleep(0.016) for <>'`
 
+And finally, if you want to playback the animation at a specific frame rate, then this one-liner will do that. The example below will try to re-run the animation at approx. 30fps or 0.03 seconds.
+
+`grep -B 31 "ELO-FRAME-MARKER" temp.log | perl -MTime::HiRes=sleep -e '(/ELO\-FRAME\-MARKER/ && sleep(0.03)), print for <>'`
+
+And lastly, you can "play" it over HTTP. Here is the `curl` command to fetch a short (16 frame) clip that I uploaded as a gist.
+
+`curl -s "https://gist.githubusercontent.com/stevan/2606722a3052ec360a85ae60057cc8bd/raw/512da811029481aa3eba5941344f58f0583c62c9/clip.log"`
 
 
 

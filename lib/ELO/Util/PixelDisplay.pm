@@ -101,8 +101,6 @@ sub run_shader ($self, $shader) {
 
     my $time = time;
 
-    $|--;
-
     print HOME_CURSOR;
     foreach my ($x1, $x2) ( @rows ) {
         foreach my $y ( @cols ) {
@@ -116,18 +114,19 @@ sub run_shader ($self, $shader) {
         say '';
     }
     print RESET;
-    say '';
 
     my $dur = time - $self->{start};
     my $fps = 1 / ($dur / $self->{frame});
 
-    printf(GOTO_FORMAT, ($height/2)+2, 0);
+    # NOTE: this is not really needed since
+    # we are already at this position
+    #printf(GOTO_FORMAT, ($height/2)+2, 0);
     printf('frame: %05d | fps: %3d | elapsed: %f',
         $self->{frame}, $fps, $dur);
 
-    $self->{frame}++;
+    print "\nELO-FRAME-MARKER\e[2K";
 
-    $|++;
+    $self->{frame}++;
 }
 
 sub poke ($self, $x, $y, $color) {
