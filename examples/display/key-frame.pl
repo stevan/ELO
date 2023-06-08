@@ -14,7 +14,7 @@ use ELO::Types  qw[ :core :events :types :typeclasses ];
 use ELO::Timers qw[ :timers :tickers ];
 use ELO::Actors qw[ receive match ];
 
-use ELO::Util::PixelDisplay;
+use ELO::Graphics::Display;
 
 # ...
 

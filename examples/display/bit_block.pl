@@ -11,98 +11,10 @@ use ELO::Types  qw[ :core :events :types :typeclasses ];
 use ELO::Timers qw[ :timers :tickers ];
 use ELO::Actors qw[ receive match ];
 
-use ELO::Util::PixelDisplay;
+use ELO::Graphics::Display;
 
-# ...
-
-type *R       => *Int;
-type *G       => *Int;
-type *B       => *Int;
-type *Opacity => *Bool;
-
-datatype *Color => sub {
-    case RGB  => ( *R, *G, *B );
-    case RGBA => ( *R, *G, *B, *Opacity );
-};
-
-typeclass[*Color] => sub {
-    method r => {
-        RGB  => sub ($r, $, $)    { $r },
-        RGBA => sub ($r, $, $, $) { $r },
-    };
-
-    method g => {
-        RGB  => sub ($, $g, $)    { $g },
-        RGBA => sub ($, $g, $, $) { $g },
-    };
-
-    method b => {
-        RGB  => sub ($, $, $b)    { $b },
-        RGBA => sub ($, $, $b, $) { $b },
-    };
-
-    method a => {
-        RGB  => sub ($, $, $)     { 1 },
-        RGBA => sub ($, $, $, $a) { $a },
-    };
-
-    method rgb => {
-        RGB  => sub ($r, $g, $b)    { $r, $g, $b },
-        RGBA => sub ($r, $g, $b, $) { $r, $g, $b },
-    };
-
-    method rgba => {
-        RGB  => sub ($r, $g, $b)     { $r, $g, $b, 1 },
-        RGBA => sub ($r, $g, $b, $a) { $r, $g, $b, $a },
-    };
-};
-
-# ...
-
-datatype *Palette => sub {
-    case Palette => ( *HashRef ); # *Str => *Color
-};
-
-typeclass[*Palette] => sub {
-
-    method map => sub ($p, @chars) {
-        match[*Palette, $p] => {
-            Palette => sub ($m) { map $m->{ $_ }, @chars }
-        };
-    };
-};
-
-# ...
-
-datatype *Image => sub {
-    case Image => ( *ArrayRef ); # [ *Color, ... ]
-};
-
-typeclass[*Image] => sub {
-
-    method height => { Image => sub ($data) { $data->$#*      } };
-    method width  => { Image => sub ($data) { $data->[0]->$#* } };
-
-    method get_all_rows => { Image => sub ($data) { $data->@* } };
-};
-
-# ...
-
-type *Rows => *ArrayRef; # [ *Str, ... ]
-
-datatype *ImageData => sub {
-    case ImageData => ( *Palette, *Rows );
-};
-
-typeclass[*ImageData] => sub {
-
-    method create_image => {
-        ImageData => sub ($p, $rows) {
-            Image([ map [ $p->map( split //, $_ ) ], @$rows ])
-        }
-    };
-};
-
+use ELO::Graphics::Color qw[ :all ];
+use ELO::Graphics::Image qw[ :all ];
 
 # ...
 
@@ -137,7 +49,7 @@ my $TIMEOUT = $ARGV[3] // 10;
 
 die "Height must be a even number, ... or reall weird stuff happens" if ($HEIGHT % 2) != 0;
 
-my $display = ELO::Util::PixelDisplay->new(
+my $display = ELO::Graphics::Display->new(
     height   => $HEIGHT,
     width    => $WIDTH,
     bg_color => RGB( 0, 180, 255 )

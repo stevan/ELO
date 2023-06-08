@@ -9,7 +9,7 @@ use ELO::Types  qw[ :core :events ];
 use ELO::Timers qw[ :timers :tickers ];
 use ELO::Actors qw[ receive ];
 
-use ELO::Util::PixelDisplay;
+use ELO::Graphics::Display;
 
 #  fps | time in milliseconds
 # -----+---------------------
@@ -28,7 +28,7 @@ my $TIMEOUT = $ARGV[3] // 10;
 
 die "Height must be a even number, ... or reall weird stuff happens" if ($HEIGHT % 2) != 0;
 
-my $display = ELO::Util::PixelDisplay->new(
+my $display = ELO::Graphics::Display->new(
     height => $HEIGHT,
     width  => $WIDTH,
 );
@@ -49,12 +49,37 @@ sub pallete ($t) {
         my $c = $c[$i];
         my $d = $d[$i];
 
-        #$r[$i] = $a[$i] + $b[$i] * cos( 6.28318 * ($c[$i] * $t + $d[$i]));
         $r[$i] = ($a + $b * cos( 6.28318 * ($c * $t + $d )));
     }
 
     return @r;
 }
+
+# TODO:
+# we need a better way to handle the "global" values
+# for use inside a shader (HEIGHT, WIDTH, TIME, etc)
+# localizing them might work, but we would need them
+# to be available in scope already.
+#
+# use ELO::Graphics::Shaders qw[ :globals ];
+#
+# would import the right variables, so that they
+# would be in scope when the shader function is
+# defined.
+#
+# then when the shader is run, it localizes these
+# values for faster access.
+#
+# Variables would be:
+# - $Display_Height
+# - $Display_Width
+# - $Display_Aspect
+#
+# maybe this is not worth it, it isn't very many
+# but we could also take that opportunity to import
+# a bunch of helper functions (see video for ideas)
+# that can perform the math stuff. This would make
+# it easier to substitute in faster versions as well
 
 sub shader ($x, $y, $t) {
     state $height = $HEIGHT-1;

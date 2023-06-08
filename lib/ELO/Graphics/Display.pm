@@ -1,4 +1,4 @@
-package ELO::Util::PixelDisplay;
+package ELO::Graphics::Display;
 use v5.36;
 use experimental 'try', 'builtin', 'for_list';
 use builtin 'floor', 'ceil';
