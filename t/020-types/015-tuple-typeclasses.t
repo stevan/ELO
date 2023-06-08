@@ -21,6 +21,8 @@ TODO:
 
 Use smalltalk as inspiration
 
+http://www.bildungsgueter.de/Smalltalk/Pages/MVCTutorial/Pages/EoC.htm
+
 http://www.bildungsgueter.de/Smalltalk/Pages/MVCTutorial/Pages/DisplScreen.htm
     http://www.bildungsgueter.de/Smalltalk/Pages/MVCTutorial/Pages/Form.htm
         http://www.bildungsgueter.de/Smalltalk/Pages/MVCTutorial/Pages/DisplayMedium.htm
@@ -68,17 +70,16 @@ typeclass[*Point] => sub {
 
     method scale_by_point => sub ($p1, $p2) { $p1->mul( $p2 ) };
 
-    # scale by percentage (factor)
-
     method scale_by_factor => sub ($p, $factor) {
         Point( ceil( $p->x * $factor ), ceil( $p->y * $factor ) )
     };
 
-    method scale_x_by  => sub ($p, $factor) { Point( ceil( $p->x * $factor ), $p->y ) };
-    method scale_y_by  => sub ($p, $factor) { Point( $p->x, ceil( $p->y * $factor ) ) };
-    method scale_xy_by => sub ($p, $x_factor, $y_factor) {
-        Point( ceil( $p->x * $factor ), ceil( $p->y * $factor ) )
+    method scale_by_factors => sub ($p, $x_factor, $y_factor) {
+        Point( ceil( $p->x * $x_factor ), ceil( $p->y * $y_factor ) )
     };
+
+    # TODO:
+    # translate_by (delta)
 
     # Rectangle constructors
     method rect_with_extent => sub ($p, $extent) { Rectangle( $p, $p->add( $extent ) ) };
@@ -101,6 +102,27 @@ typeclass[*Rectangle] => sub {
     method origin => *Origin;
     method corner => *Corner;
 
+    method height => sub ($r) { $r->extent->x };
+    method width  => sub ($r) { $r->extent->y };
+
+    method extent => sub ($r) { $r->corner->sub( $r->origin )  };
+    method center => sub ($r) {
+        $r->origin->add( $r->extent->scale_by_factor( 0.5 ) )
+    };
+
+    # TODO:
+    # inset_by  (delta : Rect | Point | Num) -> Rect
+    # expand_by (delta : Rect | Point | Num) -> Rect
+    #
+    # contains_rect  (Rect)  -> Bool
+    # contains_point (point) -> Bool
+    # intersects     (Rect)  -> Bool
+    #
+    # intersect    (Rect)  -> Rect
+    # encompass    (Point) -> Rect
+    # areasOutside (Rect)  -> Array[Rect]
+    # translate_by (delta) -> Rect
+
     method equals => sub ($r1, $r2) {
         return 1 if $r1->origin->equals( $r2->origin )
                  && $r1->corner->equals( $r2->corner );
@@ -112,15 +134,15 @@ typeclass[*Rectangle] => sub {
 
 subtest '... testing *Point' => sub {
 
-#           (y) ->
+#           (x) ->
 #          ___________________________________
 #         | 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 |
 #     +===|===|===|===|===|===|===|===|===|===|
-# (x) | 0 |_x_|___|___|___|___|___|___|___|___| (1,2)(1,4)
+# (y) | 0 |_x_|___|___|___|___|___|___|___|___| (2,1)(4,1)
 #  |  | 1 |___|___|_@_|_._|_@_|___|___|___|___|   + - +
-#  V  | 2 |___|___|_._|___|_._|___|___|___|___|   |   |
+#  V  | 2 |___|___|_._|___|_._|___|___|___|___|   | *-|->(3,2)
 #     | 3 |___|___|_@_|_._|_@_|___|___|___|___|   + - +
-#     | 4 |___|___|___|___|___|___|___|___|___| (3,2)(3,4)
+#     | 4 |___|___|___|___|___|___|___|___|___| (2,3)(4,3)
 #     | 5 |___|___|___|___|___|___|___|___|___|
 #     | 6 |___|___|___|___|___|___|___|___|___|
 #     | 7 |___|___|___|___|___|___|___|___|___|
@@ -132,11 +154,11 @@ subtest '... testing *Point' => sub {
     ok( lookup_type(*Point)->check( $home ), '... this passed the type check for Point with home(0,0)');
     ok(!lookup_type(*Point)->check( [0,0] ), '... this passed the !type check for Point with ArrayRef[0,0]');
 
-    my $top_left     = Point( 1, 2 );
-    my $top_right    = Point( 1, 4 );
-    my $center       = Point( 2, 3 );
-    my $bottom_left  = Point( 3, 2 );
-    my $bottom_right = Point( 3, 4 );
+    my $top_left     = Point( 2, 1 );
+    my $top_right    = Point( 4, 1 );
+    my $center       = Point( 3, 2 );
+    my $bottom_left  = Point( 2, 3 );
+    my $bottom_right = Point( 4, 3 );
 
     isa_ok( $home, *::Point::Point );
     isa_ok( $end,  *::Point::Point );
@@ -152,19 +174,36 @@ subtest '... testing *Point' => sub {
 
     subtest '... testing Rectangle' => sub {
 
+        is($rect->height, 2, '... got the right height');
+        is($rect->width, 2, '... got the right width');
+
         isa_ok( $rect->origin, *::Point::Point );
         isa_ok( $rect->corner, *::Point::Point );
+        isa_ok( $rect->center, *::Point::Point );
+        isa_ok( $rect->extent, *::Point::Point );
 
         is( $rect->origin, $top_left, '... origin is the same point as top-left' );
         is( $rect->corner, $bottom_right, '... corner is the same point as bottom-right' );
+
+        isnt( $rect->center, $center, '... center is not the same instance as center' );
+        ok( $rect->center->equals($center), '... center is equal to center' );
+
+        ok( $rect->extent->equals( Point(2,2) ), '... extend is equal to Point(2,2)' );
     };
 
     subtest '... testing rect_with_extent' => sub {
-        my $r = $top_left->rect_with_extent( Point(2, 2) );
+        my $extent = Point(2, 2);
+
+        my $r = $top_left->rect_with_extent( $extent );
         isa_ok($r, *::Rectangle::Rectangle );
+
+        is($r->height, 2, '... got the right height');
+        is($r->width, 2, '... got the right width');
 
         isa_ok( $r->origin, *::Point::Point );
         isa_ok( $r->corner, *::Point::Point );
+        isa_ok( $r->center, *::Point::Point );
+        isa_ok( $r->extent, *::Point::Point );
 
         isnt($r, $rect, '... this is a new rectangle instance');
 
@@ -172,27 +211,50 @@ subtest '... testing *Point' => sub {
         isnt( $r->corner, $bottom_right, '... corner is not the same point as bottom right' );
 
         ok( $r->corner->equals($bottom_right), '... however, corner is equal to bottom right' );
+
+        isnt( $r->center, $center, '... center is not the same instance as center' );
+        ok( $r->center->equals($center), '... center is equal to center' );
+
+        isnt( $r->extent, $extent, '... extent is not the same instance as extent' );
+        ok( $r->extent->equals( $extent ), '... extent is equal to Point(2,2)' );
     };
 
     subtest '... testing rect_to_corner' => sub {
         my $r = $top_left->rect_to_corner( $bottom_right );
         isa_ok($r, *::Rectangle::Rectangle );
 
+        is($r->height, 2, '... got the right height');
+        is($r->width, 2, '... got the right width');
+
         isa_ok( $r->origin, *::Point::Point );
         isa_ok( $r->corner, *::Point::Point );
+        isa_ok( $r->center, *::Point::Point );
+        isa_ok( $r->extent, *::Point::Point );
 
         isnt($r, $rect, '... this is a new rectangle instance');
 
         is( $r->origin, $top_left, '... origin is the same point as top-left' );
         is( $r->corner, $bottom_right, '... corner is the same point as bottom right' );
+
+        isnt( $r->center, $center, '... center is not the same instance as center' );
+        ok( $r->center->equals($center), '... center is equal to center' );
+
+        ok( $r->extent->equals( Point(2,2) ), '... extend is equal to Point(2,2)' );
     };
 
     subtest '... testing rect_from_center' => sub {
-        my $r = $center->rect_from_center( Point(2, 2) );
+        my $extent = Point(2, 2);
+
+        my $r = $center->rect_from_center( $extent );
         isa_ok($r, *::Rectangle::Rectangle );
+
+        is($r->height, 2, '... got the right height');
+        is($r->width, 2, '... got the right width');
 
         isa_ok( $r->origin, *::Point::Point );
         isa_ok( $r->corner, *::Point::Point );
+        isa_ok( $r->center, *::Point::Point );
+        isa_ok( $r->extent, *::Point::Point );
 
         isnt($r, $rect, '... this is a new rectangle instance');
 
@@ -201,53 +263,59 @@ subtest '... testing *Point' => sub {
 
         ok( $r->origin->equals($top_left), '... origin is equal to top-left' );
         ok( $r->corner->equals($bottom_right), '... corner is equal to bottom right' );
+
+        isnt( $r->center, $center, '... center is not the same instance as center' );
+        ok( $r->center->equals($center), '... center is equal to center' );
+
+        isnt( $r->extent, $extent, '... extent is not the same instance as extent' );
+        ok( $r->extent->equals( $extent ), '... extent is equal to Point(2,2)' );
     };
 
     subtest '... testing x,y' => sub {
-        is($top_left->x, 1, '... got the expected x coord');
-        is($top_left->y, 2, '... got the expected y coord');
+        is($top_left->x, 2, '... got the expected x coord');
+        is($top_left->y, 1, '... got the expected y coord');
 
-        is($top_right->x, 1, '... got the expected x coord');
-        is($top_right->y, 4, '... got the expected y coord');
+        is($top_right->x, 4, '... got the expected x coord');
+        is($top_right->y, 1, '... got the expected y coord');
 
-        is($bottom_left->x, 3, '... got the expected x coord');
-        is($bottom_left->y, 2, '... got the expected y coord');
+        is($bottom_left->x, 2, '... got the expected x coord');
+        is($bottom_left->y, 3, '... got the expected y coord');
 
-        is($bottom_right->x, 3, '... got the expected x coord');
-        is($bottom_right->y, 4, '... got the expected y coord');
+        is($bottom_right->x, 4, '... got the expected x coord');
+        is($bottom_right->y, 3, '... got the expected y coord');
     };
 
     subtest '... testing add' => sub {
         my $p = $bottom_right->add( $bottom_right );
         isa_ok( $p, *::Point::Point );
 
-        is($bottom_right->x, 3, '... old x coord is unchanged');
-        is($bottom_right->y, 4, '... old y coord is unchanged');
+        is($bottom_right->x, 4, '... old x coord is unchanged');
+        is($bottom_right->y, 3, '... old y coord is unchanged');
 
-        is($p->x, 6, '... got the expected x coord after add');
-        is($p->y, 8, '... got the expected y coord after add');
+        is($p->x, 8, '... got the expected x coord after add');
+        is($p->y, 6, '... got the expected y coord after add');
     };
 
     subtest '... testing sub' => sub {
         my $p = $bottom_right->sub( Point( 2, 1 ) );
         isa_ok( $p, *::Point::Point );
 
-        is($bottom_right->x, 3, '... old x coord is unchanged');
-        is($bottom_right->y, 4, '... old y coord is unchanged');
+        is($bottom_right->x, 4, '... old x coord is unchanged');
+        is($bottom_right->y, 3, '... old y coord is unchanged');
 
-        is($p->x, 1, '... got the expected x coords after sub');
-        is($p->y, 3, '... got the expected y coords after sub');
+        is($p->x, 2, '... got the expected x coords after sub');
+        is($p->y, 2, '... got the expected y coords after sub');
     };
 
     subtest '... testing mul' => sub {
         my $p = $bottom_right->mul( Point( 2, 2 ) );
         isa_ok( $p, *::Point::Point );
 
-        is($bottom_right->x, 3, '... old x coord is unchanged');
-        is($bottom_right->y, 4, '... old y coord is unchanged');
+        is($bottom_right->x, 4, '... old x coord is unchanged');
+        is($bottom_right->y, 3, '... old y coord is unchanged');
 
-        is($p->x, 6, '... got the expected x coords after mul');
-        is($p->y, 8, '... got the expected y coords after mul');
+        is($p->x, 8, '... got the expected x coords after mul');
+        is($p->y, 6, '... got the expected y coords after mul');
     };
 
     subtest '... testing equals' => sub {
@@ -268,7 +336,7 @@ subtest '... testing *Point' => sub {
         is( $top_left->min( $top_right ), $top_left, '... top-left(1,2) is less than top_right(1,4)' );
         is( $top_right->min( $top_left ), $top_left, '... top_right(1,4) is greater than top_left(1,2)' );
 
-        is( $top_left->min( Point( 1, 2 ) ), $top_left, '... top-left(1,2) is equal to (1,2), return invocant' );
+        is( $top_left->min( Point( 2, 1 ) ), $top_left, '... top-left(1,2) is equal to (1,2), return invocant' );
     };
 
     subtest '... testing max' => sub {
@@ -284,9 +352,42 @@ subtest '... testing *Point' => sub {
         is( $top_left->max( $top_right ), $top_right, '... top-left(1,2) is less than top_right(1,4)' );
         is( $top_right->max( $top_left ), $top_right, '... top_right(1,4) is greater than top_left(1,2)' );
 
-        is( $top_left->max( Point( 1, 2 ) ), $top_left, '... top-left(1,2) is equal to (1,2), return invocant' );
+        is( $top_left->max( Point( 2, 1 ) ), $top_left, '... top-left(1,2) is equal to (1,2), return invocant' );
     };
 
+    subtest '... testing scale_by_point' => sub {
+        my $p = $bottom_right->scale_by_point( Point( 2, 2 ) );
+        isa_ok( $p, *::Point::Point );
+
+        is($bottom_right->x, 4, '... old x coord is unchanged');
+        is($bottom_right->y, 3, '... old y coord is unchanged');
+
+        is($p->x, 8, '... got the expected x coords after mul');
+        is($p->y, 6, '... got the expected y coords after mul');
+    };
+
+    subtest '... testing scale_by_factor' => sub {
+        my $p = $bottom_right->scale_by_factor( 2 );
+        isa_ok( $p, *::Point::Point );
+
+        is($bottom_right->x, 4, '... old x coord is unchanged');
+        is($bottom_right->y, 3, '... old y coord is unchanged');
+
+        is($p->x, 8, '... got the expected x coords after mul');
+        is($p->y, 6, '... got the expected y coords after mul');
+    };
+
+
+    subtest '... testing scale_by_factors' => sub {
+        my $p = $bottom_right->scale_by_factors( 2, 2 );
+        isa_ok( $p, *::Point::Point );
+
+        is($bottom_right->x, 4, '... old x coord is unchanged');
+        is($bottom_right->y, 3, '... old y coord is unchanged');
+
+        is($p->x, 8, '... got the expected x coords after mul');
+        is($p->y, 6, '... got the expected y coords after mul');
+    };
 };
 
 done_testing;
