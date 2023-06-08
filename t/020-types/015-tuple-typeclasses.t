@@ -42,8 +42,8 @@ datatype [ Point => *Point ] => ( *X, *Y );
 
 typeclass[*Point] => sub {
 
-    method x => sub ($p) { $p->[0] };
-    method y => sub ($p) { $p->[1] };
+    method x => *X;
+    method y => *Y;
 
     method add => sub ($p1, $p2) { Point( $p1->x + $p2->x, $p1->y + $p2->y ) };
     method sub => sub ($p1, $p2) { Point( $p1->x - $p2->x, $p1->y - $p2->y ) };
@@ -61,29 +61,34 @@ typeclass[*Point] => sub {
         return $p2 if $p2->x >= $p1->x && $p2->y >= $p1->y; # $p2 is below and to the to the right of $p1
     };
 
+    method equals => sub ($p1, $p2) {
+        return 1 if $p1->x == $p2->x && $p1->y == $p2->y;
+        return 0;
+    };
+
     # Rectangle constructors
     method extent => sub ($p1, $p2) { Rectangle( $p1, $p1->add( $p2 ) ) };
     method corner => sub ($p1, $p2) { Rectangle( $p1, $p2 ) };
 };
 
-# ...
+# ... Rectangle
+# http://www.bildungsgueter.de/Smalltalk/Pages/MVCTutorial/Pages/Rectangle.htm
 
 type *Origin => *Point;
 type *Corner => *Point;
 
-datatype *Rectangle => sub {
-    case Rectangle => ( *Origin, *Corner );
-};
-
-
-# ... Rectangle
-# http://www.bildungsgueter.de/Smalltalk/Pages/MVCTutorial/Pages/Rectangle.htm
+datatype [ Rectangle => *Rectangle ] => ( *Origin, *Corner );
 
 typeclass[*Rectangle] => sub {
 
-    method origin => { Rectangle => sub ($o, $) { $o } };
-    method corner => { Rectangle => sub ($, $c) { $c } };
+    method origin => *Origin;
+    method corner => *Corner;
 
+    method equals => sub ($r1, $r2) {
+        return 1 if $r1->origin->equals( $r2->origin )
+                 && $r1->corner->equals( $r2->corner );
+        return 0;
+    };
 };
 
 # ...
@@ -114,10 +119,55 @@ subtest '... testing *Point' => sub {
     my $top_right    = Point( 1, 4 );
 
     my $bottom_left  = Point( 3, 2 );
-    my $bottom_right = Point( 4, 3 );
+    my $bottom_right = Point( 3, 4 );
+
+    isa_ok( $home, *::Point::Point );
+    isa_ok( $end,  *::Point::Point );
 
     isa_ok( $top_left,     *::Point::Point );
+    isa_ok( $top_right,    *::Point::Point );
+    isa_ok( $bottom_left,  *::Point::Point );
     isa_ok( $bottom_right, *::Point::Point );
+
+    my $rect = Rectangle( $top_left, $bottom_right );
+    isa_ok( $rect, *::Rectangle::Rectangle );
+
+    subtest '... testing Rectangle' => sub {
+
+        isa_ok( $rect->origin, *::Point::Point );
+        isa_ok( $rect->corner, *::Point::Point );
+
+        is( $rect->origin, $top_left, '... origin is the same point as top-left' );
+        is( $rect->corner, $bottom_right, '... corner is the same point as bottom-right' );
+    };
+
+    subtest '... testing extent' => sub {
+        my $r = $top_left->extent( Point(2, 2) );
+        isa_ok($r, *::Rectangle::Rectangle );
+
+        isa_ok( $r->origin, *::Point::Point );
+        isa_ok( $r->corner, *::Point::Point );
+
+        isnt($r, $rect, '... this is a new rectangle instance');
+
+        is( $r->origin, $top_left, '... origin is the same point as top-left' );
+        isnt( $r->corner, $bottom_right, '... corner is not the same point as bottom right' );
+
+        ok( $r->corner->equals($bottom_right), '... however, corner is equal to bottom right' );
+    };
+
+    subtest '... testing corner' => sub {
+        my $r = $top_left->corner( $bottom_right );
+        isa_ok($r, *::Rectangle::Rectangle );
+
+        isa_ok( $r->origin, *::Point::Point );
+        isa_ok( $r->corner, *::Point::Point );
+
+        isnt($r, $rect, '... this is a new rectangle instance');
+
+        is( $r->origin, $top_left, '... origin is the same point as top-left' );
+        is( $r->corner, $bottom_right, '... corner is the same point as bottom right' );
+    };
 
     subtest '... testing x,y' => sub {
         is($top_left->x, 1, '... got the expected x coord');
@@ -129,41 +179,46 @@ subtest '... testing *Point' => sub {
         is($bottom_left->x, 3, '... got the expected x coord');
         is($bottom_left->y, 2, '... got the expected y coord');
 
-        is($bottom_right->x, 4, '... got the expected x coord');
-        is($bottom_right->y, 3, '... got the expected y coord');
+        is($bottom_right->x, 3, '... got the expected x coord');
+        is($bottom_right->y, 4, '... got the expected y coord');
     };
 
     subtest '... testing add' => sub {
         my $p = $bottom_right->add( $bottom_right );
         isa_ok( $p, *::Point::Point );
 
-        is($bottom_right->x, 4, '... old x coord is unchanged');
-        is($bottom_right->y, 3, '... old y coord is unchanged');
+        is($bottom_right->x, 3, '... old x coord is unchanged');
+        is($bottom_right->y, 4, '... old y coord is unchanged');
 
-        is($p->x, 8, '... got the expected x coord after add');
-        is($p->y, 6, '... got the expected y coord after add');
+        is($p->x, 6, '... got the expected x coord after add');
+        is($p->y, 8, '... got the expected y coord after add');
     };
 
     subtest '... testing sub' => sub {
         my $p = $bottom_right->sub( Point( 2, 1 ) );
         isa_ok( $p, *::Point::Point );
 
-        is($bottom_right->x, 4, '... old x coord is unchanged');
-        is($bottom_right->y, 3, '... old y coord is unchanged');
+        is($bottom_right->x, 3, '... old x coord is unchanged');
+        is($bottom_right->y, 4, '... old y coord is unchanged');
 
-        is($p->x, 2, '... got the expected x coords after sub');
-        is($p->y, 2, '... got the expected y coords after sub');
+        is($p->x, 1, '... got the expected x coords after sub');
+        is($p->y, 3, '... got the expected y coords after sub');
     };
 
     subtest '... testing mul' => sub {
         my $p = $bottom_right->mul( Point( 2, 2 ) );
         isa_ok( $p, *::Point::Point );
 
-        is($bottom_right->x, 4, '... old x coord is unchanged');
-        is($bottom_right->y, 3, '... old y coord is unchanged');
+        is($bottom_right->x, 3, '... old x coord is unchanged');
+        is($bottom_right->y, 4, '... old y coord is unchanged');
 
-        is($p->x, 8, '... got the expected x coords after mul');
-        is($p->y, 6, '... got the expected y coords after mul');
+        is($p->x, 6, '... got the expected x coords after mul');
+        is($p->y, 8, '... got the expected y coords after mul');
+    };
+
+    subtest '... testing equals' => sub {
+        ok($bottom_right->equals( $bottom_right ), '... bottom-right(x,y) == bottom-right(x,y)');
+        ok($home->equals( Point(0,0) ), '... home(x,y) == Point(0,0)');
     };
 
     subtest '... testing min' => sub {

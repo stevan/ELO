@@ -6,6 +6,7 @@ use builtin      qw[ blessed ];
 use Carp         qw[ confess ];
 use Scalar::Util qw[ looks_like_number ];
 use Sub::Util    qw[ set_subname ];
+use List::Util   qw[ first ];
 
 use ELO::Core::Type;
 use ELO::Core::Type::Alias;
@@ -223,8 +224,24 @@ sub typeclass ($t, $body) {
         my $constructor_symbol = $type->constructor->symbol;
            $constructor_symbol =~ s/main//;
 
+        my @definitions = $type->definition;
+
         $method = sub ($name, $body) {
             no strict 'refs';
+            if (ref $body ne 'CODE') {
+                my $i;
+                for ($i = 0; $i < $#definitions; $i++) {
+                    #warn "$body ==? ".$definitions[$i]->symbol;
+                    last if $body eq $definitions[$i]->symbol;
+                }
+
+                confess 'Could not find symbol('.$body.') in type definition tuple['.$type->symbol.']'
+                    unless defined $i;
+
+                # encapsulation ;)
+                $body = sub ($_t) { $_t->[$i] };
+            }
+
             #warn "[tuple] &: ${constructor_symbol}::${name}\n";
             *{"${constructor_symbol}::${name}"} = set_subname(
                 "${constructor_symbol}::${name}" => $body
