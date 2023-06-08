@@ -14,6 +14,8 @@ use ELO::Core::Type::Event;
 use ELO::Core::Type::Event::Protocol;
 use ELO::Core::Type::Enum;
 use ELO::Core::Type::TaggedUnion;
+
+use ELO::Core::Type::Tuple::Constructor;
 use ELO::Core::Type::TaggedUnion::Constructor;
 
 use ELO::Core::Typeclass;
@@ -165,7 +167,6 @@ sub typeclass ($t, $body) {
     my $caller = caller;
     my $type   = lookup_type($t->[0]);
     my $symbol = $type->symbol;
-    my %cases  = $type->cases->%*;
 
     warn "Calling typeclass ($symbol) from $caller" if DEBUG;
 
@@ -174,6 +175,9 @@ sub typeclass ($t, $body) {
     my $method;
 
     if ( $type isa ELO::Core::Type::TaggedUnion ) {
+
+        my %cases  = $type->cases->%*;
+
         $method = sub ($name, $table) {
 
             if ( ref $table eq 'CODE' ) {
@@ -212,8 +216,24 @@ sub typeclass ($t, $body) {
             $typeclass->method_definitions->{ $name } = $table;
         };
     }
+    elsif ( $type isa ELO::Core::Type::Tuple ) {
+        confess 'Cannot create typeclass for tuple['.$type->symbol.'] because '.$type->symbol.' does not have a constructor'
+            unless $type->has_constructor;
+
+        my $constructor_symbol = $type->constructor->symbol;
+           $constructor_symbol =~ s/main//;
+
+        $method = sub ($name, $body) {
+            no strict 'refs';
+            #warn "[tuple] &: ${constructor_symbol}::${name}\n";
+            *{"${constructor_symbol}::${name}"} = set_subname(
+                "${constructor_symbol}::${name}" => $body
+            );
+            $typeclass->method_definitions->{ $name } = $body;
+        };
+    }
     else {
-        confess "Unsupported typeclass type($symbol), only datatype(Type::TaggedUnion) is supported";
+        confess "Unsupported typeclass type($symbol), only datatype(Type::TaggedUnion, Type::Tuple) is supported";
     }
 
     no strict 'refs';
@@ -234,76 +254,124 @@ my %TYPE_REGISTRY;
 
 sub case ($, @) { confess 'You cannot call `case` outside of `datatype`' }
 
-sub datatype ($symbol, $cases) {
+sub datatype ($symbol, @args) {
     my $caller = caller;
-    warn "Calling datatype ($symbol) from $caller" if DEBUG;
 
-    # FIXME - use the MOP here
+    # Tuples with constructor
+    if ( ref $symbol eq 'ARRAY' ) {
+        my $constructor = $symbol->[0];
+                $symbol = $symbol->[1];
 
-    no strict 'refs';
+        warn "Calling datatype[tuple] [ $constructor => $symbol ] from $caller" if DEBUG;
 
-    my %cases;
-    local *{"${caller}::case"} = sub ($constructor, @definition) {
+        my $definition = resolve_types( \@args );
 
-        my $definition = resolve_types( \@definition );
+        my $constructor_symbol = "${symbol}::${constructor}";
+           $constructor_symbol =~ s/main//;
 
-        my $constructor_tag = "${symbol}::${constructor}";
-           $constructor_tag =~ s/main//;
+        no strict 'refs';
 
-        # TODO:
-        # this could be done much nicer, and we can
-        # do better in the classes as well. The empty
-        # constructor can use a bless scalar (perhaps the constructor name)
-        # and we could make them proper classes that use
-        # U::O::Imuttable as a base class.
-
-        # NOTE:
-        # It should also be possible to optimize the storage
-        # type, using the smallest/smartest type for each, such as:
-        # - for constructors with no args, an empty scalar ref
-        # - for constructors with 1 arg, a ref of that value
-        # - for constructors with n args, use an ARRAY ref
-        # This will add some complexity to `typeclass` above
-        # because it assumes an ARRAY ref and just de-refs it
-        # but that is a solvable problem.
         *{"${caller}::${constructor}"} = set_subname(
             "${caller}::${constructor}",
-            (scalar @definition == 0
-                ? sub ()      { bless [] => $constructor_tag }
+            (scalar @$definition == 0
+                ? sub ()      { bless [] => $constructor_symbol }
                 : sub (@args) {
                     check_types( $definition, \@args )
-                        || confess "Typecheck failed for $constructor_tag with (".(join ', ' => map $_//'undef', @args).')';
-                    bless [ @args ] => $constructor_tag;
+                        || confess "Typecheck failed for $constructor_symbol with (".(join ', ' => map $_//'undef', @args).')';
+                    bless [ @args ] => $constructor_symbol;
                 }
             )
         );
 
-        $cases{$constructor_tag} = ELO::Core::Type::TaggedUnion::Constructor->new(
-            symbol      => $constructor,
-            constructor => \&{"${caller}::${constructor}"},
+        $TYPE_REGISTRY{ $symbol } = ELO::Core::Type::Tuple->new(
+            symbol      => $symbol,
             definition  => $definition,
+            checker     => sub ($values) {
+                # we only want to accept blessed values ...
+                return unless $values isa $constructor_symbol;
+                return check_types( $definition, $values )
+            },
+            constructor => ELO::Core::Type::Tuple::Constructor->new(
+                symbol      => $constructor_symbol,
+                constructor => \&{"${caller}::${constructor}"},
+                definition  => $definition,
+            )
         );
-    };
 
-    # first register the type ...
-    $TYPE_REGISTRY{ $symbol } = ELO::Core::Type::TaggedUnion->new(
-        symbol => $symbol,
-        cases  => \%cases,
-        checker => sub ( $instance ) {
-            # FIXME:
-            # this can be improved with a simple `isa` check
-            # against all the case classes, OR we could give
-            # them a base class instead.
-            my $type = blessed($instance);
-            return unless $type;
-            return exists $cases{ $type };
-        }
-    );
+    }
+    # Tagged Unions
+    else {
+        warn "Calling datatype[tagged-union] ($symbol) from $caller" if DEBUG;
 
-    # now create the cases ...
-    $cases->();
+        my ($case_builder) = @args;
 
-    # to allow for recurisve types :)
+        # FIXME - use the MOP here
+
+        no strict 'refs';
+
+        my %cases;
+        local *{"${caller}::case"} = sub ($constructor, @definition) {
+
+            my $definition = resolve_types( \@definition );
+
+            my $constructor_symbol = "${symbol}::${constructor}";
+               $constructor_symbol =~ s/main//;
+
+            # TODO:
+            # this could be done much nicer, and we can
+            # do better in the classes as well. The empty
+            # constructor can use a bless scalar (perhaps the constructor name)
+            # and we could make them proper classes that use
+            # U::O::Imuttable as a base class.
+
+            # NOTE:
+            # It should also be possible to optimize the storage
+            # type, using the smallest/smartest type for each, such as:
+            # - for constructors with no args, an empty scalar ref
+            # - for constructors with 1 arg, a ref of that value
+            # - for constructors with n args, use an ARRAY ref
+            # This will add some complexity to `typeclass` above
+            # because it assumes an ARRAY ref and just de-refs it
+            # but that is a solvable problem.
+            *{"${caller}::${constructor}"} = set_subname(
+                "${caller}::${constructor}",
+                (scalar @definition == 0
+                    ? sub ()      { bless [] => $constructor_symbol }
+                    : sub (@args) {
+                        check_types( $definition, \@args )
+                            || confess "Typecheck failed for $constructor_symbol with (".(join ', ' => map $_//'undef', @args).')';
+                        bless [ @args ] => $constructor_symbol;
+                    }
+                )
+            );
+
+            $cases{$constructor_symbol} = ELO::Core::Type::TaggedUnion::Constructor->new(
+                symbol      => $constructor,
+                constructor => \&{"${caller}::${constructor}"},
+                definition  => $definition,
+            );
+        };
+
+        # first register the type ...
+        $TYPE_REGISTRY{ $symbol } = ELO::Core::Type::TaggedUnion->new(
+            symbol => $symbol,
+            cases  => \%cases,
+            checker => sub ( $instance ) {
+                # FIXME:
+                # this can be improved with a simple `isa` check
+                # against all the case classes, OR we could give
+                # them a base class instead.
+                my $type = blessed($instance);
+                return unless $type;
+                return exists $cases{ $type };
+            }
+        );
+
+        # now create the cases ...
+        $case_builder->();
+
+        # to allow for recurisve types :)
+    }
 }
 
 sub protocol ($symbol, $events) {
