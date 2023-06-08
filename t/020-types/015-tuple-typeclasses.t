@@ -66,14 +66,25 @@ typeclass[*Point] => sub {
         return 0;
     };
 
+    method scale_by_point => sub ($p1, $p2) { $p1->mul( $p2 ) };
+
+    # scale by percentage (factor)
+
+    method scale_by_factor => sub ($p, $factor) {
+        Point( ceil( $p->x * $factor ), ceil( $p->y * $factor ) )
+    };
+
+    method scale_x_by  => sub ($p, $factor) { Point( ceil( $p->x * $factor ), $p->y ) };
+    method scale_y_by  => sub ($p, $factor) { Point( $p->x, ceil( $p->y * $factor ) ) };
+    method scale_xy_by => sub ($p, $x_factor, $y_factor) {
+        Point( ceil( $p->x * $factor ), ceil( $p->y * $factor ) )
+    };
+
     # Rectangle constructors
     method rect_with_extent => sub ($p, $extent) { Rectangle( $p, $p->add( $extent ) ) };
     method rect_to_corner   => sub ($p, $corner) { Rectangle( $p, $corner ) };
     method rect_from_center => sub ($p, $extent) {
-        Point(
-            $p->x - ceil($extent->x * 0.5),
-            $p->y - ceil($extent->y * 0.5),
-        )->rect_with_extent( $extent );
+        $p->sub( $extent->scale_by_factor( 0.5 ) )->rect_with_extent( $extent );
     };
 };
 
