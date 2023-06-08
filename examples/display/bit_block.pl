@@ -118,13 +118,32 @@ sub init ($this, $) {
     } for 0 .. $display->height;
 
     $display->bit_block( 3, 3, $image1 );
-    $display->bit_block( 3, ($display->width - $image1->width)-3, $image1 );
+    $display->bit_block( 3, ($display->width - $image1->width)-3, $image1->mirror );
     $display->bit_block( ($display->height - $image1->height)-3, 3, $image1 );
-    $display->bit_block( ($display->height - $image1->height)-3, ($display->width - $image1->width)-3, $image1 );
+    $display->bit_block( ($display->height - $image1->height)-3, ($display->width - $image1->width)-3, $image1->mirror );
+
     $display->bit_block(
-        (($display->height/2) - ($image2->height/2)),
-        ($display->width  - $image2->width)/2,
+        ($display->height / 2) - $image2->height,
+        ($display->width  / 2) - $image2->width,
         $image2
+    );
+
+    $display->bit_block(
+        ($display->height / 2),
+        ($display->width  / 2) - $image2->width,
+        $image2->flip
+    );
+
+    $display->bit_block(
+        ($display->height / 2) - $image2->height,
+        ($display->width  / 2),
+        $image2->mirror
+    );
+
+    $display->bit_block(
+        ($display->height / 2),
+        ($display->width  / 2),
+        $image2->mirror->flip
     );
 
     timer( $this, $TIMEOUT, sub {
