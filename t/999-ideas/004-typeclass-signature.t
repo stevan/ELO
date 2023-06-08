@@ -20,6 +20,68 @@ use ok 'ELO::Types',  qw[
 
 # ...
 
+type *X => *Int;
+type *Y => *Int;
+
+datatype [ Point => *Point ] => ( *X, *Y );
+
+=pod
+
+Here is one option, where we specify the signature in the method definition
+though I am not sure it would work for tagged unions, maybe like this::
+
+typeclass[*Point] => sub {
+
+    method add => {
+        Point2D => [*Point, *Point => *Point] => sub ($p1, $p2) {
+            Point2D( $p1->x + $p2->x, $p1->y + $p2->y )
+        },
+        Point3D => [*Point, *Point => *Point] => sub ($p1, $p2) {
+            Point3D( $p1->x + $p2->x, $p1->y + $p2->y, $p1->x + $p2->x )
+        }
+    };
+
+};
+
+
+Anyway, here is the idea ....
+
+typeclass[*Point] => sub {
+
+    method x => *X;
+    method y => *Y;
+
+    method add => [*Point, *Point => *Point] => sub ($p1, $p2) { Point( $p1->x + $p2->x, $p1->y + $p2->y ) };
+    method sub => [*Point, *Point => *Point] => sub ($p1, $p2) { Point( $p1->x - $p2->x, $p1->y - $p2->y ) };
+    method mul => [*Point, *Point => *Point] => sub ($p1, $p2) { Point( $p1->x * $p2->x, $p1->y * $p2->y ) };
+
+    method min => [*Point, *Point => *Point] => sub ($p1, $p2) {
+        # returns the top-left corner defined by rectangle of $p1 x $p2
+        return $p1 if $p1->x <= $p2->x && $p1->y <= $p2->y; # $p1 is above and to the to the left of $p2
+        return $p2 if $p2->x <= $p1->x && $p2->y <= $p1->y; # $p2 is below and to the to the right of $p1
+    };
+
+    method max => [*Point, *Point => *Point] => sub ($p1, $p2) {
+        # returns the bottom-right corner defined by rectangle of $p1 x $p2
+        return $p1 if $p1->x >= $p2->x && $p1->y >= $p2->y; # $p1 is below and to the to the right of $p2
+        return $p2 if $p2->x >= $p1->x && $p2->y >= $p1->y; # $p2 is below and to the to the right of $p1
+    };
+
+    method equals => [*Point, *Point => *Bool]  => sub ($p1, $p2) {
+        return 1 if $p1->x == $p2->x && $p1->y == $p2->y;
+        return 0;
+    };
+
+    # Rectangle constructors
+    method extent => [*Point, *Point => *Rectangle] => sub ($p1, $p2) { Rectangle( $p1, $p1->add( $p2 ) ) };
+    method corner => [*Point, *Point => *Rectangle] => sub ($p1, $p2) { Rectangle( $p1, $p2 ) };
+};
+
+=cut
+
+
+# ...
+
 type *Height => *Int;
 type *Width  => *Int;
 type *Space  => *ArrayRef;

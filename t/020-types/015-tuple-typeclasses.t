@@ -67,8 +67,14 @@ typeclass[*Point] => sub {
     };
 
     # Rectangle constructors
-    method extent => sub ($p1, $p2) { Rectangle( $p1, $p1->add( $p2 ) ) };
-    method corner => sub ($p1, $p2) { Rectangle( $p1, $p2 ) };
+    method rect_with_extent => sub ($p, $extent) { Rectangle( $p, $p->add( $extent ) ) };
+    method rect_to_corner   => sub ($p, $corner) { Rectangle( $p, $corner ) };
+    method rect_from_center => sub ($p, $extent) {
+        Point(
+            $p->x - ceil($extent->x * 0.5),
+            $p->y - ceil($extent->y * 0.5),
+        )->rect_with_extent( $extent );
+    };
 };
 
 # ... Rectangle
@@ -117,7 +123,7 @@ subtest '... testing *Point' => sub {
 
     my $top_left     = Point( 1, 2 );
     my $top_right    = Point( 1, 4 );
-
+    my $center       = Point( 2, 3 );
     my $bottom_left  = Point( 3, 2 );
     my $bottom_right = Point( 3, 4 );
 
@@ -126,6 +132,7 @@ subtest '... testing *Point' => sub {
 
     isa_ok( $top_left,     *::Point::Point );
     isa_ok( $top_right,    *::Point::Point );
+    isa_ok( $center,       *::Point::Point );
     isa_ok( $bottom_left,  *::Point::Point );
     isa_ok( $bottom_right, *::Point::Point );
 
@@ -141,8 +148,8 @@ subtest '... testing *Point' => sub {
         is( $rect->corner, $bottom_right, '... corner is the same point as bottom-right' );
     };
 
-    subtest '... testing extent' => sub {
-        my $r = $top_left->extent( Point(2, 2) );
+    subtest '... testing rect_with_extent' => sub {
+        my $r = $top_left->rect_with_extent( Point(2, 2) );
         isa_ok($r, *::Rectangle::Rectangle );
 
         isa_ok( $r->origin, *::Point::Point );
@@ -156,8 +163,8 @@ subtest '... testing *Point' => sub {
         ok( $r->corner->equals($bottom_right), '... however, corner is equal to bottom right' );
     };
 
-    subtest '... testing corner' => sub {
-        my $r = $top_left->corner( $bottom_right );
+    subtest '... testing rect_to_corner' => sub {
+        my $r = $top_left->rect_to_corner( $bottom_right );
         isa_ok($r, *::Rectangle::Rectangle );
 
         isa_ok( $r->origin, *::Point::Point );
@@ -167,6 +174,22 @@ subtest '... testing *Point' => sub {
 
         is( $r->origin, $top_left, '... origin is the same point as top-left' );
         is( $r->corner, $bottom_right, '... corner is the same point as bottom right' );
+    };
+
+    subtest '... testing rect_from_center' => sub {
+        my $r = $center->rect_from_center( Point(2, 2) );
+        isa_ok($r, *::Rectangle::Rectangle );
+
+        isa_ok( $r->origin, *::Point::Point );
+        isa_ok( $r->corner, *::Point::Point );
+
+        isnt($r, $rect, '... this is a new rectangle instance');
+
+        isnt( $r->origin, $top_left, '... origin is the same point as top-left' );
+        isnt( $r->corner, $bottom_right, '... corner is the same point as bottom right' );
+
+        ok( $r->origin->equals($top_left), '... origin is equal to top-left' );
+        ok( $r->corner->equals($bottom_right), '... corner is equal to bottom right' );
     };
 
     subtest '... testing x,y' => sub {
