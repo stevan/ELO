@@ -507,94 +507,85 @@ subtest '... testing *Point' => sub {
 
 type *Height => *Int;
 type *Width  => *Int;
-type *Device => *Any;
+type *Output => *Any; # this will be a filehandle
 
-datatype [ Screen => *Screen ] => ( *Height, *Width, *Device );
+datatype [ Device => *Device ] => ( *Height, *Width, *Output );
 
-typeclass[*Screen] => sub {
+typeclass[*Device] => sub {
 
     method height => *Height;
     method width  => *Width;
-    method device => *Device;
+    method output => *Output;
 
-    method rows => sub ($d) { $d->height - 1 };
-    method cols => sub ($d) { $d->width  - 1 };
+    # ... private methods in the class scope
 
-    my sub fmt_pixel ($p, $c, $pixel) {
-        sprintf((
-            "\e[s".               # save cursor pos
-            "\e[%d;%dH".          # goto pixel
-            "\e[48;2;%d;%d;%d;m". # paint it
-            "%s".                 # draw it
-            "\e[0m".              # reset color
-            "\e[u"                # restore cursor pos
-        ), (
-            $p->add( Point(2,2) )->xy,  # account for 1 indexed screen
-            (map { 255 * $_ } $c->rgb),
-            $pixel
-        ))
-    }
+    my sub format_bg_color ($c) { sprintf "\e[48;2;%d;%d;%d;m" => map int(255 * $_), $c->rgb };
+    my sub format_fg_color ($c) { sprintf "\e[38;2;%d;%d;%d;m" => map int(255 * $_), $c->rgb };
 
-    method poke => sub ($d, $p, $c) {
-        $d->device->print( fmt_pixel( $p, $c, ' ' ) );
+    my sub format_goto ($p) { sprintf "\e[%d;%dH" => $p->xy }
+
+    my sub out ($d, @str) { $d->output->print( @str ); $d }
+
+    # ...
+    # these should all return $self
+
+    method clear_screen => sub ($d) { out( $d => "\e[2J" ) };
+    method home_cursor  => sub ($d) { out( $d => "\e[H"  ) };
+    method end_cursor   => sub ($d) { out( $d => "\e[".$d->height."H"  ) };
+
+    method set_background => sub ($d, $c) {
+        out( $d->home_cursor => (
+            # set background color
+            format_bg_color($c),
+            # paint background
+            # draw of $width spaces and goto next line
+            ((sprintf "\e[%d\@\e[E" => $d->width) x $d->height), # and repeat it $height times
+            # end paint background
+           "\e[0m"  # reset colors
+        ));
     };
 
-    method paint => sub ($d, $r, $c) {
-        $d->poke( $r->top_left,     $c );
-        $d->poke( $r->top_right,    $c );
-        $d->poke( $r->center,       $c );
-        $d->poke( $r->bottom_left,  $c );
-        $d->poke( $r->bottom_right, $c );
+    method poke_color => sub ($d, $point, $color) {
+        # NOTE:
+        # we consider background to be
+        # our canvas by default, so we
+        # use the <space> and bg-color
+        # for this kind of operation
+        out( $d, format_goto( $point ), format_bg_color($color), " \e[0m", );
     };
+
+    method poke_char => sub ($d, $point, $char, $fg_color=undef, $bg_color=undef) {
+        out( $d => (
+            format_goto( $point )
+            .($fg_color ? format_fg_color($fg_color) : '')
+            .($bg_color ? format_bg_color($bg_color) : '')
+            .($char)
+            .($fg_color || $bg_color ? "\e[0m" : '')
+        ));
+    };
+
 };
 
-my $screen = Screen( 30, 30, *STDOUT );
+my $d = Device( 45, 160, *STDOUT );
 
-print "\e[0;0H\e[2J+";
-print(($_ % 10) == 0 ? "\e[38;2;255;127;127;mv\e[0m" : ($_ % 10)) for 0 .. 29;
-print("\n");
-  say(($_ % 10) == 0 ? "\e[38;2;255;127;127;m>\e[0m" : ($_ % 10)) for 0 .. 29;
-
-#$screen->poke( Point(5, 5 + $_), Color(1/$_, 0, 0) ) for 1 .. 10;
-
-$screen->paint(
-    Point($_, $_)->rect_with_extent( Point( $_+1, $_+1 ) ),
-    Color(1/$_*0.7, 1/$_, 1/($_ * 0.3))
-) for reverse 1 .. 10;
-
-sleep(1);
-
-# this could be used to initialize the screen quickly
-# but since it can only insert, it is limited in use
-# in other situations
-
-print "\e[s"              # save cursor
-    . "\e[5;5H"           # goto 5,5
-    . "\e[48;2;255;0;0m"  # make background color
-    . "\e[10".'@'         # draw 10 characters
-    . "\e[0m"             # reset colors
-    . "\e[u"              # restore cursor
+$d->clear_screen
+  ->set_background( Color( 0.6, 0.6, 0.6 ) );
 ;
+do {
+    $d->poke_color(
+        Point( int(rand(($d->height/2)-10)), int(rand($d->width-20)) )->add( Point( 5, 10 ) ),
+        Color( rand, rand, rand )->mul( Color( rand, 0.5, 0.9 ) )
+    );
 
-# quick rectangle filling code
+    $d->poke_char(
+        Point( int(rand(($d->height/2)-10)) + ($d->height/2), int(rand($d->width-20)) )->add( Point( 5, 10 ) ),
+        chr( int(rand(93)) + 33 ),
+        Color( rand, rand, rand )->mul( Color( rand, 0.5, 0.9 ) )
+    );
 
-print "\e[s"              # save cursor
-    . "\e[8;5H"           # goto 8,5
-    . "\e[48;2;255;99;0m" # make background color
+} while 1;
 
-    . "          \e[1B\e[10D" # print 10 spaces ... move down, and back
-    . "          \e[1B\e[10D" # print 10 spaces ... move down, and back
-    . "          \e[1B\e[10D" # print 10 spaces ... move down, and back
-    . "          "            # print 10 spaces ... no need to do any movement here
-
-    . "\e[0m"             # reset colors
-    . "\e[u"              # restore cursor
-;
-
-#$screen->paint(
-#    Point(10, 10)->rect_with_extent( Point( 10, 10 ) ),
-#    Color(0, 0, 1)
-#);
+$d->end_cursor;
 
 done_testing;
 
