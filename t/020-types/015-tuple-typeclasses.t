@@ -4,6 +4,8 @@ use v5.36;
 use experimental 'try', 'builtin', 'for_list';
 use builtin 'floor', 'ceil';
 
+use Time::HiRes qw[ alarm sleep ];
+
 use Test::More;
 use Test::Differences;
 use Test::ELO;
@@ -568,19 +570,59 @@ typeclass[*Device] => sub {
 
 my $d = Device( 45, 160, *STDOUT );
 
-$d->clear_screen
-  ->set_background( Color( 0.6, 0.6, 0.6 ) );
-;
+$d->clear_screen;
+$d->set_background( Color( 0.6, 0.6, 0.6 ) );
+
+
+# ... margins
+# remeber we have a 1,1 origin
+
+my $margin = $ARGV[0] // 3;
+
+my $horz_sections = 1;
+my $vert_sections = 3;
+
+my $offset = Point( $margin, $margin*2 );
+
+my $area_height = ($d->height / $vert_sections) - ($offset->x * 2);
+my $area_width  = ($d->width  / $horz_sections) - ($offset->y * 2);
+
+# ... seed color and alarm animation
+
+my $seed_color = Color( rand, rand, rand );
+
+local $SIG{ALRM} = sub { $seed_color = Color( rand, rand, rand ) };
+
+alarm 1, 0.03;
+
 do {
+
     $d->poke_color(
-        Point( int(rand(($d->height/2)-10)), int(rand($d->width-20)) )->add( Point( 5, 10 ) ),
-        Color( rand, rand, rand )->mul( Color( rand, 0.5, 0.9 ) )
+        Point(
+            int(rand($area_height)),
+            int(rand($area_width))
+        )->add( $offset ),
+        Color( rand, 0.1, rand )->mul( $seed_color ),
     );
 
     $d->poke_char(
-        Point( int(rand(($d->height/2)-10)) + ($d->height/2), int(rand($d->width-20)) )->add( Point( 5, 10 ) ),
+        Point(
+            int(rand($area_height)) + ($area_height + ($margin*2)),
+            int(rand($area_width))
+        )->add( $offset ),
         chr( int(rand(93)) + 33 ),
-        Color( rand, rand, rand )->mul( Color( rand, 0.5, 0.9 ) )
+        Color( rand, 0.2, 0.2 )->mul( $seed_color ),
+        Color( 0.2, rand, 0.2 )->mul( $seed_color ),
+    );
+
+    $d->poke_char(
+        Point(
+            int(rand($area_height)) + ($area_height + ($margin*2)) * 2,
+            int(rand($area_width))
+        )->add( $offset ),
+        '▀',
+        Color( rand, 0.2, 0.2 )->mul( $seed_color ),
+        Color( 0.2, rand, 0.2 )->mul( $seed_color ),
     );
 
 } while 1;
