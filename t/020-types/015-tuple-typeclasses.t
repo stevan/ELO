@@ -507,16 +507,17 @@ subtest '... testing *Point' => sub {
 
 # ... Screen
 
-type *Height => *Int;
-type *Width  => *Int;
-type *Output => *Any; # this will be a filehandle
+# TODO:
+# this should take a Rectangle, not HxW pair
 
-datatype [ Device => *Device ] => ( *Height, *Width, *Output );
+type *DisplayArea => *Rectangle;
+type *Output      => *Any; # this will be a filehandle
+
+datatype [ Device => *Device ] => ( *DisplayArea, *Output );
 
 typeclass[*Device] => sub {
 
-    method height => *Height;
-    method width  => *Width;
+    method area   => *DisplayArea;
     method output => *Output;
 
     # ... private methods in the class scope
@@ -541,7 +542,7 @@ typeclass[*Device] => sub {
             format_bg_color($c),
             # paint background
             # draw of $width spaces and goto next line
-            ((sprintf "\e[%d\@\e[E" => $d->width) x $d->height), # and repeat it $height times
+            ((sprintf "\e[%d\@\e[E" => $d->area->width) x $d->area->height), # and repeat it $height times
             # end paint background
            "\e[0m"  # reset colors
         ));
@@ -568,7 +569,7 @@ typeclass[*Device] => sub {
 
 };
 
-my $d = Device( 45, 160, *STDOUT );
+my $d = Device( Rectangle( 45, 160), *STDOUT );
 
 $d->clear_screen;
 $d->set_background( Color( 0.6, 0.6, 0.6 ) );
