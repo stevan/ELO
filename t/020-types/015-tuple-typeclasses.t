@@ -205,6 +205,13 @@ typeclass[*Rectangle] => sub {
         $r->origin->add( $r->extent->scale_by_factor( 0.5 ) )
     };
 
+    method inset_by => sub ($r, $inset_by) {
+        Rectangle(
+            $r->origin->add( $inset_by ),
+            $r->corner->sub( $inset_by ),
+        )
+    };
+
     # TODO:
     # inset_by  (delta : Rect | Point | Num) -> Rect
     # expand_by (delta : Rect | Point | Num) -> Rect
@@ -544,7 +551,11 @@ typeclass[*Device] => sub {
             # draw of $width spaces and goto next line
             ((sprintf "\e[%d\@\e[E" => $d->width) x $d->height), # and repeat it $height times
             # end paint background
-           "\e[0m"  # reset colors
+            "\e[0m",  # reset colors
+            ("(origin: ".(join ' @ ' => $d->area->origin->xy).", "
+            ."corner: ".(join ' @ ' => $d->area->corner->xy).", "
+            ."{ h: ".$d->height.", w: ".$d->width." })"),
+
         ));
     };
 
@@ -554,16 +565,34 @@ typeclass[*Device] => sub {
         # our canvas by default, so we
         # use the <space> and bg-color
         # for this kind of operation
-        out( $d, format_goto( $point ), format_bg_color($color), " \e[0m", );
+        out( $d => ( format_goto( $point ), format_bg_color($color), " \e[0m" ) );
     };
 
     method poke_char => sub ($d, $point, $char, $fg_color=undef, $bg_color=undef) {
         out( $d => (
-            format_goto( $point )
-            .($fg_color ? format_fg_color($fg_color) : '')
-            .($bg_color ? format_bg_color($bg_color) : '')
-            .($char)
-            .($fg_color || $bg_color ? "\e[0m" : '')
+            format_goto( $point ),
+            ($fg_color ? format_fg_color($fg_color) : ''),
+            ($bg_color ? format_bg_color($bg_color) : ''),
+            ($char),
+            ($fg_color || $bg_color ? "\e[0m" : ''),
+        ));
+    };
+
+    method draw_rectangle => sub ($d, $rectangle, $color) {
+
+        my $h = $rectangle->height;
+        my $w = $rectangle->width;
+
+        out( $d => (
+            format_goto( $rectangle->origin ),
+            format_bg_color($color),
+            # paint rectangle
+            (((' ' x $w) . "\e[B\e[${w}D") x $h),
+            "\e[0m",  # reset colors
+            # end paint rectangle
+            ("(origin: ".(join ' @ ' => $rectangle->origin->xy).", "
+            ."corner: ".(join ' @ ' => $rectangle->corner->xy).", "
+            ."{ h: $h, w: $w })"),
         ));
     };
 
@@ -576,6 +605,7 @@ typeclass[*Device] => sub {
 # - also the section slicing should be done with Rectangle operations
 # - implement a Color->generate_random or something similar
 # - implement Rectangle drawing
+# - use an IO::Scalar as *Output to test this
 # -----------------------------------------------------------------------------
 
 my $d = Device(
@@ -585,58 +615,76 @@ my $d = Device(
     )
 );
 
-$d->clear_screen;
-$d->set_background( Color( 0.6, 0.6, 0.6 ) );
-
-# ... margins
 # remeber we have a 1,1 origin
 
-my $margin = $ARGV[0] // 3;
-
-my $horz_sections = 1;
-my $vert_sections = 3;
-
-my $offset = Point( $margin, $margin*2 );
-
-my $area_height = ($d->height / $vert_sections) - ($offset->x * 2);
-my $area_width  = ($d->width  / $horz_sections) - ($offset->y * 2);
-
 # ... seed color and alarm animation
-
 my $seed_color = Color( rand, rand, rand );
 
 local $SIG{ALRM} = sub { $seed_color = Color( rand, rand, rand ) };
+alarm 1, 0.25;
 
-alarm 1, 0.03;
+my $margin = Point( 2, 4 );
+my $area1  = $d->area->inset_by( $margin );
+my $area2  = $area1->inset_by( Point( 2, 4 ) );
+my $area3  = $area2->inset_by( Point( 4, 8 ) );
+my $area4  = $area3->origin
+                   ->add( Point(1, 2) )
+                   ->rect_with_extent(
+                        Point(
+                            $area3->height,
+                            ($area3->width / 2)
+                        )->sub( Point(2, 3) )
+                   );
+
+my $area5  = $area3->origin
+                   ->add( Point(1, 1+($area3->width / 2)) )
+                   ->rect_with_extent(
+                        Point(
+                            $area3->height,
+                            ($area3->width / 2)
+                        )->sub( Point(2, 3) )
+                   );
+#die Dumper [ $area3, $area5 ];
+
+$d->clear_screen;
+$d->set_background( Color( 0.6, 0.6, 0.6 ) );
+
+$d->draw_rectangle( $area1, Color( 0.6, 0.3, 0.1 ) );
+$d->draw_rectangle( $area2, Color( 0.3, 0.6, 0.2 ) );
+$d->draw_rectangle( $area3, Color( 0.3, 0.3, 0.9 ) );
+$d->draw_rectangle( $area4, Color( 0.5, 0.5, 0.6 ) );
+$d->draw_rectangle( $area5, Color( 0.4, 0.6, 0.6 ) );
+
+# draw markers
+$d->poke_color( Point( 1, $_*2 ), (($_*2) % 10) == 0 ? Color(0.1,0.3,0.5) : Color(0.3,0.5,0.8) )
+    foreach 1 .. ($d->width/2);
+$d->poke_color( Point( $d->height, $_*2 ), (($_*2) % 10) == 0 ? Color(0.1,0.3,0.5) : Color(0.3,0.5,0.8) )
+    foreach 1 .. ($d->width/2);
+
+$d->poke_color( Point( $_*2, 1 ), (($_*2) % 10) == 0 ? Color(0.1,0.3,0.5) : Color(0.3,0.5,0.8) )
+    foreach 1 .. ($d->height/2);
+$d->poke_color( Point( $_*2, $d->width ), (($_*2) % 10) == 0 ? Color(0.1,0.3,0.5) : Color(0.3,0.5,0.8) )
+    foreach 1 .. ($d->height/2);
 
 do {
+    #last;
 
     $d->poke_color(
-        Point(
-            int(rand($area_height)),
-            int(rand($area_width))
-        )->add( $offset ),
-        Color( rand, 0.1, rand )->mul( $seed_color ),
+       $area4->origin->add( Point(
+           int(rand($area4->height)),
+           int(rand($area4->width)),
+       )),
+       Color( rand, rand, rand )->mul( $seed_color ),
     );
 
     $d->poke_char(
-        Point(
-            int(rand($area_height)) + ($area_height + ($margin*2)),
-            int(rand($area_width))
-        )->add( $offset ),
-        chr( int(rand(93)) + 33 ),
-        Color( rand, 0.2, 0.2 )->mul( $seed_color ),
-        Color( 0.2, rand, 0.2 )->mul( $seed_color ),
-    );
-
-    $d->poke_char(
-        Point(
-            int(rand($area_height)) + ($area_height + ($margin*2)) * 2,
-            int(rand($area_width))
-        )->add( $offset ),
+        $area5->origin->add( Point(
+            int(rand($area4->height)),
+            int(rand($area4->width)),
+        )),
         '▀',
-        Color( rand, 0.2, 0.2 )->mul( $seed_color ),
-        Color( 0.2, rand, 0.2 )->mul( $seed_color ),
+        Color( rand, rand, rand )->mul( $seed_color ),
+        Color( rand, rand, rand )->mul( $seed_color ),
     );
 
 } while 1;
