@@ -507,18 +507,18 @@ subtest '... testing *Point' => sub {
 
 # ... Screen
 
-# TODO:
-# this should take a Rectangle, not HxW pair
-
 type *DisplayArea => *Rectangle;
 type *Output      => *Any; # this will be a filehandle
 
-datatype [ Device => *Device ] => ( *DisplayArea, *Output );
+datatype [ Device => *Device ] => ( *Output, *DisplayArea );
 
 typeclass[*Device] => sub {
 
     method area   => *DisplayArea;
     method output => *Output;
+
+    method height => sub ($d) { $d->area->height };
+    method width  => sub ($d) { $d->area->width };
 
     # ... private methods in the class scope
 
@@ -542,7 +542,7 @@ typeclass[*Device] => sub {
             format_bg_color($c),
             # paint background
             # draw of $width spaces and goto next line
-            ((sprintf "\e[%d\@\e[E" => $d->area->width) x $d->area->height), # and repeat it $height times
+            ((sprintf "\e[%d\@\e[E" => $d->width) x $d->height), # and repeat it $height times
             # end paint background
            "\e[0m"  # reset colors
         ));
@@ -569,11 +569,24 @@ typeclass[*Device] => sub {
 
 };
 
-my $d = Device( Rectangle( 45, 160), *STDOUT );
+# -----------------------------------------------------------------------------
+# TODO:
+# -----------------------------------------------------------------------------
+# - implement Rectangle->inset_by to do the margin calculations
+# - also the section slicing should be done with Rectangle operations
+# - implement a Color->generate_random or something similar
+# - implement Rectangle drawing
+# -----------------------------------------------------------------------------
+
+my $d = Device(
+    *STDOUT,
+    Point(1,1)->rect_with_extent(
+        Point(40, 160)
+    )
+);
 
 $d->clear_screen;
 $d->set_background( Color( 0.6, 0.6, 0.6 ) );
-
 
 # ... margins
 # remeber we have a 1,1 origin
