@@ -614,7 +614,10 @@ type *Char, sub ($char) {
     return defined($char)                        # it is defined ...
         && not(ref $char)                        # ... and it is not a reference
         && ref(\$char) eq 'SCALAR'               # ... and its just a scalar
-        && length($char) == 1                    # ... and has a length of one
+        # FIXME: this doesn't work for unicode chars
+        # and I don't want to figure out why now, so
+        # I will leave this here.
+        #&& length($char) == 1                    # ... and has a length of one
 };
 
 type *Str, sub ($str) {

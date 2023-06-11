@@ -1,4 +1,3 @@
-
 #!perl
 
 use v5.36;
@@ -7,6 +6,7 @@ use builtin 'floor', 'ceil';
 
 use Time::HiRes qw[ alarm sleep ];
 
+use ELO::Graphics qw[ Point Color ColorPixel CharPixel Display ];
 
 # -----------------------------------------------------------------------------
 # TODO:
@@ -19,7 +19,7 @@ use Time::HiRes qw[ alarm sleep ];
 my $H = $ARGV[0] // 40;
 my $W = $ARGV[1] // 160;
 
-my $d = Device(
+my $d = Display(
     *STDOUT,
     Point(1,1)->rect_with_extent( Point($H, $W) )
 );
@@ -66,22 +66,26 @@ $d->draw_rectangle( $area5, Color( 0.4, 0.6, 0.6 ) );
 do {
     #last;
 
-    $d->poke_color(
-       $area4->origin->add( Point(
-           int(rand($area4->height)),
-           int(rand($area4->width)),
-       )),
-       Color( rand, rand, rand )->mul( $seed_color ),
+    $d->poke(
+        ColorPixel(
+            $area4->origin->add( Point(
+                int(rand($area4->height)),
+                int(rand($area4->width)),
+            )),
+            Color( rand, rand, rand )->mul( $seed_color )
+        )
     );
 
-    $d->poke_char(
-        $area5->origin->add( Point(
-            int(rand($area4->height)),
-            int(rand($area4->width)),
-        )),
-        '▀',
-        Color( rand, rand, rand )->mul( $seed_color ),
-        Color( rand, rand, rand )->mul( $seed_color ),
+    $d->poke(
+        CharPixel(
+            $area5->origin->add( Point(
+                int(rand($area4->height)),
+                int(rand($area4->width)),
+            )),
+            Color( rand, rand, rand )->mul( $seed_color ),
+            Color( rand, rand, rand )->mul( $seed_color ),
+            '▀'
+        )
     );
 
 } while 1;

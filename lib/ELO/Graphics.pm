@@ -9,7 +9,7 @@ use ELO::Types qw[ :core :types :typeclasses ];
 ## Environment Variables
 ## ----------------------------------------------------------------------------
 
-use constant DEBUG => $ENV{ELO_GR_DEVICE_DEBUG} // 0;
+use constant DEBUG => $ENV{ELO_GR_DISPLAY_DEBUG} // 0;
 
 ## ----------------------------------------------------------------------------
 ## Exportables
@@ -228,9 +228,9 @@ typeclass[*Pixel] => sub {
 type *DisplayArea => *Rectangle;
 type *Output      => *Any; # this will be a filehandle
 
-datatype [ Device => *Device ] => ( *Output, *DisplayArea );
+datatype [ Display => *Display ] => ( *Output, *DisplayArea );
 
-typeclass[*Device] => sub {
+typeclass[*Display] => sub {
 
     method area   => *DisplayArea;
     method output => *Output;
@@ -244,11 +244,11 @@ typeclass[*Device] => sub {
     my $CLEAR_SCREEN = "\e[2J";
     my $HOME_CURSOR  = "\e[H";
 
-    my sub format_bg_color ($c) {
+    my sub format_bg_color ($c=undef) {
         return unless defined $c;
         sprintf "\e[48;2;%d;%d;%d;m" => map int(255 * $_), $c->rgb
     };
-    my sub format_fg_color ($c) {
+    my sub format_fg_color ($c=undef) {
         return unless defined $c;
         sprintf "\e[38;2;%d;%d;%d;m" => map int(255 * $_), $c->rgb
     };
@@ -272,7 +272,7 @@ typeclass[*Device] => sub {
             # end paint background
             "\e[0m",  # reset colors
             (DEBUG
-                ? ("B(origin: ".(join ' @ ' => $d->area->origin->xy).", "
+                ? ("D(origin: ".(join ' @ ' => $d->area->origin->xy).", "
                   ."corner: ".(join ' @ ' => $d->area->corner->xy).", "
                   ."{ h: ".$d->height.", w: ".$d->width." })")
                 : ()),
@@ -284,14 +284,14 @@ typeclass[*Device] => sub {
 
             $d->home_cursor;
             # draw markers
-            $d->poke_color( Point( 1, $_*2 ), (($_*2) % 10) == 0 ? $ten_marker : $two_marker )
+            $d->poke( ColorPixel( Point( 1, $_*2 ), (($_*2) % 10) == 0 ? $ten_marker : $two_marker ) )
                 foreach 1 .. ($d->width/2);
-            $d->poke_color( Point( $d->height, $_*2 ), (($_*2) % 10) == 0 ? $ten_marker : $two_marker )
+            $d->poke( ColorPixel( Point( $d->height, $_*2 ), (($_*2) % 10) == 0 ? $ten_marker : $two_marker ) )
                 foreach 1 .. ($d->width/2);
 
-            $d->poke_color( Point( $_*2, 1 ), (($_*2) % 10) == 0 ? $ten_marker : $two_marker )
+            $d->poke( ColorPixel( Point( $_*2, 1 ), (($_*2) % 10) == 0 ? $ten_marker : $two_marker ) )
                 foreach 1 .. ($d->height/2);
-            $d->poke_color( Point( $_*2, $d->width ), (($_*2) % 10) == 0 ? $ten_marker : $two_marker )
+            $d->poke( ColorPixel( Point( $_*2, $d->width ), (($_*2) % 10) == 0 ? $ten_marker : $two_marker ) )
                 foreach 1 .. ($d->height/2);
         }
     };
@@ -301,7 +301,7 @@ typeclass[*Device] => sub {
 
     method poke => sub ($d, $pixel) {
         out( $d => (
-            format_goto     ( $pixel->coords   ),
+            format_goto     ( $pixel->coord    ),
             format_fg_color ( $pixel->fg_color ),
             format_bg_color ( $pixel->color    ),
                             ( $pixel->char     ),
