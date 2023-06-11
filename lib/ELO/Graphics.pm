@@ -449,7 +449,7 @@ typeclass[*Display] => sub {
         ));
     };
 
-    method bit_block => sub ($d, $coord, $image) {
+    method poke_block => sub ($d, $coord, $image) {
 
         #die split // => join '' => (map { map { format_colors( $_->colors ).($_->char) } $_->@* } $image->get_all_rows);
 

@@ -119,10 +119,10 @@ my $d = Display(
     $d->poke_rectangle( $d->area->inset_by( Point( 6, 12 ) ), Color( 0.5, 0.3, 0.9 ) );
     sleep($DELAY);
 
-    $d->bit_block( Point( 10, 5 ), $small_mario_image );
+    $d->poke_block( Point( 10, 5 ), $small_mario_image );
     sleep($DELAY);
 
-    $d->bit_block(
+    $d->poke_block(
         Point( 7, 20 ),
         $small_mario_image
             ->flip
@@ -146,10 +146,10 @@ my $d = Display(
     $d->poke_rectangle( $d->area->inset_by( Point( 14, 20 ) ), Color( 0.3, 0.9, 0.9 ) );
     sleep($DELAY);
 
-    $d->bit_block( Point( 5, 35 ), $small_mario_image->mirror );
+    $d->poke_block( Point( 5, 35 ), $small_mario_image->mirror );
     sleep($DELAY);
 
-    $d->bit_block(
+    $d->poke_block(
         Point( 8, 50 ),
         $small_mario_image
             ->mirror
@@ -173,10 +173,10 @@ my $d = Display(
     $d->poke_rectangle( Point( 12, 40 )->rect_with_extent( Point( 2, 30 ) ), Color( 0.9, 0.5, 0.7 ) );
     sleep($DELAY);
 
-    $d->bit_block( Point( 11, 65 ), $small_mario_image->flip->mirror );
+    $d->poke_block( Point( 11, 65 ), $small_mario_image->flip->mirror );
     sleep($DELAY);
 
-    $d->bit_block( Point( 8, 30 ), $big_mario_image );
+    $d->poke_block( Point( 8, 30 ), $big_mario_image );
     sleep($DELAY);
 }
 
@@ -279,7 +279,7 @@ my $big_mario_image = $big_mario->create_image;
 
 $display->turn_on;
 
-$display->bit_block( 5, 5, $big_mario_image );
+$display->poke_block( 5, 5, $big_mario_image );
 
 
 my $big_mario = ImageData(
@@ -373,5 +373,5 @@ my $big_mario_image = $big_mario->create_image;
 
 $display->turn_on;
 
-$display->bit_block( 5, 5, $big_mario_image );
+$display->poke_block( 5, 5, $big_mario_image );
 
