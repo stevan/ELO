@@ -4,6 +4,8 @@ use v5.36;
 use experimental 'try', 'builtin', 'for_list';
 use builtin 'floor', 'ceil';
 
+use Time::HiRes qw[ sleep ];
+
 use Data::Dumper;
 
 use ELO::Loop;
@@ -11,30 +13,37 @@ use ELO::Types  qw[ :core :events :types :typeclasses ];
 use ELO::Timers qw[ :timers :tickers ];
 use ELO::Actors qw[ receive match ];
 
-use ELO::Graphics::Display;
-
-use ELO::Graphics::Color qw[ :all ];
-use ELO::Graphics::Image qw[ :all ];
+use ELO::Graphics qw[
+    Color
+    Palette
+    TransPixel
+    ColorPixel
+    CharPixel
+    Image
+    ImageData
+    Display
+    Point
+];
 
 # ...
 
 # https://htmlcolors.com/palette/70/super-mario-bros
 
-my $RED    = RGBA( 194, 53, 45, 1 );
-my $EMPTY  = RGBA(   0,  0,  0, 0 );
-my $BLACK  = RGBA(   0,  0,  0, 1 );
-my $BLUE   = RGBA(   8, 70,158, 1 );
-my $GOLD   = RGBA( 216,158,109, 1 );
-my $BROWN  = RGBA( 130, 76, 65, 1 );
-my $WHITE  = RGBA( 244,243,244, 1 );
-my $YELLOW = RGBA( 244,243,  8, 1 );
+my $EMPTY  = TransPixel();
+my $RED    = ColorPixel( Color( 0.8, 0.2, 0.2 ) );
+my $BLACK  = ColorPixel( Color( 0.0, 0.0, 0.0 ) );
+my $BLUE   = ColorPixel( Color( 0.0, 0.3, 0.6 ) );
+my $GOLD   = ColorPixel( Color( 0.8, 0.6, 0.4 ) );
+my $BROWN  = ColorPixel( Color( 0.5, 0.3, 0.3 ) );
+my $WHITE  = ColorPixel( Color( 1.0, 1.0, 1.0 ) );
+my $YELLOW = CharPixel( Color( 1.0, 1.0, 0.0 ), Color( 0.7, 0.6, 0.0 ), '*' );
 
-my $PALETTE = Palette({
+my $mario_palette = Palette({
     '$' => $RED,
     ' ' => $EMPTY,
     '`' => $BLACK,
-    '_' => $BROWN,
-    '.' => $BLUE,
+    '.' => $BROWN,
+    ':' => $BLUE,
     '@' => $GOLD,
     '#' => $WHITE,
     '%' => $YELLOW,
@@ -42,122 +51,138 @@ my $PALETTE = Palette({
 
 # ...
 
-my $FPS     = $ARGV[0] // 30;
-my $HEIGHT  = $ARGV[1] // 60;
-my $WIDTH   = $ARGV[2] // 120;
-my $TIMEOUT = $ARGV[3] // 10;
+my $small_mario_image_data = ImageData( $mario_palette, [
+'   $$$$$    ',
+'  $$$$$$$$$ ',
+'  ...@@`@   ',
+' .@.@@@`@@@ ',
+' .@..@@@.@@ ',
+' ..@@@@@... ',
+'   @@@@@@@  ',
+'  ::$::$::  ',
+' :::$::$::: ',
+':::$$$$$$:::',
+'## $%$$%$ ##',
+'@@@$$$$$$@@@',
+'@@$$$$$$$$@@',
+'  $$$  $$$  ',
+' ...    ... ',
+'....    ....',
+]);
 
-die "Height must be a even number, ... or reall weird stuff happens" if ($HEIGHT % 2) != 0;
+my $big_mario_image_data = ImageData( $mario_palette, [
+    ' ###                 ',
+     '####   $$$$$$$$      ',
+     '###$$$$$$$$$$$$$     ',
+     '###$$$$$$$$$$$$$     ',
+     ':::   @@`@@@...      ',
+     ':::  @@@`@@@@.@.     ',
+     ':::::@@@`@@@..@.     ',
+     '::@@@@..@@@@....     ',
+     '  .......@@@@@..     ',
+     '   ::@@@@@@@@@       ',
+     '     :$$::::$$:::::  ',
+     '     :$$::::$$:::::: ',
+     '     :$$::::$$:::::: ',
+     '     ::::::$:::: ### ',
+     ' ```  :$$$$$:::: ####',
+     ' ``  %%$$$%%$:$$ ####',
+     ' ``$$%%$$$%%$$$$  ## ',
+     ' ``$$$$$$$$$$$$``    ',
+     ' ``$$$$$$$$$$$````   ',
+     '        $$$$$$$```   ',
+     '           $$$  ``   ',
+     '                ``   ',
+]);
 
-my $display = ELO::Graphics::Display->new(
-    height   => $HEIGHT,
-    width    => $WIDTH,
-    bg_color => RGB( 0, 180, 255 )
+my $small_mario_image = $small_mario_image_data->create_image;
+my $big_mario_image   = $big_mario_image_data->create_image;
+
+#die Dumper $small_mario_image;
+
+my $HEIGHT  = 30;
+my $WIDTH   = 90;
+my $DELAY   = 0.5;
+
+my $d = Display(
+    *STDOUT,
+    Point(1,1)->rect_with_extent( Point($HEIGHT, $WIDTH) )
 );
 
-sub init ($this, $) {
+{
+    $d->clear_screen( Color( 0, 0.7, 1.0 ) );
+    sleep($DELAY);
 
-    # https://cdn-learn.adafruit.com/assets/assets/000/074/898/original/gaming_newMarioFour02.png?1556139661
+    $d->poke_rectangle( $d->area->inset_by( Point( 8, 2 ) ), Color( 0.1, 0.7, 0.3 ) );
+    sleep($DELAY);
 
-    my $image1_data = ImageData( $PALETTE, [
-        '   $$$$$    ',
-        '  $$$$$$$$$ ',
-        '  ...@@.@   ',
-        ' .@.@@@.@@@ ',
-        ' .@..@@@.@@ ',
-        ' ..@@@@@... ',
-        '   @@@@@@@  ',
-        '  ..$...    ',
-        ' ...$..$... ',
-        '....$$$$....',
-        '@@.$@$$@$.@@',
-        '@@@$$$$$$@@@',
-        '@@$$$$$$$$@@',
-        '  $$$  $$$  ',
-        ' ...    ... ',
-        '....    ....',
-    ]);
+    $d->poke_rectangle( $d->area->inset_by( Point( 6, 12 ) ), Color( 0.5, 0.3, 0.9 ) );
+    sleep($DELAY);
 
-    my $image2_data = ImageData( $PALETTE, [
-        ' ###                 ',
-         '####   $$$$$$$$      ',
-         '###$$$$$$$$$$$$$     ',
-         '###$$$$$$$$$$$$$     ',
-         '...   @@`@@@___      ',
-         '...  @@@`@@@@_@_     ',
-         '.....@@@`@@@__@_     ',
-         '..@@@@__@@@@____     ',
-         '  _______@@@@@__     ',
-         '   ..@@@@@@@@@       ',
-         '     .$$....$$.....  ',
-         '     .$$....$$...... ',
-         '     .$$....$$...... ',
-         '     ......$.... ### ',
-         ' ```  .$$$$$.... ####',
-         ' ``  %%$$$%%$.$$ ####',
-         ' ``$$%%$$$%%$$$$  ## ',
-         ' ``$$$$$$$$$$$$``    ',
-         ' ``$$$$$$$$$$$````   ',
-         '        $$$$$$$```   ',
-         '           $$$  ``   ',
-         '                ``   ',
-    ]);
+    $d->bit_block( Point( 10, 5 ), $small_mario_image );
+    sleep($DELAY);
 
-    my $image1 = $image1_data->create_image;
-    my $image2 = $image2_data->create_image;
+    $d->bit_block(
+        Point( 7, 20 ),
+        $small_mario_image
+            ->flip
+            ->map(sub ($p) {
+                match[*ELO::Graphics::Pixel, $p] => {
+                    TransPixel => sub ()                { TransPixel() },
+                    ColorPixel => sub ($bg)             { ColorPixel( $bg->sub( Color( 0.4, 0.4, 0.4 ) ) ) },
+                    CharPixel  => sub ($bg, $fg, $char) {
+                        CharPixel(
+                            $bg->sub( Color( 0.2, 0.2, 0.2 ) ),
+                            $fg->sub( Color( 0.2, 0.2, 0.2 ) ),
+                            $char,
+                        )
+                    },
 
-    $display->turn_on;
-
-    # make a background we stand out against ...
-    do {
-        my $x = $_;
-        $display->poke(
-            $x, $_,
-            RGB( $_, $x, $_ )
-        ) for 0 .. $display->width
-    } for 0 .. $display->height;
-
-    $display->bit_block( 3, 3, $image1 );
-    $display->bit_block( 3, ($display->width - $image1->width)-3, $image1->mirror );
-    $display->bit_block( ($display->height - $image1->height)-3, 3, $image1 );
-    $display->bit_block( ($display->height - $image1->height)-3, ($display->width - $image1->width)-3, $image1->mirror );
-
-    $display->bit_block(
-        ($display->height / 2) - $image2->height,
-        ($display->width  / 2) - $image2->width,
-        $image2
+                }
+            })
     );
+    sleep($DELAY);
 
-    $display->bit_block(
-        ($display->height / 2),
-        ($display->width  / 2) - $image2->width,
-        $image2->flip
+    $d->poke_rectangle( $d->area->inset_by( Point( 14, 20 ) ), Color( 0.3, 0.9, 0.9 ) );
+    sleep($DELAY);
+
+    $d->bit_block( Point( 5, 35 ), $small_mario_image->mirror );
+    sleep($DELAY);
+
+    $d->bit_block(
+        Point( 8, 50 ),
+        $small_mario_image
+            ->mirror
+            ->flip
+            ->map(sub ($p) {
+                match[*ELO::Graphics::Pixel, $p] => {
+                    TransPixel => sub ()                { TransPixel() },
+                    ColorPixel => sub ($bg)             { ColorPixel( $bg->add( Color( 0.2, 0.2, 0.2 ) ) ) },
+                    CharPixel  => sub ($bg, $fg, $char) {
+                        CharPixel(
+                            $bg->add( Color( 0.2, 0.2, 0.2 ) ),
+                            $fg->add( Color( 0.2, 0.2, 0.2 ) ),
+                            $char,
+                        )
+                    },
+                }
+            })
     );
+    sleep($DELAY);
 
-    $display->bit_block(
-        ($display->height / 2) - $image2->height,
-        ($display->width  / 2),
-        $image2->mirror
-    );
+    $d->poke_rectangle( Point( 12, 40 )->rect_with_extent( Point( 2, 30 ) ), Color( 0.9, 0.5, 0.7 ) );
+    sleep($DELAY);
 
-    $display->bit_block(
-        ($display->height / 2),
-        ($display->width  / 2),
-        $image2->mirror->flip
-    );
+    $d->bit_block( Point( 11, 65 ), $small_mario_image->flip->mirror );
+    sleep($DELAY);
 
-    timer( $this, $TIMEOUT, sub {
-        $display->turn_off();
-        $this->exit(0);
-    });
-
-    local $SIG{INT} = sub {
-        $display->turn_off();
-        exit(0);
-    };
+    $d->bit_block( Point( 8, 30 ), $big_mario_image );
+    sleep($DELAY);
 }
 
-ELO::Loop->run( \&init );
+$d->end_cursor;
+
+say "\n\n\nGoodbye";
 
 1;
 

@@ -23,24 +23,23 @@ subtest '... testing *Pixel' => sub {
     my $green = Color(0.0, 1.0, 0.0);
     my $blue  = Color(0.0, 0.0, 1.0);
 
-    my @points = map Point( $_, $_ ), 0 .. 10;
-
-    my $pixel = ColorPixel( $points[0], $white );
+    my $pixel = ColorPixel( $white );
     isa_ok($pixel, 'ELO::Graphics::Pixel::ColorPixel');
 
-    is($pixel->coord, $points[0], '... got the expected coords from ColorPixel');
-    is($pixel->color, $white, '... got the expected color from ColorPixel');
+    is($pixel->bg_color, $white, '... got the expected color from ColorPixel');
     ok((not defined $pixel->fg_color),'... got the expected fg-color from ColorPixel');
     is($pixel->char, ' ', '... got the expected char from ColorPixel');
 
-    my $char_pixel = CharPixel( $points[1], $red, $green, '*' );
+    is_deeply([$pixel->colors], [undef, $white], '... got the right colors');
+
+    my $char_pixel = CharPixel( $red, $green, '*' );
     isa_ok($char_pixel, 'ELO::Graphics::Pixel::CharPixel');
 
-    is($char_pixel->coord, $points[1], '... got the expected coords from CharPixel');
-    is($char_pixel->color, $red, '... got the expected color from CharPixel');
+    is($char_pixel->bg_color, $red, '... got the expected color from CharPixel');
     is($char_pixel->fg_color, $green, '... got the expected fg-color from CharPixel');
     is($char_pixel->char, '*', '... got the expected char from CharPixel');
 
+    is_deeply([$char_pixel->colors], [$green, $red], '... got the right colors');
 };
 
 done_testing;

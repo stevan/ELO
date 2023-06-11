@@ -58,31 +58,29 @@ my $area5  = $area3->origin
 
 $d->clear_screen( Color( 0.6, 0.6, 0.6 ) );
 
-$d->draw_rectangle( $area1, Color( 0.6, 0.3, 0.1 ) );
-$d->draw_rectangle( $area2, Color( 0.3, 0.6, 0.2 ) );
-$d->draw_rectangle( $area3, Color( 0.3, 0.3, 0.9 ) );
-$d->draw_rectangle( $area4, Color( 0.5, 0.5, 0.6 ) );
-$d->draw_rectangle( $area5, Color( 0.4, 0.6, 0.6 ) );
+$d->poke_rectangle( $area1, Color( 0.6, 0.3, 0.1 ) );
+$d->poke_rectangle( $area2, Color( 0.3, 0.6, 0.2 ) );
+$d->poke_rectangle( $area3, Color( 0.3, 0.3, 0.9 ) );
+$d->poke_rectangle( $area4, Color( 0.5, 0.5, 0.6 ) );
+$d->poke_rectangle( $area5, Color( 0.4, 0.6, 0.6 ) );
 
 do {
     #last;
 
     $d->poke(
-        ColorPixel(
-            $area4->origin->add( Point(
+        $area4->origin->add( Point(
                 int(rand($area4->height)),
                 int(rand($area4->width)),
-            )),
-            Color( rand, rand, rand )->mul( $seed_color )
-        )
+        )),
+        ColorPixel( Color( rand, rand, rand )->mul( $seed_color ) )
     );
 
     $d->poke(
+        $area5->origin->add( Point(
+            int(rand($area4->height)),
+            int(rand($area4->width)),
+        )),
         CharPixel(
-            $area5->origin->add( Point(
-                int(rand($area4->height)),
-                int(rand($area4->width)),
-            )),
             Color( rand, rand, rand )->mul( $seed_color ),
             Color( rand, rand, rand )->mul( $seed_color ),
             '▀'

@@ -3,6 +3,8 @@ use v5.36;
 use experimental 'builtin';
 use builtin 'floor', 'ceil';
 
+$|++;
+
 use ELO::Types qw[ :core :types :typeclasses ];
 
 ## ----------------------------------------------------------------------------
@@ -25,6 +27,12 @@ our @EXPORT_OK = qw[
 
     ColorPixel
     CharPixel
+    TransPixel
+
+    Palette
+
+    ImageData
+    Image
 
     Display
 ];
@@ -191,30 +199,132 @@ typeclass[*Rectangle] => sub {
 ## ----------------------------------------------------------------------------
 
 type *FgColor => *Color;
+type *BgColor => *Color;
+
+# This might also be a place to implement the StackedPixel to get
+# the higher resolution. Hmmm ???
 
 datatype *Pixel => sub {
-    case ColorPixel => ( *Point, *Color );
-    case CharPixel  => ( *Point, *Color, *FgColor, *Char );
+    case ColorPixel => ( *BgColor );
+    case CharPixel  => ( *BgColor, *FgColor, *Char );
+    case TransPixel => ();
 };
 
 typeclass[*Pixel] => sub {
 
-    method coord => *Point;
-    method color => *Color;
-
+    method bg_color => {
+        ColorPixel => *BgColor,
+        CharPixel  => *BgColor,
+        TransPixel => sub () { () },
+    };
     method fg_color => {
-        ColorPixel => sub ($, $) {  () },
+        ColorPixel => sub ($) { () },
         CharPixel  => *FgColor,
+        TransPixel => sub () { () },
+    };
+
+    method colors => {
+        ColorPixel => sub ($bg_color)               {     undef, $bg_color },
+        CharPixel  => sub ($bg_color, $fg_color, $) { $fg_color, $bg_color },
+        TransPixel => sub () { undef, undef },
     };
 
     method char => {
-        ColorPixel => sub ($, $) { ' ' },
+        ColorPixel => sub ($) { ' ' },
         CharPixel  => *Char,
+        TransPixel => sub () { "\e[C" }, #  Move cursor over by one
+        # XXX: should I have an ANSI code here? What are my alternatives?
+        # I am already encoding data here about spacees with ColorPixel
     };
 
     # TODO:
     # - implement equals
 
+};
+
+## ----------------------------------------------------------------------------
+## Image
+## ----------------------------------------------------------------------------
+##
+## ----------------------------------------------------------------------------
+
+type *BitMap => *ArrayRef; # rows of *Pixel objects
+
+datatype [ Image => *Image ] => ( *BitMap );
+
+typeclass[*Image] => sub {
+
+    method bitmap => *BitMap;
+
+    method height => sub ($i) { scalar $i->bitmap->@*      };
+    method width  => sub ($i) { scalar $i->bitmap->[0]->@* };
+
+    method get_all_rows => sub ($i)        { $i->bitmap->@* };
+    method get_row      => sub ($i, $idx)  { $i->bitmap->[ $idx ]->@* };
+
+    # NOTE:
+    # the below methods will copy the
+    # full bitmap as these are immutable
+    # references
+
+    method mirror => sub ($i) {
+        Image([ map { [ reverse @$_ ] } $i->get_all_rows ])
+    };
+
+    method flip => sub ($i) {
+        Image([ map { [ @$_ ] } reverse $i->get_all_rows ])
+    };
+
+    method map => sub ($i, $f) {
+        Image([ map { [ map $f->($_), @$_ ] } $i->get_all_rows ])
+    };
+};
+
+## ----------------------------------------------------------------------------
+## Palette
+## ----------------------------------------------------------------------------
+##
+## ----------------------------------------------------------------------------
+
+type *ColorMap => *HashRef; # *Str => *Color
+
+datatype [ Palette => *Palette ] => ( *ColorMap );
+
+typeclass[*Palette] => sub {
+
+    method color_map => *ColorMap;
+    method colors    => sub ($p) { values $p->color_map->%* };
+
+    method map => sub ($p, @chars) {
+        my $map = $p->color_map;
+        my @out = map { $map->{ $_ } // die 'Could not find color for ('.$_.')' } @chars;
+        return @out;
+    };
+};
+
+
+## ----------------------------------------------------------------------------
+## ImageData
+## ----------------------------------------------------------------------------
+##
+## ----------------------------------------------------------------------------
+
+type *RawImageData => *ArrayRef; # lines of image data stored as *Str
+
+datatype [ ImageData => *ImageData ] => ( *Palette, *RawImageData );
+
+typeclass[*ImageData] => sub {
+
+    method palette  => *Palette;
+    method raw_data => *RawImageData;
+
+    method get_all_rows => sub ($i)        { $i->raw_data->@* };
+    method get_row      => sub ($i, $idx)  { $i->raw_data->[ $idx ]->@* };
+
+    method create_image => sub ($img) {
+        my $p = $img->palette;
+        Image([ map [ $p->map( split //, $_ ) ], $img->get_all_rows ])
+    };
 };
 
 ## ----------------------------------------------------------------------------
@@ -245,13 +355,24 @@ typeclass[*Display] => sub {
     my $HOME_CURSOR  = "\e[H";
 
     my sub format_bg_color ($c=undef) {
-        return unless defined $c;
+        return '' unless defined $c;
         sprintf "\e[48;2;%d;%d;%d;m" => map int(255 * $_), $c->rgb
-    };
+    }
+
     my sub format_fg_color ($c=undef) {
-        return unless defined $c;
+        return '' unless defined $c;
         sprintf "\e[38;2;%d;%d;%d;m" => map int(255 * $_), $c->rgb
-    };
+    }
+
+    my sub format_colors ($fg_color=undef, $bg_color=undef) {
+        return ''                           if !defined $fg_color && !defined $bg_color;
+        return format_fg_color( $fg_color ) if  defined $fg_color && !defined $bg_color;
+        return format_bg_color( $bg_color ) if !defined $fg_color &&  defined $bg_color;
+        sprintf "\e[38;2;%d;%d;%d;48;2;%d;%d;%d;m"
+            => map int(255 * $_),
+                $fg_color->rgb,
+                $bg_color->rgb,
+    }
 
     my sub format_goto ($p) { sprintf "\e[%d;%dH" => $p->xy }
 
@@ -270,7 +391,7 @@ typeclass[*Display] => sub {
             # draw of $width spaces and goto next line
             ((sprintf "\e[%d\@\e[E" => $d->width) x $d->height), # and repeat it $height times
             # end paint background
-            "\e[0m",  # reset colors
+            $RESET,
             (DEBUG
                 ? ("D(origin: ".(join ' @ ' => $d->area->origin->xy).", "
                   ."corner: ".(join ' @ ' => $d->area->corner->xy).", "
@@ -284,14 +405,14 @@ typeclass[*Display] => sub {
 
             $d->home_cursor;
             # draw markers
-            $d->poke( ColorPixel( Point( 1, $_*2 ), (($_*2) % 10) == 0 ? $ten_marker : $two_marker ) )
+            $d->poke( Point( 1, $_*2 ), ColorPixel( (($_*2) % 10) == 0 ? $ten_marker : $two_marker ))
                 foreach 1 .. ($d->width/2);
-            $d->poke( ColorPixel( Point( $d->height, $_*2 ), (($_*2) % 10) == 0 ? $ten_marker : $two_marker ) )
+            $d->poke( Point( $d->height, $_*2 ), ColorPixel( (($_*2) % 10) == 0 ? $ten_marker : $two_marker ))
                 foreach 1 .. ($d->width/2);
 
-            $d->poke( ColorPixel( Point( $_*2, 1 ), (($_*2) % 10) == 0 ? $ten_marker : $two_marker ) )
+            $d->poke( Point( $_*2, 1 ), ColorPixel( (($_*2) % 10) == 0 ? $ten_marker : $two_marker ))
                 foreach 1 .. ($d->height/2);
-            $d->poke( ColorPixel( Point( $_*2, $d->width ), (($_*2) % 10) == 0 ? $ten_marker : $two_marker ) )
+            $d->poke( Point( $_*2, $d->width ), ColorPixel( (($_*2) % 10) == 0 ? $ten_marker : $two_marker ))
                 foreach 1 .. ($d->height/2);
         }
     };
@@ -299,17 +420,16 @@ typeclass[*Display] => sub {
     method home_cursor  => sub ($d) { out( $d => $HOME_CURSOR ) };
     method end_cursor   => sub ($d) { out( $d => "\e[".$d->height."H"  ) };
 
-    method poke => sub ($d, $pixel) {
+    method poke => sub ($d, $coord, $pixel) {
         out( $d => (
-            format_goto     ( $pixel->coord    ),
-            format_fg_color ( $pixel->fg_color ),
-            format_bg_color ( $pixel->color    ),
-                            ( $pixel->char     ),
-            $RESET
+            format_goto   ( $coord         ),
+            format_colors ( $pixel->colors ),
+                          ( $pixel->char   ),
+            $RESET,
         ));
     };
 
-    method draw_rectangle => sub ($d, $rectangle, $color) {
+    method poke_rectangle => sub ($d, $rectangle, $color) {
 
         my $h = $rectangle->height;
         my $w = $rectangle->width;
@@ -319,12 +439,39 @@ typeclass[*Display] => sub {
             format_bg_color($color),
             # paint rectangle
             (((' ' x $w) . "\e[B\e[${w}D") x $h),
-            $RESET,  # reset colors
             # end paint rectangle
+            $RESET,
             (DEBUG
                 ? ("R(origin: ".(join ' @ ' => $rectangle->origin->xy).", "
                   ."corner: ".(join ' @ ' => $rectangle->corner->xy).", "
                   ."{ h: $h, w: $w })")
+                : ()),
+        ));
+    };
+
+    method bit_block => sub ($d, $coord, $image) {
+
+        #die split // => join '' => (map { map { format_colors( $_->colors ).($_->char) } $_->@* } $image->get_all_rows);
+
+        my $carrige_return = "\e[B\e[".$image->width."D";
+
+        out( $d => (
+            format_goto( $coord ),
+            # paint image
+            (join $carrige_return => map {
+                join '' => map {
+                    #use Data::Dumper;
+                    #die Dumper [ split // => format_colors( $_->colors ) ] if $_ isa ELO::Graphics::Pixel::CharPixel;
+
+                    format_colors( $_->colors ).($_->char)
+                } $_->@*
+            } $image->get_all_rows),
+            $carrige_return,
+            # end paint image
+            $RESET,
+            (DEBUG
+                ? ("I(coord: ".(join ' @ ' => $coord->xy).", "
+                  ."{ h: ".$image->height.", w: ".$image->width." })")
                 : ()),
         ));
     };
