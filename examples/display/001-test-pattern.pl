@@ -4,7 +4,7 @@ use v5.36;
 use experimental 'try', 'builtin', 'for_list';
 use builtin 'floor', 'ceil';
 
-use Time::HiRes qw[ alarm sleep ];
+use Time::HiRes qw[ alarm ];
 
 use ELO::Graphics qw[ Point Color ColorPixel CharPixel Display ];
 
@@ -14,6 +14,7 @@ use ELO::Graphics qw[ Point Color ColorPixel CharPixel Display ];
 # - implement a Color->generate_random or something similar
 # - use an IO::Scalar as *Output to test this
 # - implement a refresh screen method that redraws the background
+# - make this use ELO::Loop and not `alarm` ;)
 # -----------------------------------------------------------------------------
 
 my $H = $ARGV[0] // 40;
