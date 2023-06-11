@@ -33,6 +33,7 @@ my @PERL_TYPES = (
 
     *Undef,    # undef value
     *Bool,     # 1, 0 or ''
+    *Char,     # single character
     *Str,      # pretty much anything
     *Num,      # any numeric value
     *Int,      # if it looks like a number and int($_) == $_
@@ -201,17 +202,64 @@ sub typeclass ($t, $body) {
                     ($constructor)
                         || confess "In typeclass($symbol) the case($constructor_symbol) is not found, must be one of (".(join ', ' => keys %cases).')';
 
+                    my $body;
+
                     my $handler = $table->{$type_name};
+
+                    if (ref $handler ne 'CODE') {
+                        my @definitions = $constructor->definition;
+
+                        my $i;
+                        for ($i = 0; $i < $#definitions; $i++) {
+                            #warn "$body ==? ".$definitions[$i]->symbol;
+                            last if $handler eq $definitions[$i]->symbol;
+                        }
+
+                        confess 'Could not find symbol('.$body.') in type definition tuple['.$type->symbol.']'
+                            unless defined $i;
+
+                        # encapsulation ;)
+                        $body = sub ($_t) { $_t->[$i] };
+                    }
+                    else {
+                        $body = sub ($_t) { $handler->( @$_t ) }
+                    }
+
                     no strict 'refs';
 
                     #warn "[HASH] &: ${constructor_symbol}::${name}\n";
                     *{"${constructor_symbol}::${name}"} = set_subname(
-                        "${constructor_symbol}::${name}" => sub ($self) { $handler->( @$self ) }
+                        "${constructor_symbol}::${name}" => $body
                     );
                 }
             }
+            elsif ( ref((my $x = \$table)) eq 'GLOB' ) {
+
+                foreach my $constructor_symbol ( keys %cases ) {
+                    no strict 'refs';
+
+                    my @definitions = $cases{$constructor_symbol}->definition;
+
+                    my $i;
+                    for ($i = 0; $i < $#definitions; $i++) {
+                        #warn "$body ==? ".$definitions[$i]->symbol;
+                        last if $table eq $definitions[$i]->symbol;
+                    }
+
+                    confess 'Could not find symbol('.$table.') in type definition tuple['.$type->symbol.']'
+                        unless defined $i;
+
+                    # encapsulation ;)
+                    my $body = sub ($_t) { $_t->[$i] };
+
+                    *{"${constructor_symbol}::${name}"} = set_subname(
+                        "${constructor_symbol}::${name}" => $body
+                    );
+                }
+
+            }
             else {
-                confess 'Unsupported method type, only CODE and HASH supported';
+                confess 'Unsupported method type, only CODE, GLOB and HASH[CODE], HASH[GLOB] supported';
             }
 
             $typeclass->method_definitions->{ $name } = $table;
@@ -283,7 +331,7 @@ sub datatype ($symbol, @args) {
 
         my $definition = resolve_types( \@args );
 
-        my $constructor_symbol = "${symbol}::${constructor}";
+        my $constructor_symbol = "${symbol}"; # ::${constructor}";
            $constructor_symbol =~ s/main//;
 
         no strict 'refs';
@@ -560,6 +608,13 @@ type *Bool, sub ($bool) {
     return defined($bool)                       # it is defined ...
         && not(ref $bool)                       # ... and it is not a reference
         && ($bool =~ /^[01]$/ || $bool eq '')   # ... and is either 1,0 or an empty string
+};
+
+type *Char, sub ($char) {
+    return defined($char)                        # it is defined ...
+        && not(ref $char)                        # ... and it is not a reference
+        && ref(\$char) eq 'SCALAR'               # ... and its just a scalar
+        && length($char) == 1                    # ... and has a length of one
 };
 
 type *Str, sub ($str) {
