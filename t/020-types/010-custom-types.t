@@ -9,6 +9,31 @@ use Test::Differences;
 use ok 'ELO::Actors', qw[ match ];
 use ok 'ELO::Types',  qw[ :core :types :events ];
 
+# ... extended types
+
+type *ZeroThroughNine => *Int, ( range => [0, 9] );
+
+subtest '... checking *ZeroThroughNine' => sub {
+    ok(  lookup_type(*ZeroThroughNine)->check( 1 ),   '... this type checked for ZeroThroughNine with a single-digit ZeroThroughNine' );
+    ok(  lookup_type(*ZeroThroughNine)->check( 0 ),   '... this type checked for ZeroThroughNine with a single-digit ZeroThroughNine' );
+    ok(  lookup_type(*ZeroThroughNine)->check( 9 ),   '... this type checked for ZeroThroughNine with a single-digit ZeroThroughNine' );
+    ok(  lookup_type(*ZeroThroughNine)->check( !!1 ),  '... this type checked for ZeroThroughNine with a Bool (see also - Perl)' );
+    ok( !lookup_type(*ZeroThroughNine)->check( -1 ),   '... this type checked for ZeroThroughNine with a single-digit ZeroThroughNine' );
+    ok( !lookup_type(*ZeroThroughNine)->check( 10 ),   '... this type checked for ZeroThroughNine with a regular ZeroThroughNine' );
+    ok( !lookup_type(*ZeroThroughNine)->check( 100 ),   '... this type checked for ZeroThroughNine with a regular ZeroThroughNine' );
+    ok( !lookup_type(*ZeroThroughNine)->check( 1_000_000 ),  '... this type checked for ZeroThroughNine with a _ seperated ZeroThroughNine' );
+    ok( !lookup_type(*ZeroThroughNine)->check( int("256") ),  '... this type checked for ZeroThroughNine with a Str converted via int()' );
+    ok( !lookup_type(*ZeroThroughNine)->check( "256" ),  '... this type checked for ZeroThroughNine with a Str containing numbers (see also - Perl)' );
+
+    ok( !lookup_type(*ZeroThroughNine)->check( 'foo' ),   '... this failed the type check for ZeroThroughNine with a single-quoted Str' );
+    ok( !lookup_type(*ZeroThroughNine)->check( "foo" ),   '... this failed the type check for ZeroThroughNine with a double-quoted Str' );
+    ok( !lookup_type(*ZeroThroughNine)->check( q[foo] ),  '... this failed the type check for ZeroThroughNine with a q[] Str' );
+    ok( !lookup_type(*ZeroThroughNine)->check( qq[foo] ), '... this failed the type check for ZeroThroughNine with a qq[] Str' );
+    ok( !lookup_type(*ZeroThroughNine)->check( 0.01 ), '... this failed the type check for ZeroThroughNine with an Float' );
+    ok( !lookup_type(*ZeroThroughNine)->check( [] ),   '... this failed the type check for ZeroThroughNine with an ArrayRef' );
+    ok( !lookup_type(*ZeroThroughNine)->check( {} ),   '... this failed the type check for ZeroThroughNine with an HashRef' );
+};
+
 # ... Custom Types
 
 type *Foo, sub ($foo) { "$foo" eq 'foo' };
@@ -93,6 +118,28 @@ subtest '... checking *MyArrayRef' => sub {
     ok( !lookup_type(*MyArrayRef)->check( q[foo] ),  '... this failed the type check for MyArrayRef with a q[] Str' );
     ok( !lookup_type(*MyArrayRef)->check( qq[foo] ), '... this failed the type check for MyArrayRef with a qq[] Str' );
     ok( !lookup_type(*MyArrayRef)->check( {} ),   '... this failed the type check for MyArrayRef with an HashRef' );
+};
+
+# extended types with ArrayRef
+
+type *ArrayRefOfInts => *ArrayRef, ( of => [ *Int ] );
+
+subtest '... checking *ArrayRefOfInts' => sub {
+    ok( lookup_type(*ArrayRefOfInts)->check( [] ),   '... this type checked for ArrayRefOfInts with an ArrayRef' );
+    ok( lookup_type(*ArrayRefOfInts)->check( [ 1 .. 10 ] ),   '... this type checked for ArrayRefOfInts with an ArrayRef' );
+
+    ok( !lookup_type(*ArrayRefOfInts)->check( [ "string", 30 ] ),   '... this type checked for ArrayRefOfInts with mixed types an ArrayRef' );
+    ok( !lookup_type(*ArrayRefOfInts)->check( [ 0.25, 0.33 ] ),   '... this type checked for ArrayRefOfInts with an ArrayRef of Floats' );
+
+    ok( !lookup_type(*ArrayRefOfInts)->check( 1.0 ),   '... this failed the type check for ArrayRefOfInts with a simple Flot' );
+    ok( !lookup_type(*ArrayRefOfInts)->check( 100 ),   '... this failed the type check for ArrayRefOfInts with with an Int' );
+    ok( !lookup_type(*ArrayRefOfInts)->check( !!1 ),  '... this failed the type check for ArrayRefOfInts with a Bool' );
+    ok( !lookup_type(*ArrayRefOfInts)->check( '3.14' ),  '... this failed the type check for ArrayRefOfInts with a Str containing a float (see also - Perl)' );
+    ok( !lookup_type(*ArrayRefOfInts)->check( 'foo' ),   '... this failed the type check for ArrayRefOfInts with a single-quoted Str' );
+    ok( !lookup_type(*ArrayRefOfInts)->check( "foo" ),   '... this failed the type check for ArrayRefOfInts with a double-quoted Str' );
+    ok( !lookup_type(*ArrayRefOfInts)->check( q[foo] ),  '... this failed the type check for ArrayRefOfInts with a q[] Str' );
+    ok( !lookup_type(*ArrayRefOfInts)->check( qq[foo] ), '... this failed the type check for ArrayRefOfInts with a qq[] Str' );
+    ok( !lookup_type(*ArrayRefOfInts)->check( {} ),   '... this failed the type check for ArrayRefOfInts with an HashRef' );
 };
 
 done_testing;

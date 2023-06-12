@@ -498,13 +498,14 @@ sub enum ($enum, @values) {
     );
 }
 
-sub type ($type, $checker) {
+sub type ($type, $checker, %params) {
     warn "Creating type $type" if DEBUG;
 
     if ( ref $checker eq 'CODE' ) {
         $TYPE_REGISTRY{ $type } = ELO::Core::Type->new(
             symbol  => $type,
             checker => $checker,
+            params  => \%params, # the definition of the parameters ...
         );
     }
     elsif ( ref $checker eq 'ARRAY' ) {
@@ -521,6 +522,13 @@ sub type ($type, $checker) {
         my $alias = $TYPE_REGISTRY{ $checker }
             || confess "Unable to alias type($type) to alias($checker): alias type not found";
 
+        my $param_checker;
+
+        # NOTE: params is a single key/value pair
+        if (%params) {
+            $param_checker = $alias->build_params_checker( %params );
+        }
+
         $TYPE_REGISTRY{ $type } = ELO::Core::Type::Alias->new(
             symbol  => $type,
             alias   => $alias,
@@ -529,7 +537,8 @@ sub type ($type, $checker) {
                 # wrap this in try/catch and wrap the
                 # error message accordingly, this should
                 # cascade down the tree accordingly
-                $alias->check( $value );
+                $alias->check( $value )
+                    && ($param_checker ? $param_checker->( $value ) : 1)
             }
         );
     }
@@ -637,7 +646,14 @@ type *Int, sub ($int) {
         && not(ref $int)                        # if it is not a reference
         && looks_like_number($int)              # ... if it looks like a number
         && int($int) == $int                    # and is the same value when converted to int()
-};
+}, (
+    # parameters
+    range => sub ($min, $max) { # << the arguments passed with parameter
+        # a function to be appended to the
+        # check for *Int above ...
+        sub ($int) { $int >= $min && $int <= $max }
+    }
+);
 
 type *Float, sub ($float) {
     return defined($float)                      # it is defined ...
@@ -649,7 +665,18 @@ type *Float, sub ($float) {
 type *ArrayRef, sub ($array_ref) {
     return defined($array_ref)                  # it is defined ...
         && ref($array_ref) eq 'ARRAY'           # and it is an ARRAY reference
-};
+}, (
+    # parameters
+    of => sub ($type) {
+        my $t = lookup_type( $type ) // die "Could not find type($type) for ArrayRef of";
+        sub ($array_ref) {
+            foreach ( @$array_ref ) {
+                return unless $t->check( $_ );
+            }
+            return 1;
+        }
+    }
+);
 
 type *HashRef, sub ($hash_ref) {
     return defined($hash_ref)                   # it is defined ...
