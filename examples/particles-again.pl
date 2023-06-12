@@ -6,7 +6,7 @@ use experimental 'builtin';
 use Data::Dumper;
 
 use ELO::Loop;
-use ELO::Actors    qw[ match receive ];
+use ELO::Actors    qw[ receive ];
 use ELO::Timers    qw[ :timers :tickers ];
 use ELO::Types     qw[ :core :events ];
 

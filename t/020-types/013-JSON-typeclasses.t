@@ -13,7 +13,6 @@ use lib 't/lib';
 use ok 'ELO::Loop';
 use ok 'ELO::Types',  qw[ :core :events :types :typeclasses ];
 use ok 'ELO::Timers', qw[ :timers ];
-use ok 'ELO::Actors', qw[ match ];
 
 use ELO::JSON;
 use ELO::JSON::Token;

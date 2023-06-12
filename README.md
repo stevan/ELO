@@ -94,8 +94,8 @@ And a Promise mechanism to coordinate between Actors.
 use experimental 'try';
 
 use ELO::Loop;
-use ELO::Types    qw[ :core :events ];
-use ELO::Actors   qw[ receive match ];
+use ELO::Types    qw[ :core :events ]; # match is exported with :core
+use ELO::Actors   qw[ receive ];
 use ELO::Promises qw[ promise ];
 
 enum *MathOps => (

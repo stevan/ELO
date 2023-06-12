@@ -11,8 +11,8 @@ use Data::Dumper;
 use List::Util qw[ max min ];
 
 use ok 'ELO::Loop';
-use ok 'ELO::Types',  qw[ :core event ];
-use ok 'ELO::Actors', qw[ match build_actor receive ];
+use ok 'ELO::Types',  qw[ :core :events ];
+use ok 'ELO::Actors', qw[ build_actor receive ];
 use ok 'ELO::Timers', qw[ :timers ];
 
 my $log = Test::ELO->create_logger;

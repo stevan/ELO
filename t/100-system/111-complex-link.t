@@ -11,8 +11,8 @@ use Data::Dumper;
 use Hash::Util qw[fieldhash];
 
 use ok 'ELO::Loop';
-use ok 'ELO::Actors',    qw[ match receive ];
-use ok 'ELO::Types',     qw[ :events *SIGEXIT ];
+use ok 'ELO::Actors',    qw[ receive ];
+use ok 'ELO::Types',     qw[ :core :events *SIGEXIT ];
 use ok 'ELO::Timers',    qw[ ticker ];
 
 my $log = Test::ELO->create_logger;

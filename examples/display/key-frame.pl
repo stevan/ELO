@@ -12,9 +12,7 @@ use Term::ANSIColor qw[ colored ];
 use ELO::Loop;
 use ELO::Types  qw[ :core :events :types :typeclasses ];
 use ELO::Timers qw[ :timers :tickers ];
-use ELO::Actors qw[ receive match ];
-
-use ELO::Graphics::Display;
+use ELO::Actors qw[ receive ];
 
 # ...
 

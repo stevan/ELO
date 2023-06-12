@@ -6,7 +6,6 @@ use Data::Dumper;
 
 use ELO::JSON;
 
-use ELO::Actors qw[ match ];
 use ELO::Types  qw[
     :core
     :types

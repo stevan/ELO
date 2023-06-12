@@ -10,14 +10,14 @@ use Test::ELO;
 use Data::Dumper;
 
 use ELO::Types    qw[ :core :types :typeclasses ];
-use ELO::Graphics qw[ Palette Color ];
+use ELO::Graphics qw[ Palette Color ColorPixel ];
 
 
 subtest '... testing *Palette' => sub {
 
-    my $black = Color(0.0, 0.0, 0.0);
-    my $white = Color(1.0, 1.0, 1.0);
-    my $grey  = Color(0.5, 0.5, 0.5);
+    my $black = ColorPixel( Color(0.0, 0.0, 0.0) );
+    my $white = ColorPixel( Color(1.0, 1.0, 1.0) );
+    my $grey  = ColorPixel( Color(0.5, 0.5, 0.5) );
 
     my $mono_map = {
         ' ' => $black,

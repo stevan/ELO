@@ -15,7 +15,7 @@ use Hash::Util qw[fieldhash];
 use ok 'ELO::Loop';
 use ok 'ELO::Types',  qw[ :core :signals :events :types :typeclasses ];
 use ok 'ELO::Timers', qw[ :tickers ];
-use ok 'ELO::Actors', qw[ receive match setup ];
+use ok 'ELO::Actors', qw[ receive setup ];
 
 use lib 't/lib';
 

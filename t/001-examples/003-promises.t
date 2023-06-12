@@ -11,7 +11,7 @@ use Data::Dumper;
 
 use ok 'ELO::Loop';
 use ok 'ELO::Types',    qw[ :core :types :events ];
-use ok 'ELO::Actors',   qw[ match receive ];
+use ok 'ELO::Actors',   qw[ receive ];
 use ok 'ELO::Promises', qw[ promise collect ];
 
 my $log = Test::ELO->create_logger;

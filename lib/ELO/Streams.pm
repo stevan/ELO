@@ -3,7 +3,7 @@ use v5.36;
 use experimental 'try';
 
 use ELO::Types  qw[ :core :types :events :signals :typeclasses ];
-use ELO::Actors qw[ receive match setup ];
+use ELO::Actors qw[ receive setup ];
 use ELO::Timers qw[ :timers ];
 
 our $log;

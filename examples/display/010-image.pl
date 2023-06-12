@@ -11,7 +11,6 @@ use Data::Dumper;
 use ELO::Loop;
 use ELO::Types  qw[ :core :events :types :typeclasses ];
 use ELO::Timers qw[ :timers :tickers ];
-use ELO::Actors qw[ receive match ];
 
 use ELO::Graphics qw[
     Color
@@ -122,25 +121,7 @@ my $d = Display(
     $d->poke_block( Point( 10, 5 ), $small_mario_image );
     sleep($DELAY);
 
-    $d->poke_block(
-        Point( 7, 20 ),
-        $small_mario_image
-            ->flip
-            ->map(sub ($p) {
-                match[*ELO::Graphics::Pixel, $p] => {
-                    TransPixel => sub ()                { TransPixel() },
-                    ColorPixel => sub ($bg)             { ColorPixel( $bg->sub( Color( 0.4, 0.4, 0.4 ) ) ) },
-                    CharPixel  => sub ($bg, $fg, $char) {
-                        CharPixel(
-                            $bg->sub( Color( 0.2, 0.2, 0.2 ) ),
-                            $fg->sub( Color( 0.2, 0.2, 0.2 ) ),
-                            $char,
-                        )
-                    },
-
-                }
-            })
-    );
+    $d->poke_block( Point( 7, 20 ), $small_mario_image ->flip->lighten( 0.4 ) );
     sleep($DELAY);
 
     $d->poke_rectangle( $d->area->inset_by( Point( 14, 20 ) ), Color( 0.3, 0.9, 0.9 ) );
@@ -149,25 +130,7 @@ my $d = Display(
     $d->poke_block( Point( 5, 35 ), $small_mario_image->mirror );
     sleep($DELAY);
 
-    $d->poke_block(
-        Point( 8, 50 ),
-        $small_mario_image
-            ->mirror
-            ->flip
-            ->map(sub ($p) {
-                match[*ELO::Graphics::Pixel, $p] => {
-                    TransPixel => sub ()                { TransPixel() },
-                    ColorPixel => sub ($bg)             { ColorPixel( $bg->add( Color( 0.2, 0.2, 0.2 ) ) ) },
-                    CharPixel  => sub ($bg, $fg, $char) {
-                        CharPixel(
-                            $bg->add( Color( 0.2, 0.2, 0.2 ) ),
-                            $fg->add( Color( 0.2, 0.2, 0.2 ) ),
-                            $char,
-                        )
-                    },
-                }
-            })
-    );
+    $d->poke_block( Point( 8, 50 ), $small_mario_image->mirror->flip->darken ( 0.4 ) );
     sleep($DELAY);
 
     $d->poke_rectangle( Point( 12, 40 )->rect_with_extent( Point( 2, 30 ) ), Color( 0.9, 0.5, 0.7 ) );

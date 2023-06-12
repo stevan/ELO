@@ -8,7 +8,7 @@ use Data::Dumper;
 use Test::More;
 use Test::Differences;
 
-use ok 'ELO::Actors', qw[ match receive ];
+use ok 'ELO::Actors', qw[ receive ];
 use ok 'ELO::Types',  qw[
     :core
     :events

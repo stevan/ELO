@@ -10,7 +10,7 @@ use Data::Dumper;
 
 use ok 'ELO::Loop';
 use ok 'ELO::Types',  qw[ :core :events *SIGEXIT ];
-use ok 'ELO::Actors', qw[ receive match setup ];
+use ok 'ELO::Actors', qw[ receive setup ];
 
 my $log = Test::ELO->create_logger;
 
@@ -23,6 +23,23 @@ protocol *Pong => sub {
     event *eStopPong  => ();
     event *ePing      => ( *Process );
 };
+
+=pod
+
+type *Pinger => *Process responds_to => [ *Ping ];
+type *Ponger => *Process responds_to => [ *Pong ];
+
+protocol *Ping => sub {
+    event *eStartPing => ( *Ponger );
+    event *ePong      => ( *Ponger );
+};
+
+protocol *Pong => sub {
+    event *eStopPong  => ();
+    event *ePing      => ( *Pinger );
+};
+
+=cut
 
 sub Ping (%args) {
 

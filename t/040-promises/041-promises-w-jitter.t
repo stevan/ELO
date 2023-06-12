@@ -10,8 +10,8 @@ use Test::ELO;
 use Data::Dumper;
 
 use ok 'ELO::Loop';
-use ok 'ELO::Types',    qw[ :core event ];
-use ok 'ELO::Actors',   qw[ match receive ];
+use ok 'ELO::Types',    qw[ :core :events ];
+use ok 'ELO::Actors',   qw[ receive ];
 use ok 'ELO::Promises', qw[ promise collect ];
 use ok 'ELO::Timers',   qw[ ticker ];
 

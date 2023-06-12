@@ -43,9 +43,9 @@ our @EXPORT_OK = qw[
 ## http://www.bildungsgueter.de/Smalltalk/Pages/MVCTutorial/Pages/Color.htm
 ## ----------------------------------------------------------------------------
 
-type *R => *Float;
-type *G => *Float;
-type *B => *Float;
+type *R => *Float, range => [ 0.0, 1.0 ];
+type *G => *Float, range => [ 0.0, 1.0 ];
+type *B => *Float, range => [ 0.0, 1.0 ];
 
 datatype [ Color => *Color ] => ( *R, *G, *B );
 
@@ -57,6 +57,7 @@ typeclass[*Color] => sub {
 
     method rgb => sub ($c) { ($c->r, $c->g, $c->b) };
 
+    # constrain all the values we create with out match operations
     my sub __ ($x) { $x > 1.0 ? 1.0 : $x < 0.0 ? 0.0 : $x }
 
     method add => sub ($c1, $c2) { Color( __($c1->r + $c2->r), __($c1->g + $c2->g), __($c1->b + $c2->b) ) };
@@ -80,6 +81,10 @@ typeclass[*Color] => sub {
 ## ----------------------------------------------------------------------------
 ## http://www.bildungsgueter.de/Smalltalk/Pages/MVCTutorial/Pages/Point.htm
 ## ----------------------------------------------------------------------------
+
+# use Num here so that we can support Int and Floats in the same class
+# and no need to constrain this either, it can be negative and positve
+# if they need to be
 
 type *X => *Num;
 type *Y => *Num;
@@ -237,6 +242,34 @@ typeclass[*Pixel] => sub {
         # I am already encoding data here about spacees with ColorPixel
     };
 
+    method lighten => sub ($p, $lighten_by) {
+        match[*Pixel, $p] => +{
+            TransPixel => sub ()                { TransPixel() },
+            ColorPixel => sub ($bg)             { ColorPixel( $bg->sub( $lighten_by ) ) },
+            CharPixel  => sub ($bg, $fg, $char) {
+                CharPixel(
+                    $bg->sub( $lighten_by ),
+                    $fg->sub( $lighten_by ),
+                    $char,
+                )
+            },
+        }
+    };
+
+    method darken => sub ($p, $darken_by) {
+        match[*Pixel, $p] => +{
+            TransPixel => sub ()                { TransPixel() },
+            ColorPixel => sub ($bg)             { ColorPixel( $bg->add( $darken_by ) ) },
+            CharPixel  => sub ($bg, $fg, $char) {
+                CharPixel(
+                    $bg->add( $darken_by ),
+                    $fg->add( $darken_by ),
+                    $char,
+                )
+            },
+        }
+    };
+
     # TODO:
     # - implement equals
 
@@ -248,7 +281,8 @@ typeclass[*Pixel] => sub {
 ##
 ## ----------------------------------------------------------------------------
 
-type *BitMap => *ArrayRef; # rows of *Pixel objects
+type *BitRow => *ArrayRef, of => [ *Pixel  ];
+type *BitMap => *ArrayRef, of => [ *BitRow ];
 
 datatype [ Image => *Image ] => ( *BitMap );
 
@@ -278,6 +312,24 @@ typeclass[*Image] => sub {
     method map => sub ($i, $f) {
         Image([ map { [ map $f->($_), @$_ ] } $i->get_all_rows ])
     };
+
+    method lighten => sub ($i, $lighten_by) {
+        my $lightener = Color( $lighten_by, $lighten_by, $lighten_by );
+        Image([
+            map { [
+                map $_->lighten( $lightener ), @$_
+            ] } $i->get_all_rows
+        ])
+    };
+
+    method darken => sub ($i, $darken_by) {
+        my $darkener = Color( $darken_by, $darken_by, $darken_by );
+        Image([
+            map { [
+                map $_->darken( $darkener ), @$_
+            ] } $i->get_all_rows
+        ])
+    };
 };
 
 ## ----------------------------------------------------------------------------
@@ -286,7 +338,7 @@ typeclass[*Image] => sub {
 ##
 ## ----------------------------------------------------------------------------
 
-type *ColorMap => *HashRef; # *Str => *Color
+type *ColorMap => *HashRef, of => [ *Pixel ];
 
 datatype [ Palette => *Palette ] => ( *ColorMap );
 
@@ -309,11 +361,11 @@ typeclass[*Palette] => sub {
 ##
 ## ----------------------------------------------------------------------------
 
-type *RawImageData => *ArrayRef; # lines of image data stored as *Str
+type *RawImageData => *ArrayRef, of => [ *Str ]; # lines of image data stored as *Str
 
 datatype [ ImageData => *ImageData ] => ( *Palette, *RawImageData );
 
-typeclass[*ImageData] => sub {
+typeclass[ *ImageData ] => sub {
 
     method palette  => *Palette;
     method raw_data => *RawImageData;

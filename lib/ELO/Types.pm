@@ -1,6 +1,6 @@
 package ELO::Types;
 use v5.36;
-use experimental 'builtin';
+use experimental 'builtin', 'try';
 
 use builtin      qw[ blessed ];
 use Carp         qw[ confess ];
@@ -93,6 +93,8 @@ sub get_type_name ( $type ) {
 use Exporter 'import';
 
 our @EXPORT_OK = (qw[
+    match
+
     enum
     datatype case
     typeclass method
@@ -112,12 +114,89 @@ our @EXPORT_OK = (qw[
 );
 
 our %EXPORT_TAGS = (
-    core        => [ @ALL_TYPE_GLOBS ],
+    core        => [ 'match', @ALL_TYPE_GLOBS ],
     signals     => [ @ALL_SIGNAL_GLOBS ],
     types       => [qw[ enum type datatype case lookup_type resolve_types ]],
     events      => [qw[ event lookup_event_type resolve_event_types protocol ]],
     typeclasses => [qw[ typeclass method lookup_typeclass ]],
 );
+
+# -----------------------------------------------------------------------------
+# Type Checkers (INTERNAL USE ONLY)
+# -----------------------------------------------------------------------------
+
+sub match ($target, $table) {
+    my ($type, @args) = @$target;
+
+    my $match;
+    if ( my $type_checker = lookup_type( $type ) ) {
+        warn "Checking $type against $type_checker" if DEBUG;
+
+        # TODO - turn conditionals into polymorphic method calls
+        #
+        # NOTE:
+        # they can be just deconstructable, like event
+        # or deconstructable and bounds checkable, like tagged unions
+        # or just bounds checkable, like enums
+        #
+        # bounds checks should be memoized, so we dont
+        # have to do them every time match is called
+
+        if ( $type_checker isa ELO::Core::Type::Event ) {
+            $type_checker->check( \@args )
+                or confess "Event($type) failed to type check (".(join ', ' => @args).")";
+            $match = $table->{ $type }
+                or confess "Unable to find match for Event($type)";
+        }
+        elsif ( $type_checker isa ELO::Core::Type::Event::Protocol ) {
+
+            my ($msg) = @args;
+            $type_checker->check( $msg )
+                or confess "Event::Protocol($type) failed to type check msg(".(join ', ' => @$msg).")";
+
+            my ($event, @_args) = @$msg;
+            $match = $table->{ $event }
+                or confess "Unable to find match for Event::Protocol($type) with event($event)";
+            # fixup the args ...
+            @args = @_args;
+
+        }
+        elsif ( $type_checker isa ELO::Core::Type::TaggedUnion ) {
+            my ($arg) = @args;
+            $type_checker->check( $arg )
+                or confess "TaggedUnion::Constructor($type) failed to type check instance of ($arg)";
+            # TODO: check the members of table as well
+            my $tag = $type_checker->cases->{ blessed( $arg ) }->symbol;
+            $match = $table->{ $tag }
+                or confess "Unable to find match for TaggedUnion::Constructor($type) with tag($tag)";
+            # deconstruct the args now ...
+            @args = @$arg;
+        }
+        elsif ( $type_checker isa ELO::Core::Type::Enum ) {
+            my ($enum_val) = @args;
+            $type_checker->check( $enum_val )
+                or confess "Enum($type) failed to type check instance of ($enum_val)";
+            # TODO: check the members of table as well
+            $match = $table->{ $enum_val }
+                or confess "Unable to find match for Enum($type) with value($enum_val)";
+            # clear the args now ...
+            @args = ();
+        }
+        else {
+            confess "matching on T($type_checker) is not (yet) supported";
+        }
+    }
+    else {
+        confess "Could not locate type($type), no match available";
+    }
+    # check other types as well ...
+
+    try {
+        $match->(@args);
+    } catch ($e) {
+        confess "Match failed because: $e";
+    }
+}
 
 # -----------------------------------------------------------------------------
 # Type Checkers (INTERNAL USE ONLY)
@@ -679,6 +758,7 @@ type *ArrayRef, sub ($array_ref) {
         my $t = lookup_type( $type ) // die "Could not find type($type) for ArrayRef of";
         sub ($array_ref) {
             foreach ( @$array_ref ) {
+                #warn $t->symbol, " $_ ";
                 return unless $t->check( $_ );
             }
             return 1;
@@ -695,6 +775,7 @@ type *HashRef, sub ($hash_ref) {
         my $t = lookup_type( $type ) // die "Could not find type($type) for HashRef of";
         sub ($hash_ref) {
             foreach ( values %$hash_ref ) {
+                #warn $t->symbol, " $_ ";
                 return unless $t->check( $_ );
             }
             return 1;

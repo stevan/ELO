@@ -18,6 +18,15 @@ https://www.youtube.com/watch?v=f4s1h2YETNY&ab_channel=kishimisu
 
 - Remove all UNIVERSAL::Object usage
     - it is not really necessary and adds to the runtime
+        - mostly done
+
+### Medium
+
+- add `responds_to => $Protocol`  param to `*Process`
+    - which will check that the Process's receiver handles a given protocol
+    - see example in `t/001-examples/002-ping-pong.t`
+
+
 
 ### Low
 

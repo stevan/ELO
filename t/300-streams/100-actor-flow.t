@@ -11,7 +11,7 @@ use Data::Dumper;
 
 use ok 'ELO::Loop';
 use ok 'ELO::Types',  qw[ :core :types :events :signals :typeclasses ];
-use ok 'ELO::Actors', qw[ receive setup match ];
+use ok 'ELO::Actors', qw[ receive setup ];
 use ok 'ELO::Timers', qw[ :timers ];
 use ok 'ELO::Types',  qw[ *SIGEXIT ];
 use ok 'ELO::Streams';
