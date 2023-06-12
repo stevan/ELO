@@ -634,6 +634,7 @@ type *Str, sub ($str) {
         && not(ref $str)                        # ... and it is not a reference
         && ref(\$str) eq 'SCALAR'               # ... and its just a scalar
 }, (
+    # parameters
     matches => sub ($regexp) {
         sub ($str) { $str =~ m/$regexp/ }
     }
@@ -652,9 +653,7 @@ type *Int, sub ($int) {
         && int($int) == $int                    # and is the same value when converted to int()
 }, (
     # parameters
-    range => sub ($min, $max) { # << the arguments passed with parameter
-        # a function to be appended to the
-        # check for *Int above ...
+    range => sub ($min, $max) {
         sub ($int) { $int >= $min && $int <= $max }
     }
 );
@@ -664,7 +663,12 @@ type *Float, sub ($float) {
         && not(ref $float)                      # if it is not a reference
         && looks_like_number($float)            # ... if it looks like a number
         && $float == ($float + 0.0)             # and is the same value when converted to float()
-};
+}, (
+    # parameters
+    range => sub ($min, $max) {
+        sub ($int) { $int >= $min && $int <= $max }
+    }
+);
 
 type *ArrayRef, sub ($array_ref) {
     return defined($array_ref)                  # it is defined ...
@@ -685,7 +689,18 @@ type *ArrayRef, sub ($array_ref) {
 type *HashRef, sub ($hash_ref) {
     return defined($hash_ref)                   # it is defined ...
         && ref($hash_ref) eq 'HASH'             # and it is a HASH reference
-};
+}, (
+    # parameters
+    of => sub ($type) {
+        my $t = lookup_type( $type ) // die "Could not find type($type) for HashRef of";
+        sub ($hash_ref) {
+            foreach ( values %$hash_ref ) {
+                return unless $t->check( $_ );
+            }
+            return 1;
+        }
+    }
+);
 
 type *CodeRef, sub ($code_ref) {
     return defined($code_ref)                   # it is defined ...

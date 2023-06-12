@@ -167,6 +167,25 @@ subtest '... checking *ArrayRefOfInts' => sub {
     ok( !lookup_type(*ArrayRefOfInts)->check( {} ),   '... this failed the type check for ArrayRefOfInts with an HashRef' );
 };
 
+type *HashRefOfInts => *HashRef, ( of => [ *Int ] );
+
+subtest '... checking *HashRefOfInts' => sub {
+    ok( lookup_type(*HashRefOfInts)->check( {} ),   '... this type checked for HashRefOfInts with an ArrayRef' );
+    ok( lookup_type(*HashRefOfInts)->check( { one => 1, two => 2, three => 3 } ),   '... this type checked for HashRefOfInts with an ArrayRef' );
+
+    ok( !lookup_type(*HashRefOfInts)->check( { one => 1, two => 'two', three => 3 } ),   '... this type checked for HashRefOfInts with mixed types an ArrayRef' );
+    ok( !lookup_type(*HashRefOfInts)->check( { one => 0.1, two => 0.2, three => 0.3 } ),   '... this type checked for HashRefOfInts with an ArrayRef of Floats' );
+
+    ok( !lookup_type(*HashRefOfInts)->check( 1.0 ),   '... this failed the type check for HashRefOfInts with a simple Flot' );
+    ok( !lookup_type(*HashRefOfInts)->check( 100 ),   '... this failed the type check for HashRefOfInts with with an Int' );
+    ok( !lookup_type(*HashRefOfInts)->check( !!1 ),  '... this failed the type check for HashRefOfInts with a Bool' );
+    ok( !lookup_type(*HashRefOfInts)->check( '3.14' ),  '... this failed the type check for HashRefOfInts with a Str containing a float (see also - Perl)' );
+    ok( !lookup_type(*HashRefOfInts)->check( 'foo' ),   '... this failed the type check for HashRefOfInts with a single-quoted Str' );
+    ok( !lookup_type(*HashRefOfInts)->check( "foo" ),   '... this failed the type check for HashRefOfInts with a double-quoted Str' );
+    ok( !lookup_type(*HashRefOfInts)->check( q[foo] ),  '... this failed the type check for HashRefOfInts with a q[] Str' );
+    ok( !lookup_type(*HashRefOfInts)->check( qq[foo] ), '... this failed the type check for HashRefOfInts with a qq[] Str' );
+};
+
 done_testing;
 
 1;
