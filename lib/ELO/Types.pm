@@ -633,7 +633,11 @@ type *Str, sub ($str) {
     return defined($str)                        # it is defined ...
         && not(ref $str)                        # ... and it is not a reference
         && ref(\$str) eq 'SCALAR'               # ... and its just a scalar
-};
+}, (
+    matches => sub ($regexp) {
+        sub ($str) { $str =~ m/$regexp/ }
+    }
+);
 
 type *Num, sub ($num) {
     return defined($num)                        # it is defined ...

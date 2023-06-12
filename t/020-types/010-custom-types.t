@@ -11,7 +11,7 @@ use ok 'ELO::Types',  qw[ :core :types :events ];
 
 # ... extended types
 
-type *ZeroThroughNine => *Int, ( range => [0, 9] );
+type *ZeroThroughNine => *Int, range => [0, 9];
 
 subtest '... checking *ZeroThroughNine' => sub {
     ok(  lookup_type(*ZeroThroughNine)->check( 1 ),   '... this type checked for ZeroThroughNine with a single-digit ZeroThroughNine' );
@@ -32,6 +32,31 @@ subtest '... checking *ZeroThroughNine' => sub {
     ok( !lookup_type(*ZeroThroughNine)->check( 0.01 ), '... this failed the type check for ZeroThroughNine with an Float' );
     ok( !lookup_type(*ZeroThroughNine)->check( [] ),   '... this failed the type check for ZeroThroughNine with an ArrayRef' );
     ok( !lookup_type(*ZeroThroughNine)->check( {} ),   '... this failed the type check for ZeroThroughNine with an HashRef' );
+};
+
+type *SayHello => *Str, matches => [qr/^Hello/];
+
+subtest '... checking *SayHello' => sub {
+    ok(  lookup_type(*SayHello)->check( "Hello 256" ),  '... this type checked for SayHello with a Str containing Hello' );
+
+    ok( !lookup_type(*SayHello)->check( 1 ),   '... this type checked for SayHello with a single-digit SayHello' );
+    ok( !lookup_type(*SayHello)->check( 0 ),   '... this type checked for SayHello with a single-digit SayHello' );
+    ok( !lookup_type(*SayHello)->check( 9 ),   '... this type checked for SayHello with a single-digit SayHello' );
+    ok( !lookup_type(*SayHello)->check( !!1 ),  '... this type checked for SayHello with a Bool (see also - Perl)' );
+    ok( !lookup_type(*SayHello)->check( -1 ),   '... this type checked for SayHello with a single-digit SayHello' );
+    ok( !lookup_type(*SayHello)->check( 10 ),   '... this type checked for SayHello with a regular SayHello' );
+    ok( !lookup_type(*SayHello)->check( 100 ),   '... this type checked for SayHello with a regular SayHello' );
+    ok( !lookup_type(*SayHello)->check( 1_000_000 ),  '... this type checked for SayHello with a _ seperated SayHello' );
+    ok( !lookup_type(*SayHello)->check( int("256") ),  '... this type checked for SayHello with a Str converted via int()' );
+    ok( !lookup_type(*SayHello)->check( "256" ),  '... this type checked for SayHello with a Str containing numbers (see also - Perl)' );
+
+    ok( !lookup_type(*SayHello)->check( 'foo' ),   '... this failed the type check for SayHello with a single-quoted Str' );
+    ok( !lookup_type(*SayHello)->check( "foo" ),   '... this failed the type check for SayHello with a double-quoted Str' );
+    ok( !lookup_type(*SayHello)->check( q[foo] ),  '... this failed the type check for SayHello with a q[] Str' );
+    ok( !lookup_type(*SayHello)->check( qq[foo] ), '... this failed the type check for SayHello with a qq[] Str' );
+    ok( !lookup_type(*SayHello)->check( 0.01 ), '... this failed the type check for SayHello with an Float' );
+    ok( !lookup_type(*SayHello)->check( [] ),   '... this failed the type check for SayHello with an ArrayRef' );
+    ok( !lookup_type(*SayHello)->check( {} ),   '... this failed the type check for SayHello with an HashRef' );
 };
 
 # ... Custom Types
