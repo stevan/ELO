@@ -12,17 +12,7 @@ use ELO::Loop;
 use ELO::Types  qw[ :core :events :types :typeclasses ];
 use ELO::Timers qw[ :timers :tickers ];
 
-use ELO::Graphics qw[
-    Color
-    Palette
-    TransPixel
-    ColorPixel
-    CharPixel
-    Image
-    ImageData
-    Display
-    Point
-];
+use ELO::Graphics;
 
 # ...
 
@@ -112,10 +102,22 @@ my $d = Display(
     $d->clear_screen( Color( 0, 0.7, 1.0 ) );
     sleep($DELAY);
 
+    $d->poke( Point( $_, $_ ), $BLUE ) for 1 .. 5;
+    $d->poke( Point( $_, (6 - $_) ), $RED  ) for reverse 1 .. 5;
+
     $d->poke_rectangle( $d->area->inset_by( Point( 8, 2 ) ), Color( 0.1, 0.7, 0.3 ) );
     sleep($DELAY);
 
-    $d->poke_rectangle( $d->area->inset_by( Point( 6, 12 ) ), Color( 0.5, 0.3, 0.9 ) );
+    $d->poke_fill(
+        GradientFill(
+            $d->area->inset_by( Point( 6, 12 ) ),
+            Gradient(
+                Color( 0.5, 0.3, 0.9 ),
+                Color( 0.0, 1.0, 0.4 ),
+            ),
+            Vertical()
+        ),
+    );
     sleep($DELAY);
 
     $d->poke_block( Point( 10, 5 ), $small_mario_image );
@@ -133,7 +135,16 @@ my $d = Display(
     $d->poke_block( Point( 8, 50 ), $small_mario_image->mirror->flip->darken ( 0.4 ) );
     sleep($DELAY);
 
-    $d->poke_rectangle( Point( 12, 40 )->rect_with_extent( Point( 2, 30 ) ), Color( 0.9, 0.5, 0.7 ) );
+    $d->poke_fill(
+        GradientFill(
+            Point( 12, 40 )->rect_with_extent( Point( 2, 30 ) ),
+            Gradient(
+                Color( 1.0, 0.1, 0.2 ),
+                Color( 0.5, 0.5, 0.5 ),
+            ),
+            Horizontal()
+        ),
+    );
     sleep($DELAY);
 
     $d->poke_block( Point( 11, 65 ), $small_mario_image->flip->mirror );

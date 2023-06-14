@@ -6,7 +6,7 @@ use builtin 'floor', 'ceil';
 
 use Time::HiRes qw[ alarm ];
 
-use ELO::Graphics qw[ Point Color ColorPixel CharPixel Display ];
+use ELO::Graphics;
 
 # -----------------------------------------------------------------------------
 # TODO:

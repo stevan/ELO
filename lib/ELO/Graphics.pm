@@ -19,8 +19,9 @@ use constant DEBUG => $ENV{ELO_GR_DISPLAY_DEBUG} // 0;
 
 use Exporter 'import';
 
-our @EXPORT_OK = qw[
+our @EXPORT = qw[
     Color
+    Gradient
 
     Point
     Rectangle
@@ -28,6 +29,11 @@ our @EXPORT_OK = qw[
     ColorPixel
     CharPixel
     TransPixel
+
+    GradientFill
+
+    Horizontal
+    Vertical
 
     Palette
 
@@ -73,6 +79,34 @@ typeclass[*Color] => sub {
     method equals => sub ($c1, $c2) {
         return 1 if $c1->r == $c2->r && $c1->g == $c2->g && $c1->b == $c2->b;
         return 0;
+    };
+};
+
+## ----------------------------------------------------------------------------
+## Gradient
+## ----------------------------------------------------------------------------
+##
+## ----------------------------------------------------------------------------
+
+type *StartColor => *Color;
+type *EndColor   => *Color;
+
+datatype [ Gradient => *Gradient ] => ( *StartColor, *EndColor );
+
+typeclass[*Gradient] => sub {
+
+    method start_color => *StartColor;
+    method end_color   => *EndColor;
+
+    method calculate_at => sub ($g, $percent) {
+        my $start = $g->start_color;
+        my $end   = $g->end_color;
+
+        Color(
+            $start->r + $percent * ($end->r - $start->r),
+            $start->g + $percent * ($end->g - $start->g),
+            $start->b + $percent * ($end->b - $start->b),
+        )
     };
 };
 
@@ -380,6 +414,43 @@ typeclass[ *ImageData ] => sub {
 };
 
 ## ----------------------------------------------------------------------------
+## Fill
+## ----------------------------------------------------------------------------
+##
+## ----------------------------------------------------------------------------
+
+
+datatype *FillDirection => sub {
+    case Vertical   => ();
+    case Horizontal => ();
+};
+
+typeclass[*FillDirection] => sub {
+    method is_horz => { Horizontal => sub { 1 }, Vertical => sub { 0 } };
+    method is_vert => { Horizontal => sub { 0 }, Vertical => sub { 1 } };
+};
+
+type *FillArea => *Rectangle;
+
+datatype *Fill => sub {
+    case GradientFill => ( *FillArea, *Gradient, *FillDirection );
+};
+
+typeclass[*Fill] => sub {
+
+    method area      => *FillArea;
+    method direction => *FillDirection;
+
+    method create_pixels => {
+        GradientFill => sub ( $area, $gradient, $direction ) {
+            my $steps = $direction->is_horz ? $area->width : $area->height;
+
+            map ColorPixel( $gradient->calculate_at( $_ / $steps) ), (1 .. $steps);
+        }
+    };
+};
+
+## ----------------------------------------------------------------------------
 ## Display
 ## ----------------------------------------------------------------------------
 ##
@@ -425,6 +496,8 @@ typeclass[*Display] => sub {
                 $fg_color->rgb,
                 $bg_color->rgb,
     }
+
+    my sub format_pixel ($p) { format_colors( $p->colors ).($p->char) }
 
     my sub format_goto ($p) { sprintf "\e[%d;%dH" => $p->xy }
 
@@ -474,9 +547,8 @@ typeclass[*Display] => sub {
 
     method poke => sub ($d, $coord, $pixel) {
         out( $d => (
-            format_goto   ( $coord         ),
-            format_colors ( $pixel->colors ),
-                          ( $pixel->char   ),
+            format_goto(  $coord ),
+            format_pixel( $pixel ),
             $RESET,
         ));
     };
@@ -496,6 +568,39 @@ typeclass[*Display] => sub {
             (DEBUG
                 ? ("R(origin: ".(join ' @ ' => $rectangle->origin->xy).", "
                   ."corner: ".(join ' @ ' => $rectangle->corner->xy).", "
+                  ."{ h: $h, w: $w })")
+                : ()),
+        ));
+    };
+
+    method poke_fill => sub ($d, $fill) {
+
+        my $area = $fill->area;
+        my $h    = $area->height;
+        my $w    = $area->width;
+
+        my @pixels = $fill->create_pixels;
+
+        my $filled = match [*FillDirection, $fill->direction] => {
+            Vertical   => sub {
+                my @formatted = map { format_pixel( $_ ) } @pixels;
+                join '' => map { ($_ x $w)."\e[B\e[${w}D" } @formatted;
+            },
+            Horizontal => sub {
+                my $row = join '' => map { format_pixel( $_ ) } @pixels;
+                ("${row}\e[B\e[${w}D" x $h);
+            },
+        };
+
+        out( $d => (
+            format_goto( $area->origin ),
+            # paint the fill
+            $filled,
+            # end fill paint
+            $RESET,
+            (DEBUG
+                ? ("F(origin: ".(join ' @ ' => $area->origin->xy).", "
+                  ."corner: ".(join ' @ ' => $area->corner->xy).", "
                   ."{ h: $h, w: $w })")
                 : ()),
         ));
