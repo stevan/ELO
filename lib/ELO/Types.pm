@@ -301,6 +301,8 @@ sub typeclass ($t, $body) {
                         $body = sub ($_t) { $_t->[$i] };
                     }
                     else {
+                        set_subname( "${constructor_symbol}::${name}" => $handler );
+
                         $body = sub ($_t) { $handler->( @$_t ) }
                     }
 
@@ -483,7 +485,7 @@ sub datatype ($symbol, @args) {
                     ? sub ()      { bless [] => $constructor_symbol }
                     : sub (@args) {
                         check_types( $definition, \@args )
-                            || confess "Typecheck failed for $constructor_symbol with (".(join ', ' => map $_//'undef', @args).')';
+                            || confess "Typecheck failed for $constructor_symbol with (".(join ', ' => map $_//'undef', @args).') expected ('.(join ', ' => map { $_->symbol } @$definition).')';
                         bless [ @args ] => $constructor_symbol;
                     }
                 )
@@ -833,5 +835,43 @@ event *SIGEXIT => (*Process);
 __END__
 
 =pod
+
+=encoding UTF-8
+
+=head1 NAME
+
+ELO::Types
+
+=head1 SYNOPSIS
+
+  type *X => *Num;
+  type *Y => *Num;
+  type *Z => *Num;
+
+  datatype *Point => sub {
+      case Point2D => ( *X, *Y );
+      case Point3D => ( *X, *Y, *Z );
+  };
+
+  typeclass[*Point] => sub {
+
+      method x => *X;
+      method y => *Y;
+
+      method z => {
+          Point2D => sub ($,$) { die 'Cannot call `z` on a Point2D type' },
+          Point3D => *Z,
+      };
+
+      method clear => {
+          Point2D => sub ($,$)     { Point2D(0, 0) },
+          Point3D => sub ($,$,$)  { Point3D(0, 0, 0) },
+      };
+  };
+
+
+=head1 DESCRIPTION
+
+...TODO
 
 =cut

@@ -419,7 +419,6 @@ typeclass[ *ImageData ] => sub {
 ##
 ## ----------------------------------------------------------------------------
 
-
 datatype *FillDirection => sub {
     case Vertical   => ();
     case Horizontal => ();
@@ -429,6 +428,8 @@ typeclass[*FillDirection] => sub {
     method is_horz => { Horizontal => sub { 1 }, Vertical => sub { 0 } };
     method is_vert => { Horizontal => sub { 0 }, Vertical => sub { 1 } };
 };
+
+# ...
 
 type *FillArea => *Rectangle;
 
