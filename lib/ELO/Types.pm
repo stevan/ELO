@@ -23,6 +23,8 @@ use ELO::Core::Typeclass;
 
 use constant DEBUG => $ENV{TYPES_DEBUG} || 0;
 
+our $TYPES_DISABLED = 0;
+
 # -----------------------------------------------------------------------------
 # Setup the Core Types
 # -----------------------------------------------------------------------------
@@ -203,6 +205,7 @@ sub match ($target, $table) {
 # -----------------------------------------------------------------------------
 
 my sub check_types ($types, $values) {
+    return 1 if $TYPES_DISABLED;
 
     #use Data::Dumper;
     #warn Dumper [ $types, $values ];

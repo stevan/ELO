@@ -3,6 +3,8 @@ use v5.36;
 use experimental 'builtin';
 use builtin 'floor', 'ceil';
 
+use List::Util qw[ min max ];
+
 $|++;
 
 use ELO::Types qw[ :core :types :typeclasses ];
@@ -43,6 +45,13 @@ our @EXPORT = qw[
     Display
 ];
 
+# TODO:
+# - Shaders
+#   - poke_shader
+# - BitMasks (over images, gradients?, shaders?)
+# - Sprite (image + bg-color)
+
+
 ## ----------------------------------------------------------------------------
 ## Color
 ## ----------------------------------------------------------------------------
@@ -64,13 +73,16 @@ typeclass[*Color] => sub {
     method rgb => sub ($c) { ($c->r, $c->g, $c->b) };
 
     # constrain all the values we create with out match operations
-    my sub __ ($x) { $x > 1.0 ? 1.0 : $x < 0.0 ? 0.0 : $x }
+
+    my sub __ ($x) { max(0, min(1.0, $x)); } # $x > 1.0 ? 1.0 : $x < 0.0 ? 0.0 : $x }
 
     method add => sub ($c1, $c2) { Color( __($c1->r + $c2->r), __($c1->g + $c2->g), __($c1->b + $c2->b) ) };
     method sub => sub ($c1, $c2) { Color( __($c1->r - $c2->r), __($c1->g - $c2->g), __($c1->b - $c2->b) ) };
     method mul => sub ($c1, $c2) { Color( __($c1->r * $c2->r), __($c1->g * $c2->g), __($c1->b * $c2->b) ) };
 
     method alpha => sub ($c, $a) { Color( __($c->r * $a), __($c->g * $a), __($c->b * $a) ) };
+
+    method factor => sub ($c, $factor) { Color( __($c->r * $factor), __($c->g * $factor), __($c->b * $factor) ) };
 
     # TODO:
     # merge colors
@@ -191,8 +203,8 @@ typeclass[*Rectangle] => sub {
     method origin => *Origin;
     method corner => *Corner;
 
-    method height => sub ($r) { $r->extent->x };
-    method width  => sub ($r) { $r->extent->y };
+    method height => sub ($r) { $r->extent->y };
+    method width  => sub ($r) { $r->extent->x };
 
     method top_left     => sub ($r) { $r->origin };
     method top_right    => sub ($r) { Point( $r->corner->x, $r->origin->y ) };
@@ -208,7 +220,7 @@ typeclass[*Rectangle] => sub {
         Rectangle(
             $r->origin->add( $inset_by ),
             $r->corner->sub( $inset_by ),
-        )
+        );
     };
 
     # TODO:
@@ -456,6 +468,19 @@ typeclass[*Fill] => sub {
 ## ----------------------------------------------------------------------------
 ##
 ## ----------------------------------------------------------------------------
+##           (x) ->
+##          ___________________________________
+##         | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 |
+##     +===|===|===|===|===|===|===|===|===|===|
+## (y) | 1 |_x_|___|___|___|___|___|___|___|___| (3,2)(5,2)
+##  |  | 2 |___|___|_@_|_._|_@_|___|___|___|___|   + - +
+##  V  | 3 |___|___|_._|___|_._|___|___|___|___|   | *-|->(4,3)
+##     | 4 |___|___|_@_|_._|_@_|___|___|___|___|   + - +
+##     | 5 |___|___|___|___|___|___|___|___|___| (3,4)(5,4)
+##     | 6 |___|___|___|___|___|___|___|___|___|
+##     | 7 |___|___|___|___|___|___|___|___|___|
+##     | 8 |___|___|___|___|___|___|___|___|___|
+##     | 9 |___|___|___|___|___|___|___|___|_x_|
 
 # ... Screen
 
@@ -468,6 +493,9 @@ typeclass[*Display] => sub {
 
     method area   => *DisplayArea;
     method output => *Output;
+
+    method cols => sub ($d) { $d->area->width  + 1 };
+    method rows => sub ($d) { $d->area->height + 1 };
 
     method height => sub ($d) { $d->area->height };
     method width  => sub ($d) { $d->area->width };
@@ -500,7 +528,7 @@ typeclass[*Display] => sub {
 
     my sub format_pixel ($p) { format_colors( $p->colors ).($p->char) }
 
-    my sub format_goto ($p) { sprintf "\e[%d;%dH" => $p->xy }
+    my sub format_goto ($p) { sprintf "\e[%d;%dH" => map $_+1, $p->yx }
 
     my sub out ($d, @str) { $d->output->print( @str ); $d }
 
@@ -515,13 +543,13 @@ typeclass[*Display] => sub {
             format_bg_color($c),
             # paint background
             # draw of $width spaces and goto next line
-            ((sprintf "\e[%d\@\e[E" => $d->width) x $d->height), # and repeat it $height times
+            ((sprintf "\e[%d\@\e[E" => ($d->cols)) x ($d->rows)), # and repeat it $height times
             # end paint background
             $RESET,
             (DEBUG
-                ? ("D(origin: ".(join ' @ ' => $d->area->origin->xy).", "
-                  ."corner: ".(join ' @ ' => $d->area->corner->xy).", "
-                  ."{ h: ".$d->height.", w: ".$d->width." })")
+                ? ("D(origin: x:".(join ' @ y:' => $d->area->origin->xy).", "
+                  ."corner: x:".(join ' @ y:' => $d->area->corner->xy).", "
+                  ."{ w: ".$d->width.", h: ".$d->height." })")
                 : ()),
         ));
 
@@ -531,20 +559,20 @@ typeclass[*Display] => sub {
 
             $d->home_cursor;
             # draw markers
-            $d->poke( Point( 1, $_*2 ), ColorPixel( (($_*2) % 10) == 0 ? $ten_marker : $two_marker ))
-                foreach 1 .. ($d->width/2);
-            $d->poke( Point( $d->height, $_*2 ), ColorPixel( (($_*2) % 10) == 0 ? $ten_marker : $two_marker ))
-                foreach 1 .. ($d->width/2);
+            $d->poke( Point( 0, $_*2 ), ColorPixel( (($_*2) % 10) == 0 ? $ten_marker : $two_marker ))
+                foreach 0 .. ($d->height/2);
+            $d->poke( Point( $d->width, $_*2 ), ColorPixel( (($_*2) % 10) == 0 ? $ten_marker : $two_marker ))
+                foreach 0 .. ($d->height/2);
 
-            $d->poke( Point( $_*2, 1 ), ColorPixel( (($_*2) % 10) == 0 ? $ten_marker : $two_marker ))
-                foreach 1 .. ($d->height/2);
-            $d->poke( Point( $_*2, $d->width ), ColorPixel( (($_*2) % 10) == 0 ? $ten_marker : $two_marker ))
-                foreach 1 .. ($d->height/2);
+            $d->poke( Point( $_*2, 0 ), ColorPixel( (($_*2) % 10) == 0 ? $ten_marker : $two_marker ))
+                foreach 0 .. ($d->width/2);
+            $d->poke( Point( $_*2, $d->height ), ColorPixel( (($_*2) % 10) == 0 ? $ten_marker : $two_marker ))
+                foreach 0 .. ($d->width/2);
         }
     };
 
     method home_cursor  => sub ($d) { out( $d => $HOME_CURSOR ) };
-    method end_cursor   => sub ($d) { out( $d => "\e[".$d->height."H"  ) };
+    method end_cursor   => sub ($d) { out( $d => "\e[".($d->rows)."H"  ) };
 
     method poke => sub ($d, $coord, $pixel) {
         out( $d => (
@@ -556,8 +584,8 @@ typeclass[*Display] => sub {
 
     method poke_rectangle => sub ($d, $rectangle, $color) {
 
-        my $h = $rectangle->height;
-        my $w = $rectangle->width;
+        my $h = $rectangle->height + 1;
+        my $w = $rectangle->width  + 1;
 
         out( $d => (
             format_goto( $rectangle->origin ),
@@ -567,9 +595,9 @@ typeclass[*Display] => sub {
             # end paint rectangle
             $RESET,
             (DEBUG
-                ? ("R(origin: ".(join ' @ ' => $rectangle->origin->xy).", "
-                  ."corner: ".(join ' @ ' => $rectangle->corner->xy).", "
-                  ."{ h: $h, w: $w })")
+                ? ("R(origin: x:".(join ' @ y:' => $rectangle->origin->xy).", "
+                  ."corner: x:".(join ' @ y:' => $rectangle->corner->xy).", "
+                  ."{ w: ".$rectangle->width.", h: ".$rectangle->height." })")
                 : ()),
         ));
     };
@@ -577,7 +605,7 @@ typeclass[*Display] => sub {
     method poke_fill => sub ($d, $fill) {
 
         my $area = $fill->area;
-        my $h    = $area->height;
+        my $h    = $area->height; # FIXME - this likely need + 1
         my $w    = $area->width;
 
         my @pixels = $fill->create_pixels;
@@ -600,9 +628,9 @@ typeclass[*Display] => sub {
             # end fill paint
             $RESET,
             (DEBUG
-                ? ("F(origin: ".(join ' @ ' => $area->origin->xy).", "
-                  ."corner: ".(join ' @ ' => $area->corner->xy).", "
-                  ."{ h: $h, w: $w })")
+                ? ("F(origin: x:".(join ' @ y:' => $area->origin->xy).", "
+                  ."corner: x:".(join ' @ y:' => $area->corner->xy).", "
+                  ."{ w: $w, h: $h })")
                 : ()),
         ));
     };
@@ -628,8 +656,39 @@ typeclass[*Display] => sub {
             # end paint image
             $RESET,
             (DEBUG
-                ? ("I(coord: ".(join ' @ ' => $coord->xy).", "
+                ? ("I(coord: x:".(join ' @ y:' => $coord->xy).", "
                   ."{ h: ".$image->height.", w: ".$image->width." })")
+                : ()),
+        ));
+    };
+
+    method poke_shader => sub ($d, $rectangle, $shader) {
+
+        my $h = $rectangle->height;
+        my $w = $rectangle->width;
+
+        my $cols = $w + 1;
+        my $rows = $h + 1;
+
+        my $carrige_return = "\e[B\e[${cols}D";
+
+        my $shaded = '';
+        foreach my $y ( 0 .. $h ) {
+            foreach my $x ( 0 .. $w ) {
+                $shaded .= format_pixel( $shader->( $x, $y, $cols, $rows ) );
+            }
+            $shaded .= $carrige_return;
+        }
+
+        out( $d => (
+            format_goto( $rectangle->origin ),
+            #format_bg_color($color),
+            $shaded,
+            $RESET,
+            (DEBUG
+                ? ("S(origin: x:".(join ' @ y:' => $rectangle->origin->xy).", "
+                  ."corner: x:".(join ' @ y:' => $rectangle->corner->xy).", "
+                  ."{ h: ".$rectangle->height.", w: ".$rectangle->width." })")
                 : ()),
         ));
     };

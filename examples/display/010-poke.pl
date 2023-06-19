@@ -95,22 +95,22 @@ my $DELAY   = 0.5;
 
 my $d = Display(
     *STDOUT,
-    Point(1,1)->rect_with_extent( Point($HEIGHT, $WIDTH) )
+    Point(0,0)->rect_with_extent( Point($WIDTH, $HEIGHT) )
 );
 
 {
     $d->clear_screen( Color( 0, 0.7, 1.0 ) );
     sleep($DELAY);
 
-    $d->poke( Point( $_, $_ ), $BLUE ) for 1 .. 5;
-    $d->poke( Point( $_, (6 - $_) ), $RED  ) for reverse 1 .. 5;
+    $d->poke( Point( $_, $_ ), $BLUE ) for 0 .. 6;
+    $d->poke( Point( $_, (6 - $_) ), $RED  ) for reverse 0 .. 6;
 
     $d->poke_rectangle( $d->area->inset_by( Point( 8, 2 ) ), Color( 0.1, 0.7, 0.3 ) );
     sleep($DELAY);
 
     $d->poke_fill(
         GradientFill(
-            $d->area->inset_by( Point( 6, 12 ) ),
+            $d->area->inset_by( Point( 5, 10 ) ),
             Gradient(
                 Color( 0.5, 0.3, 0.9 ),
                 Color( 0.0, 1.0, 0.4 ),
@@ -120,24 +120,24 @@ my $d = Display(
     );
     sleep($DELAY);
 
-    $d->poke_block( Point( 10, 5 ), $small_mario_image );
+    $d->poke_block( Point( 5, 10 ), $small_mario_image );
     sleep($DELAY);
 
-    $d->poke_block( Point( 7, 20 ), $small_mario_image ->flip->lighten( 0.4 ) );
+    $d->poke_block( Point( 20, 7 ), $small_mario_image ->flip->lighten( 0.4 ) );
     sleep($DELAY);
 
-    $d->poke_rectangle( $d->area->inset_by( Point( 14, 20 ) ), Color( 0.3, 0.9, 0.9 ) );
+    $d->poke_rectangle( $d->area->inset_by( Point( 20, 14 ) ), Color( 0.3, 0.9, 0.9 ) );
     sleep($DELAY);
 
-    $d->poke_block( Point( 5, 35 ), $small_mario_image->mirror );
+    $d->poke_block( Point( 35, 5 ), $small_mario_image->mirror );
     sleep($DELAY);
 
-    $d->poke_block( Point( 8, 50 ), $small_mario_image->mirror->flip->darken ( 0.4 ) );
+    $d->poke_block( Point( 50, 8 ), $small_mario_image->mirror->flip->darken ( 0.4 ) );
     sleep($DELAY);
 
     $d->poke_fill(
         GradientFill(
-            Point( 12, 40 )->rect_with_extent( Point( 2, 30 ) ),
+            Point( 40, 12 )->rect_with_extent( Point( 30, 2 ) ),
             Gradient(
                 Color( 1.0, 0.1, 0.2 ),
                 Color( 0.5, 0.5, 0.5 ),
@@ -147,10 +147,10 @@ my $d = Display(
     );
     sleep($DELAY);
 
-    $d->poke_block( Point( 11, 65 ), $small_mario_image->flip->mirror );
+    $d->poke_block( Point( 65, 11 ), $small_mario_image->flip->mirror );
     sleep($DELAY);
 
-    $d->poke_block( Point( 8, 30 ), $big_mario_image );
+    $d->poke_block( Point( 30, 8 ), $big_mario_image );
     sleep($DELAY);
 }
 
