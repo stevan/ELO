@@ -436,9 +436,11 @@ sub datatype ($symbol, @args) {
             symbol      => $symbol,
             definition  => $definition,
             checker     => sub ($values) {
-                # we only want to accept blessed values ...
-                return unless $values isa $constructor_symbol;
-                return check_types( $definition, $values )
+                # we only want to accept blessed values and
+                # we need not check further, as it was already
+                # checked upon construction :)
+                return 1 if $values isa $constructor_symbol;
+                return;
             },
             constructor => ELO::Core::Type::Tuple::Constructor->new(
                 symbol      => $constructor_symbol,
