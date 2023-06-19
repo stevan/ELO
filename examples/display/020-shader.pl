@@ -8,6 +8,7 @@ $|++;
 
 use Data::Dumper;
 use Time::HiRes qw[ sleep time ];
+use List::Util qw[ min max ];
 
 use ELO::Graphics;
 
@@ -36,10 +37,29 @@ my $poke_total;
 
 my $frames = 0;
 
-my $COLOR = Color( rand, rand, rand );
+#my $COLOR = Color( rand, rand, rand );
 #my $PIXEL = ColorPixel( $COLOR );
 
 my $shader_rect = $d->area->inset_by( Point(4, 2) );
+
+sub pallete ($t) {
+    state @a = (0.5, 0.5, 0.5);
+    state @b = (0.5, 0.5, 0.5);
+    state @c = (1.0, 1.0, 1.0);
+    state @d = (0.263, 0.416, 0.557);
+
+    my @r;
+    foreach my $i ( 0, 1, 2 ) {
+        my $a = $a[$i];
+        my $b = $b[$i];
+        my $c = $c[$i];
+        my $d = $d[$i];
+
+        $r[$i] = ($a + $b * cos( 6.28318 * ($c * $t + $d )));
+    }
+
+    return @r;
+}
 
 while ($frames <= $F) {
 
@@ -50,6 +70,8 @@ while ($frames <= $F) {
     $d->poke_shader(
         $shader_rect,
         sub ($x, $y, $width, $height) {
+
+            my $t = time;
 
             #my $shader_start = time;
 
@@ -84,20 +106,13 @@ while ($frames <= $F) {
             my $d  = sqrt(($x*$x) + ($y*$y));
                $d *= exp( -$d0 );
 
-            $d = sin($d * 4 + time)/4;
-            $d = abs($d);
+            my @color = pallete($d0 * 0.5 + $t * 0.5);
 
-            # step it ...
-            $d = $d < 0.1 ? ($d / 0.1) : 1;
-
-            #$d = 0.4 / $d;
-            $d = (0.9 / $d) ** 1.2;
-
-            #$shader_total += time - $shader_start;
-
-            my $color = $COLOR->factor( $d );
-
-            ColorPixel( $color );
+            Color(
+                min( 1.0, $color[0] * $d ),
+                min( 1.0, $color[1] * $d ),
+                min( 1.0, $color[2] * $d ),
+            )
         }
     );
 

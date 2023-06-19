@@ -1,6 +1,6 @@
 package ELO::Graphics;
 use v5.36;
-use experimental 'builtin';
+use experimental 'builtin', 'for_list';
 use builtin 'floor', 'ceil';
 
 use List::Util qw[ min max ];
@@ -685,7 +685,49 @@ typeclass[*Display] => sub {
         my $shaded = '';
         foreach my $y ( 0 .. $h ) {
             foreach my $x ( 0 .. $w ) {
-                $shaded .= format_pixel( $shader->( $x, $y, $cols, $rows ) );
+                $shaded .= format_pixel(
+                    ColorPixel(
+                        $shader->( $x, $y, $cols, $rows )
+                    )
+                );
+            }
+            $shaded .= $carrige_return;
+        }
+
+        out( $d => (
+            format_goto( $rectangle->origin ),
+            #format_bg_color($color),
+            $shaded,
+            $RESET,
+            (DEBUG
+                ? ("S(origin: x:".(join ' @ y:' => $rectangle->origin->xy).", "
+                  ."corner: x:".(join ' @ y:' => $rectangle->corner->xy).", "
+                  ."{ h: ".$rectangle->height.", w: ".$rectangle->width." })")
+                : ()),
+        ));
+    };
+
+    method poke_shader_hgr => sub ($d, $rectangle, $shader) {
+
+        my $h = $rectangle->height * 2 - 1;
+        my $w = $rectangle->width;
+
+        my $cols = $w + 1;
+        my $rows = $h + 1;
+
+        my $carrige_return = "\e[B\e[${cols}D";
+
+        my $shaded = '';
+        foreach my ($y1, $y2) ( 0 .. $h ) {
+            die join ", " => $y1, $y2 unless defined $y2;
+            foreach my $x ( 0 .. $w ) {
+                $shaded .= format_pixel(
+                    CharPixel(
+                        $shader->( $x, $y2, $cols, $rows ),
+                        $shader->( $x, $y1, $cols, $rows ),
+                        '▀',
+                    )
+                );
             }
             $shaded .= $carrige_return;
         }
