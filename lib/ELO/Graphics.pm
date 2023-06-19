@@ -46,8 +46,6 @@ our @EXPORT = qw[
 ];
 
 # TODO:
-# - Shaders
-#   - poke_shader
 # - BitMasks (over images, gradients?, shaders?)
 # - Sprite (image + bg-color)
 
