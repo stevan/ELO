@@ -506,6 +506,12 @@ typeclass[*Display] => sub {
     my $CLEAR_SCREEN = "\e[2J";
     my $HOME_CURSOR  = "\e[H";
 
+    my $HIDE_CURSOR  = "\e[?25l";
+    my $SHOW_CURSOR  = "\e[?25h";
+
+    my $ENABLE_ALT_BUF  = "\e[?1049h";
+    my $DISABLE_ALT_BUF = "\e[?1049l";
+
     my sub format_bg_color ($c=undef) {
         return '' unless defined $c;
         sprintf "\e[48;2;%d;%d;%d;m" => map int(255 * $_), $c->rgb
@@ -573,6 +579,12 @@ typeclass[*Display] => sub {
 
     method home_cursor  => sub ($d) { out( $d => $HOME_CURSOR ) };
     method end_cursor   => sub ($d) { out( $d => "\e[".($d->rows)."H"  ) };
+
+    method hide_cursor  => sub ($d) { out( $d => $HIDE_CURSOR ) };
+    method show_cursor  => sub ($d) { out( $d => $SHOW_CURSOR ) };
+
+    method enable_alt_buffer  => sub ($d) { out( $d => $ENABLE_ALT_BUF  ) };
+    method disable_alt_buffer => sub ($d) { out( $d => $DISABLE_ALT_BUF ) };
 
     method poke => sub ($d, $coord, $pixel) {
         out( $d => (

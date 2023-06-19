@@ -25,6 +25,7 @@ my $d = Display(
 # remeber we have a 1,1 origin
 
 $d->clear_screen( Color( 0.9, 0.7, 0.3 ) );
+$d->hide_cursor;
 
 #warn Dumper  $d->area->inset_by( Point( 2, 4 ) );
 
@@ -83,14 +84,14 @@ while ($frames <= $F) {
             my $d  = sqrt(($x*$x) + ($y*$y));
                $d *= exp( -$d0 );
 
-            $d = sin($d * 2 + time)/2;
+            $d = sin($d * 4 + time)/4;
             $d = abs($d);
 
             # step it ...
             $d = $d < 0.1 ? ($d / 0.1) : 1;
 
-            $d = 0.4 / $d;
-            #$d = (0.04 / $d) ** 1.2;
+            #$d = 0.4 / $d;
+            $d = (0.9 / $d) ** 1.2;
 
             #$shader_total += time - $shader_start;
 
@@ -116,6 +117,7 @@ my $elapsed = time - $start;
 
 
 $d->end_cursor;
+$d->show_cursor;
 
 say "\n\n\nGoodbye";
 
