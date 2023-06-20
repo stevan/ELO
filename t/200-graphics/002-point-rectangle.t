@@ -34,8 +34,8 @@ subtest '... testing *Point and *Rectangle' => sub {
     my $home = Point(0,0);
     my $end  = Point(8,8);
 
-    ok( lookup_type(*ELO::Graphics::Point)->check( $home ), '... this passed the type check for Point with home(0,0)');
-    ok(!lookup_type(*ELO::Graphics::Point)->check( [0,0] ), '... this passed the !type check for Point with ArrayRef[0,0]');
+    ok( lookup_type(*ELO::Graphics::Geometry::Point)->check( $home ), '... this passed the type check for Point with home(0,0)');
+    ok(!lookup_type(*ELO::Graphics::Geometry::Point)->check( [0,0] ), '... this passed the !type check for Point with ArrayRef[0,0]');
 
     my $top_left     = Point( 2, 1 );
     my $top_right    = Point( 4, 1 );
@@ -43,33 +43,33 @@ subtest '... testing *Point and *Rectangle' => sub {
     my $bottom_left  = Point( 2, 3 );
     my $bottom_right = Point( 4, 3 );
 
-    isa_ok( $home, *ELO::Graphics::Point );
-    isa_ok( $end,  *ELO::Graphics::Point );
+    isa_ok( $home, *ELO::Graphics::Geometry::Point );
+    isa_ok( $end,  *ELO::Graphics::Geometry::Point );
 
-    isa_ok( $top_left,     *ELO::Graphics::Point );
-    isa_ok( $top_right,    *ELO::Graphics::Point );
-    isa_ok( $center,       *ELO::Graphics::Point );
-    isa_ok( $bottom_left,  *ELO::Graphics::Point );
-    isa_ok( $bottom_right, *ELO::Graphics::Point );
+    isa_ok( $top_left,     *ELO::Graphics::Geometry::Point );
+    isa_ok( $top_right,    *ELO::Graphics::Geometry::Point );
+    isa_ok( $center,       *ELO::Graphics::Geometry::Point );
+    isa_ok( $bottom_left,  *ELO::Graphics::Geometry::Point );
+    isa_ok( $bottom_right, *ELO::Graphics::Geometry::Point );
 
     my $rect = Rectangle( $top_left, $bottom_right );
-    isa_ok( $rect, *ELO::Graphics::Rectangle );
+    isa_ok( $rect, *ELO::Graphics::Geometry::Rectangle );
 
     subtest '... testing Rectangle' => sub {
 
         is($rect->height, 2, '... got the right height');
         is($rect->width, 2, '... got the right width');
 
-        isa_ok( $rect->origin, *ELO::Graphics::Point );
-        isa_ok( $rect->corner, *ELO::Graphics::Point );
+        isa_ok( $rect->origin, *ELO::Graphics::Geometry::Point );
+        isa_ok( $rect->corner, *ELO::Graphics::Geometry::Point );
 
-        isa_ok( $rect->center, *ELO::Graphics::Point );
-        isa_ok( $rect->extent, *ELO::Graphics::Point );
+        isa_ok( $rect->center, *ELO::Graphics::Geometry::Point );
+        isa_ok( $rect->extent, *ELO::Graphics::Geometry::Point );
 
-        isa_ok( $rect->top_left,     *ELO::Graphics::Point );
-        isa_ok( $rect->top_right,    *ELO::Graphics::Point );
-        isa_ok( $rect->bottom_left,  *ELO::Graphics::Point );
-        isa_ok( $rect->bottom_right, *ELO::Graphics::Point );
+        isa_ok( $rect->top_left,     *ELO::Graphics::Geometry::Point );
+        isa_ok( $rect->top_right,    *ELO::Graphics::Geometry::Point );
+        isa_ok( $rect->bottom_left,  *ELO::Graphics::Geometry::Point );
+        isa_ok( $rect->bottom_right, *ELO::Graphics::Geometry::Point );
 
         is( $rect->origin, $top_left, '... origin is the same point as top-left' );
         is( $rect->corner, $bottom_right, '... corner is the same point as bottom-right' );
@@ -94,15 +94,15 @@ subtest '... testing *Point and *Rectangle' => sub {
         my $extent = Point(2, 2);
 
         my $r = $top_left->rect_with_extent( $extent );
-        isa_ok($r, *ELO::Graphics::Rectangle );
+        isa_ok($r, *ELO::Graphics::Geometry::Rectangle );
 
         is($r->height, 2, '... got the right height');
         is($r->width, 2, '... got the right width');
 
-        isa_ok( $r->origin, *ELO::Graphics::Point );
-        isa_ok( $r->corner, *ELO::Graphics::Point );
-        isa_ok( $r->center, *ELO::Graphics::Point );
-        isa_ok( $r->extent, *ELO::Graphics::Point );
+        isa_ok( $r->origin, *ELO::Graphics::Geometry::Point );
+        isa_ok( $r->corner, *ELO::Graphics::Geometry::Point );
+        isa_ok( $r->center, *ELO::Graphics::Geometry::Point );
+        isa_ok( $r->extent, *ELO::Graphics::Geometry::Point );
 
         isnt($r, $rect, '... this is a new rectangle instance');
 
@@ -120,15 +120,15 @@ subtest '... testing *Point and *Rectangle' => sub {
 
     subtest '... testing rect_to_corner' => sub {
         my $r = $top_left->rect_to_corner( $bottom_right );
-        isa_ok($r, *ELO::Graphics::Rectangle );
+        isa_ok($r, *ELO::Graphics::Geometry::Rectangle );
 
         is($r->height, 2, '... got the right height');
         is($r->width, 2, '... got the right width');
 
-        isa_ok( $r->origin, *ELO::Graphics::Point );
-        isa_ok( $r->corner, *ELO::Graphics::Point );
-        isa_ok( $r->center, *ELO::Graphics::Point );
-        isa_ok( $r->extent, *ELO::Graphics::Point );
+        isa_ok( $r->origin, *ELO::Graphics::Geometry::Point );
+        isa_ok( $r->corner, *ELO::Graphics::Geometry::Point );
+        isa_ok( $r->center, *ELO::Graphics::Geometry::Point );
+        isa_ok( $r->extent, *ELO::Graphics::Geometry::Point );
 
         isnt($r, $rect, '... this is a new rectangle instance');
 
@@ -145,15 +145,15 @@ subtest '... testing *Point and *Rectangle' => sub {
         my $extent = Point(2, 2);
 
         my $r = $center->rect_from_center( $extent );
-        isa_ok($r, *ELO::Graphics::Rectangle );
+        isa_ok($r, *ELO::Graphics::Geometry::Rectangle );
 
         is($r->height, 2, '... got the right height');
         is($r->width, 2, '... got the right width');
 
-        isa_ok( $r->origin, *ELO::Graphics::Point );
-        isa_ok( $r->corner, *ELO::Graphics::Point );
-        isa_ok( $r->center, *ELO::Graphics::Point );
-        isa_ok( $r->extent, *ELO::Graphics::Point );
+        isa_ok( $r->origin, *ELO::Graphics::Geometry::Point );
+        isa_ok( $r->corner, *ELO::Graphics::Geometry::Point );
+        isa_ok( $r->center, *ELO::Graphics::Geometry::Point );
+        isa_ok( $r->extent, *ELO::Graphics::Geometry::Point );
 
         isnt($r, $rect, '... this is a new rectangle instance');
 
@@ -186,7 +186,7 @@ subtest '... testing *Point and *Rectangle' => sub {
 
     subtest '... testing add' => sub {
         my $p = $bottom_right->add( $bottom_right );
-        isa_ok( $p, *ELO::Graphics::Point );
+        isa_ok( $p, *ELO::Graphics::Geometry::Point );
 
         is($bottom_right->x, 4, '... old x coord is unchanged');
         is($bottom_right->y, 3, '... old y coord is unchanged');
@@ -197,7 +197,7 @@ subtest '... testing *Point and *Rectangle' => sub {
 
     subtest '... testing sub' => sub {
         my $p = $bottom_right->sub( Point( 2, 1 ) );
-        isa_ok( $p, *ELO::Graphics::Point );
+        isa_ok( $p, *ELO::Graphics::Geometry::Point );
 
         is($bottom_right->x, 4, '... old x coord is unchanged');
         is($bottom_right->y, 3, '... old y coord is unchanged');
@@ -208,7 +208,7 @@ subtest '... testing *Point and *Rectangle' => sub {
 
     subtest '... testing mul' => sub {
         my $p = $bottom_right->mul( Point( 2, 2 ) );
-        isa_ok( $p, *ELO::Graphics::Point );
+        isa_ok( $p, *ELO::Graphics::Geometry::Point );
 
         is($bottom_right->x, 4, '... old x coord is unchanged');
         is($bottom_right->y, 3, '... old y coord is unchanged');
@@ -256,7 +256,7 @@ subtest '... testing *Point and *Rectangle' => sub {
 
     subtest '... testing scale_by_point' => sub {
         my $p = $bottom_right->scale_by_point( Point( 2, 2 ) );
-        isa_ok( $p, *ELO::Graphics::Point );
+        isa_ok( $p, *ELO::Graphics::Geometry::Point );
 
         is($bottom_right->x, 4, '... old x coord is unchanged');
         is($bottom_right->y, 3, '... old y coord is unchanged');
@@ -267,7 +267,7 @@ subtest '... testing *Point and *Rectangle' => sub {
 
     subtest '... testing scale_by_factor' => sub {
         my $p = $bottom_right->scale_by_factor( 2 );
-        isa_ok( $p, *ELO::Graphics::Point );
+        isa_ok( $p, *ELO::Graphics::Geometry::Point );
 
         is($bottom_right->x, 4, '... old x coord is unchanged');
         is($bottom_right->y, 3, '... old y coord is unchanged');
@@ -279,7 +279,7 @@ subtest '... testing *Point and *Rectangle' => sub {
 
     subtest '... testing scale_by_factors' => sub {
         my $p = $bottom_right->scale_by_factors( 2, 2 );
-        isa_ok( $p, *ELO::Graphics::Point );
+        isa_ok( $p, *ELO::Graphics::Geometry::Point );
 
         is($bottom_right->x, 4, '... old x coord is unchanged');
         is($bottom_right->y, 3, '... old y coord is unchanged');

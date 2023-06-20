@@ -27,7 +27,7 @@ subtest '... testing *Palette' => sub {
 
     my $mono  = Palette($mono_map);
 
-    isa_ok($mono,  'ELO::Graphics::Palette');
+    isa_ok($mono,  'ELO::Graphics::Images::Palette');
 
     my @colors = $mono->map(split // => ' :#: ');
 

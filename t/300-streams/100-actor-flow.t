@@ -27,23 +27,23 @@ diag "... this one takes a bit";
 
 my $MAX_ITEMS = 20;
 
-my $Source = ELO::Streams::SourceFromGenerator(sub {
+my $Source = SourceFromGenerator(sub {
     state $count = 0;
     return $count if ++$count <= $MAX_ITEMS;
     return;
 });
 
 my @Sinks = (
-    ELO::Streams::SinkToBuffer([]),
-    ELO::Streams::SinkToBuffer([]),
-    ELO::Streams::SinkToCallback(sub ($item, $marker) {
+    SinkToBuffer([]),
+    SinkToBuffer([]),
+    SinkToCallback(sub ($item, $marker) {
         state @sink;
         state $done;
 
-        match [ *ELO::Streams::SinkMarkers, $marker ], +{
-            *ELO::Streams::SinkDrop  => sub () { push @sink => $item unless $done; },
-            *ELO::Streams::SinkDone  => sub () { $done++ },
-            *ELO::Streams::SinkDrain => sub () { my @d = @sink; @sink = (); $done--; @d; },
+        match [ *SinkMarkers, $marker ], +{
+            *SinkDrop  => sub () { push @sink => $item unless $done; },
+            *SinkDone  => sub () { $done++ },
+            *SinkDrain => sub () { my @d = @sink; @sink = (); $done--; @d; },
         };
     })
 );
@@ -54,11 +54,11 @@ sub Init () {
 
     setup sub ($this) {
 
-        my $publisher   = $this->spawn( ELO::Streams::Publisher( $Source ) );
+        my $publisher   = $this->spawn( Publisher( $Source ) );
         my @subscribers = (
-            $this->spawn( ELO::Streams::Subscriber( 5,  $Sinks[0] ) ),
-            $this->spawn( ELO::Streams::Subscriber( 10, $Sinks[1] ) ),
-            $this->spawn( ELO::Streams::Subscriber( 2,  $Sinks[2] ) ),
+            $this->spawn( Subscriber( 5,  $Sinks[0] ) ),
+            $this->spawn( Subscriber( 10, $Sinks[1] ) ),
+            $this->spawn( Subscriber( 2,  $Sinks[2] ) ),
         );
 
         # trap exits for all
@@ -71,7 +71,7 @@ sub Init () {
         $publisher->link( $_ ) foreach @subscribers;
 
 
-        $this->send( $publisher, [ *ELO::Streams::Subscribe => $_ ]) foreach @subscribers;
+        $this->send( $publisher, [ *Subscribe => $_ ]) foreach @subscribers;
 
         $log->info( $this, '... starting' );
 

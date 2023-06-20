@@ -24,7 +24,7 @@ subtest '... testing *Pixel' => sub {
     my $blue  = Color(0.0, 0.0, 1.0);
 
     my $pixel = ColorPixel( $white );
-    isa_ok($pixel, 'ELO::Graphics::Pixel::ColorPixel');
+    isa_ok($pixel, 'ELO::Graphics::Pixels::Pixel::ColorPixel');
 
     is($pixel->bg_color, $white, '... got the expected color from ColorPixel');
     ok((not defined $pixel->fg_color),'... got the expected fg-color from ColorPixel');
@@ -33,7 +33,7 @@ subtest '... testing *Pixel' => sub {
     is_deeply([$pixel->colors], [undef, $white], '... got the right colors');
 
     my $char_pixel = CharPixel( $red, $green, '*' );
-    isa_ok($char_pixel, 'ELO::Graphics::Pixel::CharPixel');
+    isa_ok($char_pixel, 'ELO::Graphics::Pixels::Pixel::CharPixel');
 
     is($char_pixel->bg_color, $red, '... got the expected color from CharPixel');
     is($char_pixel->fg_color, $green, '... got the expected fg-color from CharPixel');

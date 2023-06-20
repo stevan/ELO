@@ -6,6 +6,67 @@ use ELO::Types  qw[ :core :types :events :signals :typeclasses ];
 use ELO::Actors qw[ receive setup ];
 use ELO::Timers qw[ :timers ];
 
+
+## ----------------------------------------------------------------------------
+## Exportables
+## ----------------------------------------------------------------------------
+
+my @EVENTS = qw[
+    *OnComplete
+    *OnNext
+    *OnError
+
+    *OnSubscribe
+    *OnUnsubscribe
+
+    *OnRequestComplete
+
+    *Request
+    *Cancel
+
+    *Subscribe
+    *Unsubscribe
+    *GetNext
+];
+
+my @TYPECLASSES = qw[
+    *Source
+        SourceFromList
+        SourceFromGenerator
+
+    *SinkMarkers
+        *SinkDrop
+        *SinkDone
+        *SinkDrain
+
+    *Sink
+        SinkToCallback
+        SinkToBuffer
+];
+
+our @PROTOCOLS = qw[
+    *Observer
+    *Subscription
+    *Subscriber
+    *Publisher
+];
+
+our @ACTORS = qw[
+    Observer
+    Subscription
+    Subscriber
+    Publisher
+];
+
+use Exporter 'import';
+
+our @EXPORT = (
+    @EVENTS,
+    @PROTOCOLS,
+    @ACTORS,
+    @TYPECLASSES,
+);
+
 our $log;
 
 ## ----------------------------------------------------------------------------
@@ -18,7 +79,7 @@ datatype *Source => sub {
 };
 
 typeclass[*Source] => sub {
-    method 'get_next' => {
+    method get_next => {
         SourceFromList      => sub ($list) { shift $list->@* },
         SourceFromGenerator => sub ($gen)  { $gen->()        },
     };
@@ -228,8 +289,7 @@ sub Subscription ($publisher, $subscriber) {
 protocol *Publisher => sub {
     event *Subscribe   => ( *Process );
     event *Unsubscribe => ( *Process );
-
-    event *GetNext => ( *Process );
+    event *GetNext     => ( *Process );
 };
 
 sub Publisher ($source) {

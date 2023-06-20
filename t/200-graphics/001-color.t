@@ -23,12 +23,12 @@ subtest '... testing *Color' => sub {
     my $green = Color(0.0, 1.0, 0.0);
     my $blue  = Color(0.0, 0.0, 1.0);
 
-    isa_ok($black, *ELO::Graphics::Color);
-    isa_ok($white, *ELO::Graphics::Color);
+    isa_ok($black, *ELO::Graphics::Colors::Color);
+    isa_ok($white, *ELO::Graphics::Colors::Color);
 
-    isa_ok($red,   *ELO::Graphics::Color);
-    isa_ok($green, *ELO::Graphics::Color);
-    isa_ok($blue,  *ELO::Graphics::Color);
+    isa_ok($red,   *ELO::Graphics::Colors::Color);
+    isa_ok($green, *ELO::Graphics::Colors::Color);
+    isa_ok($blue,  *ELO::Graphics::Colors::Color);
 
     is($red->r, 1.0, '... got the right r for red');
     is($red->g, 0.0, '... got the right g for red');
