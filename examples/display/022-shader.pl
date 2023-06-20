@@ -16,7 +16,7 @@ my $H = $ARGV[0] // 40;
 my $W = $ARGV[1] // 80;
 my $F = $ARGV[2] // 200;
 
-#$ELO::Types::TYPES_DISABLED = 1;
+$ELO::Types::TYPES_DISABLED = 1;
 
 my $d = Display(
     *STDOUT,
@@ -84,34 +84,52 @@ while ($frames <= $F) {
 
             # center the coordinates and
             # shift them into the colorspace
-            $x = $x * 2.0 - 1.0;
-            $y = $y * 2.0 - 1.0;
+            $x = $x * 2.0 - 2.5;
+            $y = $y * 2.0 - 1.5;
 
             # start the madness
+
+            my @final_color = (0, 0, 0);
+
             my $d0 = sqrt(($x*$x) + ($y*$y));
 
-            # START REPETITION
-            $x = $x * 1.5;
-            $y = $y * 1.5;
+            for( my $i = 0.0; $i < 3.0; $i++ ) {
 
-            $x = $x - floor($x);
-            $y = $y - floor($y);
+                # START REPETITION
+                $x = $x * 1.5;
+                $y = $y * 1.5;
 
-            $x -= 0.5;
-            $y -= 0.5;
+                $x = $x - floor($x);
+                $y = $y - floor($y);
 
-            # END REPETITION
+                $x -= 0.5;
+                $y -= 0.5;
 
-            # length
-            my $d  = sqrt(($x*$x) + ($y*$y));
-               $d *= exp( -$d0 );
+                # END REPETITION
 
-            my @color = pallete($d0 * 0.5 + $t * 0.5);
+                # length
+                my $d = sqrt(($x*$x) + ($y*$y));
+
+                $d *= exp( -$d0 );
+
+                my @color = pallete($d0 + $i * 0.4 + $t * 0.4);
+
+                $d = sin($d * 10 + $t)/30;
+                $d = abs($d);
+
+                # step it ...
+                $d = $d < 0.1 ? ($d / 0.1) : 1;
+                $d = (0.03 / $d) ** 1.2;
+
+                $final_color[0] += $color[0] * $d;
+                $final_color[1] += $color[1] * $d;
+                $final_color[2] += $color[2] * $d;
+            }
 
             Color(
-                min( 1.0, $color[0] * $d ),
-                min( 1.0, $color[1] * $d ),
-                min( 1.0, $color[2] * $d ),
+                max( 0, min( 1.0, $final_color[0] ) ),
+                max( 0, min( 1.0, $final_color[1] ) ),
+                max( 0, min( 1.0, $final_color[2] ) ),
             )
         }
     );

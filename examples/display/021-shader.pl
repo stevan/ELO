@@ -61,6 +61,54 @@ sub pallete ($t) {
     return @r;
 }
 
+
+my $EMPTY  = TransPixel();
+my $RED    = ColorPixel( Color( 0.8, 0.2, 0.2 ) );
+my $BLACK  = ColorPixel( Color( 0.0, 0.0, 0.0 ) );
+my $BLUE   = ColorPixel( Color( 0.0, 0.3, 0.6 ) );
+my $GOLD   = ColorPixel( Color( 0.8, 0.6, 0.4 ) );
+my $BROWN  = ColorPixel( Color( 0.5, 0.3, 0.3 ) );
+my $WHITE  = ColorPixel( Color( 1.0, 1.0, 1.0 ) );
+my $YELLOW = CharPixel( Color( 1.0, 1.0, 0.0 ), Color( 0.7, 0.6, 0.0 ), '*' );
+
+my $mario_palette = Palette({
+    '$' => $RED,
+    ' ' => $EMPTY,
+    '`' => $BLACK,
+    '.' => $BROWN,
+    ':' => $BLUE,
+    '@' => $GOLD,
+    '#' => $WHITE,
+    '%' => $YELLOW,
+});
+
+# ...
+
+my $small_mario_image_data = ImageData( $mario_palette, [
+'   $$$$$    ',
+'  $$$$$$$$$ ',
+'  ...@@`@   ',
+' .@.@@@`@@@ ',
+' .@..@@@.@@ ',
+' ..@@@@@... ',
+'   @@@@@@@  ',
+'  ::$::$::  ',
+' :::$::$::: ',
+':::$$$$$$:::',
+'## $%$$%$ ##',
+'@@@$$$$$$@@@',
+'@@$$$$$$$$@@',
+'  $$$  $$$  ',
+' ...    ... ',
+'....    ....',
+]);
+
+my $small_mario_image = $small_mario_image_data->create_image;
+
+my $frame_cutoff = ($shader_rect->top_right->x - $small_mario_image->width-2);
+
+my $shader_origin = $shader_rect->origin;
+
 while ($frames <= $F) {
 
     $frames++;
@@ -102,18 +150,22 @@ while ($frames <= $F) {
 
             # END REPETITION
 
-            # length
-            my $d  = sqrt(($x*$x) + ($y*$y));
-               $d *= exp( -$d0 );
-
             my @color = pallete($d0 * 0.5 + $t * 0.5);
 
             Color(
-                min( 1.0, $color[0] * $d ),
-                min( 1.0, $color[1] * $d ),
-                min( 1.0, $color[2] * $d ),
+                min( 1.0, $color[0] ),
+                min( 1.0, $color[1] ),
+                min( 1.0, $color[2] ),
             )
         }
+    );
+
+    $d->poke_block(
+        Point(
+            $shader_origin->x + ($frames % $frame_cutoff),
+            15,
+        ),
+        $small_mario_image
     );
 
     #$poke_total += time - $poke_start;
