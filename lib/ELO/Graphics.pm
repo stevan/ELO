@@ -53,7 +53,6 @@ our @EXPORT = qw[
 # - BitMasks (over images, gradients?, shaders?)
 # - Sprite (image + bg-color)
 
-
 ## ----------------------------------------------------------------------------
 ## Color
 ## ----------------------------------------------------------------------------
@@ -627,12 +626,12 @@ typeclass[*Display] => sub {
     # ...
     # these should all return $self
 
-    method clear_screen => sub ($d, $c) {
+    method clear_screen => sub ($d, $bg_color) {
         $d->home_cursor;
         out( $d => (
             $CLEAR_SCREEN,   # clear the screen first
             # set background color
-            format_bg_color($c),
+            format_bg_color($bg_color),
             # paint background
             # draw of $width spaces and goto next line
             ((sprintf "\e[%d\@\e[E" => ($d->cols)) x ($d->rows)), # and repeat it $height times
