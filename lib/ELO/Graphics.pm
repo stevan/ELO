@@ -32,14 +32,14 @@ our @EXPORT = qw[
     CharPixel
     TransPixel
 
+    Horizontal
+    Vertical
+
     GradientFill
     GradientFillHGR
 
     PixelShader
     PixelShaderHGR
-
-    Horizontal
-    Vertical
 
     Palette
 
