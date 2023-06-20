@@ -115,49 +115,49 @@ while ($frames <= $F) {
 
     #my $poke_start = time;
 
-    $d->poke_shader_hgr(
-        $shader_rect,
-        sub ($x, $y, $width, $height) {
+    $d->poke_shader(
+        PixelShaderHGR(
+            $shader_rect,
+            sub ($x, $y, $width, $height) {
 
-            my $t = time;
+                my $t = time;
 
-            #my $shader_start = time;
+                #my $shader_start = time;
 
-            #return TransPixel() if ($x % 5) == 0 && ($y % 5) == 0;
+                # START COORDS
 
-            # START COORDS
+                $x = $x /  $width;
+                $y = $y / $height;
 
-            $x = $x /  $width;
-            $y = $y / $height;
+                # center the coordinates and
+                # shift them into the colorspace
+                $x = $x * 2.0 - 1.0;
+                $y = $y * 2.0 - 1.0;
 
-            # center the coordinates and
-            # shift them into the colorspace
-            $x = $x * 2.0 - 1.0;
-            $y = $y * 2.0 - 1.0;
+                # start the madness
+                my $d0 = sqrt(($x*$x) + ($y*$y));
 
-            # start the madness
-            my $d0 = sqrt(($x*$x) + ($y*$y));
+                # START REPETITION
+                $x = $x * 1.5;
+                $y = $y * 1.5;
 
-            # START REPETITION
-            $x = $x * 1.5;
-            $y = $y * 1.5;
+                $x = $x - floor($x);
+                $y = $y - floor($y);
 
-            $x = $x - floor($x);
-            $y = $y - floor($y);
+                $x -= 0.5;
+                $y -= 0.5;
 
-            $x -= 0.5;
-            $y -= 0.5;
+                # END REPETITION
 
-            # END REPETITION
+                my @color = pallete($d0 * 0.5 + $t * 0.5);
 
-            my @color = pallete($d0 * 0.5 + $t * 0.5);
-
-            Color(
-                min( 1.0, $color[0] ),
-                min( 1.0, $color[1] ),
-                min( 1.0, $color[2] ),
-            )
-        }
+                Color(
+                    min( 1.0, $color[0] ),
+                    min( 1.0, $color[1] ),
+                    min( 1.0, $color[2] ),
+                )
+            }
+        )
     );
 
     $d->poke_block(

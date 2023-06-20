@@ -33,6 +33,10 @@ our @EXPORT = qw[
     TransPixel
 
     GradientFill
+    GradientFillHGR
+
+    PixelShader
+    PixelShaderHGR
 
     Horizontal
     Vertical
@@ -444,7 +448,8 @@ typeclass[*FillDirection] => sub {
 type *FillArea => *Rectangle;
 
 datatype *Fill => sub {
-    case GradientFill => ( *FillArea, *Gradient, *FillDirection );
+    case GradientFill    => ( *FillArea, *Gradient, *FillDirection );
+    case GradientFillHGR => ( *FillArea, *Gradient, *FillDirection );
 };
 
 typeclass[*Fill] => sub {
@@ -457,6 +462,89 @@ typeclass[*Fill] => sub {
             my $steps = $direction->is_horz ? $area->width : $area->height;
 
             map ColorPixel( $gradient->calculate_at( $_ / $steps) ), (1 .. $steps);
+        },
+        GradientFillHGR => sub ( $area, $gradient, $direction ) {
+            my $steps = $direction->is_horz ? $area->width : $area->height;
+
+            if ( $direction->is_vert ) {
+                $steps *= 2;
+
+                my @pixels;
+                foreach my ($s1, $s2) (1 .. $steps) {
+                    push @pixels => CharPixel(
+                        $gradient->calculate_at( $s2 / $steps ),
+                        $gradient->calculate_at( $s1 / $steps ),
+                        '▀',
+                    );
+                }
+
+                return @pixels;
+            }
+            else {
+                return map ColorPixel( $gradient->calculate_at( $_ / $steps) ), (1 .. $steps);
+            }
+        }
+    };
+};
+
+## ----------------------------------------------------------------------------
+## Shader
+## ----------------------------------------------------------------------------
+##
+## ----------------------------------------------------------------------------
+
+type *ShadedArea => *Rectangle;
+type *ShadedFunc => *CodeRef;
+
+datatype *Shader => sub {
+    case PixelShader    => ( *ShadedArea, *ShadedFunc );
+    case PixelShaderHGR => ( *ShadedArea, *ShadedFunc );
+};
+
+typeclass[*Shader] => sub {
+
+    method area => *ShadedArea;
+
+    method create_pixels => {
+        PixelShader => sub ( $area, $shader_func ) {
+
+            my $h = $area->height;
+            my $w = $area->width;
+
+            my $cols = $w + 1;
+            my $rows = $h + 1;
+
+            my @pixels;
+            foreach my $y ( 0 .. $h ) {
+                foreach my $x ( 0 .. $w ) {
+                    push @pixels => ColorPixel(
+                        $shader_func->( $x, $y, $cols, $rows )
+                    );
+                }
+            }
+
+            @pixels;
+        },
+        PixelShaderHGR => sub ( $area, $shader_func ) {
+
+            my $h = $area->height * 2 - 1;
+            my $w = $area->width;
+
+            my $cols = $w + 1;
+            my $rows = $h + 1;
+
+            my @pixels;
+            foreach my ($y1, $y2) ( 0 .. $h ) {
+                foreach my $x ( 0 .. $w ) {
+                    push @pixels => CharPixel(
+                        $shader_func->( $x, $y2, $cols, $rows ),
+                        $shader_func->( $x, $y1, $cols, $rows ),
+                        '▀',
+                    );
+                }
+            }
+
+            @pixels;
         }
     };
 };
@@ -592,14 +680,14 @@ typeclass[*Display] => sub {
         ));
     };
 
-    method poke_rectangle => sub ($d, $rectangle, $color) {
+    method poke_rectangle => sub ($d, $rectangle, $bg_color) {
 
         my $h = $rectangle->height + 1;
         my $w = $rectangle->width  + 1;
 
         out( $d => (
             format_goto( $rectangle->origin ),
-            format_bg_color($color),
+            format_bg_color($bg_color),
             # paint rectangle
             (((' ' x $w) . "\e[B\e[${w}D") x $h),
             # end paint rectangle
@@ -672,75 +760,33 @@ typeclass[*Display] => sub {
         ));
     };
 
-    method poke_shader => sub ($d, $rectangle, $shader) {
+    method poke_shader => sub ($d, $shader) {
 
-        my $h = $rectangle->height;
-        my $w = $rectangle->width;
-
-        my $cols = $w + 1;
-        my $rows = $h + 1;
+        my $area = $shader->area;
+        my $cols = $area->width + 1;
 
         my $carrige_return = "\e[B\e[${cols}D";
 
+        my $i = 0;
         my $shaded = '';
-        foreach my $y ( 0 .. $h ) {
-            foreach my $x ( 0 .. $w ) {
-                $shaded .= format_pixel(
-                    ColorPixel(
-                        $shader->( $x, $y, $cols, $rows )
-                    )
-                );
+        foreach my $p ( $shader->create_pixels ) {
+            $shaded .= format_pixel( $p );
+            $i++;
+            if ( $i == $cols ) {
+                $shaded .= $carrige_return;
+                $i = 0;
             }
-            $shaded .= $carrige_return;
         }
 
         out( $d => (
-            format_goto( $rectangle->origin ),
+            format_goto( $area->origin ),
             #format_bg_color($color),
             $shaded,
             $RESET,
             (DEBUG
-                ? ("S(origin: x:".(join ' @ y:' => $rectangle->origin->xy).", "
-                  ."corner: x:".(join ' @ y:' => $rectangle->corner->xy).", "
-                  ."{ h: ".$rectangle->height.", w: ".$rectangle->width." })")
-                : ()),
-        ));
-    };
-
-    method poke_shader_hgr => sub ($d, $rectangle, $shader) {
-
-        my $h = $rectangle->height * 2 - 1;
-        my $w = $rectangle->width;
-
-        my $cols = $w + 1;
-        my $rows = $h + 1;
-
-        my $carrige_return = "\e[B\e[${cols}D";
-
-        my $shaded = '';
-        foreach my ($y1, $y2) ( 0 .. $h ) {
-            die join ", " => $y1, $y2 unless defined $y2;
-            foreach my $x ( 0 .. $w ) {
-                $shaded .= format_pixel(
-                    CharPixel(
-                        $shader->( $x, $y2, $cols, $rows ),
-                        $shader->( $x, $y1, $cols, $rows ),
-                        '▀',
-                    )
-                );
-            }
-            $shaded .= $carrige_return;
-        }
-
-        out( $d => (
-            format_goto( $rectangle->origin ),
-            #format_bg_color($color),
-            $shaded,
-            $RESET,
-            (DEBUG
-                ? ("S(origin: x:".(join ' @ y:' => $rectangle->origin->xy).", "
-                  ."corner: x:".(join ' @ y:' => $rectangle->corner->xy).", "
-                  ."{ h: ".$rectangle->height.", w: ".$rectangle->width." })")
+                ? ("S(origin: x:".(join ' @ y:' => $area->origin->xy).", "
+                  ."corner: x:".(join ' @ y:' => $area->corner->xy).", "
+                  ."{ h: ".$area->height.", w: ".$area->width." })")
                 : ()),
         ));
     };

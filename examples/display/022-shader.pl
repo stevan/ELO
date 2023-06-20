@@ -67,71 +67,73 @@ while ($frames <= $F) {
 
     #my $poke_start = time;
 
-    $d->poke_shader_hgr(
-        $shader_rect,
-        sub ($x, $y, $width, $height) {
+    $d->poke_shader(
+        PixelShaderHGR(
+            $shader_rect,
+            sub ($x, $y, $width, $height) {
 
-            my $t = time;
+                my $t = time;
 
-            #my $shader_start = time;
+                #my $shader_start = time;
 
-            #return TransPixel() if ($x % 5) == 0 && ($y % 5) == 0;
+                #return TransPixel() if ($x % 5) == 0 && ($y % 5) == 0;
 
-            # START COORDS
+                # START COORDS
 
-            $x = $x /  $width;
-            $y = $y / $height;
+                $x = $x /  $width;
+                $y = $y / $height;
 
-            # center the coordinates and
-            # shift them into the colorspace
-            $x = $x * 2.0 - 2.5;
-            $y = $y * 2.0 - 1.5;
+                # center the coordinates and
+                # shift them into the colorspace
+                $x = $x * 2.0 - 2.5;
+                $y = $y * 2.0 - 1.5;
 
-            # start the madness
+                # start the madness
 
-            my @final_color = (0, 0, 0);
+                my @final_color = (0, 0, 0);
 
-            my $d0 = sqrt(($x*$x) + ($y*$y));
+                my $d0 = sqrt(($x*$x) + ($y*$y));
 
-            for( my $i = 0.0; $i < 3.0; $i++ ) {
+                for( my $i = 0.0; $i < 3.0; $i++ ) {
 
-                # START REPETITION
-                $x = $x * 1.5;
-                $y = $y * 1.5;
+                    # START REPETITION
+                    $x = $x * 1.5;
+                    $y = $y * 1.5;
 
-                $x = $x - floor($x);
-                $y = $y - floor($y);
+                    $x = $x - floor($x);
+                    $y = $y - floor($y);
 
-                $x -= 0.5;
-                $y -= 0.5;
+                    $x -= 0.5;
+                    $y -= 0.5;
 
-                # END REPETITION
+                    # END REPETITION
 
-                # length
-                my $d = sqrt(($x*$x) + ($y*$y));
+                    # length
+                    my $d = sqrt(($x*$x) + ($y*$y));
 
-                $d *= exp( -$d0 );
+                    $d *= exp( -$d0 );
 
-                my @color = pallete($d0 + $i * 0.4 + $t * 0.4);
+                    my @color = pallete($d0 + $i * 0.4 + $t * 0.4);
 
-                $d = sin($d * 10 + $t)/30;
-                $d = abs($d);
+                    $d = sin($d * 10 + $t)/30;
+                    $d = abs($d);
 
-                # step it ...
-                $d = $d < 0.1 ? ($d / 0.1) : 1;
-                $d = (0.03 / $d) ** 1.2;
+                    # step it ...
+                    $d = $d < 0.1 ? ($d / 0.1) : 1;
+                    $d = (0.03 / $d) ** 1.2;
 
-                $final_color[0] += $color[0] * $d;
-                $final_color[1] += $color[1] * $d;
-                $final_color[2] += $color[2] * $d;
+                    $final_color[0] += $color[0] * $d;
+                    $final_color[1] += $color[1] * $d;
+                    $final_color[2] += $color[2] * $d;
+                }
+
+                Color(
+                    max( 0, min( 1.0, $final_color[0] ) ),
+                    max( 0, min( 1.0, $final_color[1] ) ),
+                    max( 0, min( 1.0, $final_color[2] ) ),
+                )
             }
-
-            Color(
-                max( 0, min( 1.0, $final_color[0] ) ),
-                max( 0, min( 1.0, $final_color[1] ) ),
-                max( 0, min( 1.0, $final_color[2] ) ),
-            )
-        }
+        )
     );
 
     #$poke_total += time - $poke_start;
