@@ -146,6 +146,8 @@ typeclass[*Display] => sub {
     method home_cursor  => sub ($d) { out( $d => $HOME_CURSOR ) };
     method end_cursor   => sub ($d) { out( $d => "\e[".($d->rows)."H"  ) };
 
+    method move_cursor  => sub ($d, $p) { out( $d => format_goto( $p) ) };
+
     method hide_cursor  => sub ($d) { out( $d => $HIDE_CURSOR ) };
     method show_cursor  => sub ($d) { out( $d => $SHOW_CURSOR ) };
 

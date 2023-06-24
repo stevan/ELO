@@ -137,18 +137,6 @@ while ($frames <= $F) {
                 # start the madness
                 my $d0 = sqrt(($x*$x) + ($y*$y));
 
-                # START REPETITION
-                $x = $x * 1.5;
-                $y = $y * 1.5;
-
-                $x = $x - floor($x);
-                $y = $y - floor($y);
-
-                $x -= 0.5;
-                $y -= 0.5;
-
-                # END REPETITION
-
                 my @color = pallete($d0 * 0.5 + $t * 0.5);
 
                 Color(
