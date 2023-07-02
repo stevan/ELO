@@ -61,6 +61,10 @@ sub init ($this, $msg=[]) {
 
     my $a = $this->spawn( Turtle() );
 
+    $d->clear_screen(Color(0,0,0));
+
+    $this->send( $a => [ *Move => *Up ]);
+
     on_keypress( $this, *STDIN, 0.03, sub ($key) {
 
         my $direction;
