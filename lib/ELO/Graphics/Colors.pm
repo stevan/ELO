@@ -76,14 +76,17 @@ typeclass[*Gradient] => sub {
     method start_color => *StartColor;
     method end_color   => *EndColor;
 
-    method calculate_at => sub ($g, $percent) {
+    method calculate_at => sub ($g, $ratio) {
         my $start = $g->start_color;
         my $end   = $g->end_color;
 
+        return $end   if $ratio > 1;
+        return $start if $ratio < 0;
+
         Color(
-            $start->r + $percent * ($end->r - $start->r),
-            $start->g + $percent * ($end->g - $start->g),
-            $start->b + $percent * ($end->b - $start->b),
+            $start->r + $ratio * ($end->r - $start->r),
+            $start->g + $ratio * ($end->g - $start->g),
+            $start->b + $ratio * ($end->b - $start->b),
         )
     };
 };
