@@ -13,10 +13,9 @@ our @EXPORT = qw[
 
 
 sub on_keypress ($this, $fh, $interval, $callback) {
+    ReadMode cbreak => $fh;
     return interval( $this, $interval, sub {
-        ReadMode cbreak => $fh;
         my $message = ReadKey -1, $fh;
-        ReadMode restore => $fh;
         return unless defined $message;
         if ( $message eq "\e" ) {
             $message .= ReadKey -1, $fh;

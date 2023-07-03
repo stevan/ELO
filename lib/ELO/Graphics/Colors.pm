@@ -68,17 +68,22 @@ typeclass[*Color] => sub {
 
 type *StartColor => *Color;
 type *EndColor   => *Color;
+type *Steps      => *Int;
 
-datatype [ Gradient => *Gradient ] => ( *StartColor, *EndColor );
+datatype [ Gradient => *Gradient ] => ( *StartColor, *EndColor, *Steps );
 
 typeclass[*Gradient] => sub {
 
     method start_color => *StartColor;
     method end_color   => *EndColor;
+    method steps       => *Steps;
 
-    method calculate_at => sub ($g, $ratio) {
+    method calculate_at => sub ($g, $value) {
         my $start = $g->start_color;
         my $end   = $g->end_color;
+        my $steps = $g->steps;
+
+        my $ratio = $value / $steps;
 
         return $end   if $ratio > 1;
         return $start if $ratio < 0;

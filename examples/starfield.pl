@@ -12,7 +12,7 @@ use Time::HiRes qw[ sleep ];
 use ELO::Loop;
 use ELO::Types  qw[ :core :events :types :typeclasses ];
 use ELO::Timers qw[ :timers ];
-use ELO::Actors qw[ receive ];
+use ELO::Actors qw[ setup receive ];
 
 use ELO::Graphics;
 use ELO::IO;
@@ -25,9 +25,9 @@ my $Empty = TransPixel();
 
 my $Black = Color(0,0,0);
 my $White = Color(1,1,1);
-my $Grey  = Color(0.5,0.5,0.5);
-my $Blue  = Color(0.1,0.2,0.6);
-my $Green = Color(0.4,0.7,0.2);
+my $Grey  = Color(0.7,0.7,0.7);
+my $Blue  = Color(0.5,0.5,0.7);
+my $Green = Color(0.2,0.9,0.3);
 
 my $palette = Palette({
     ' ' => $Empty,
@@ -40,28 +40,23 @@ my $palette = Palette({
 # ...
 
 my $horz_ship_image = ImageData( $palette, [
-'<><><>    ',
-'  ==      ',
-' =#==>>#>>',
-'  ==      ',
-'<><><>    ',
+'>><<>>      ',
+'  ==        ',
+'  ##==>>##>>',
+'  ==        ',
+'>><<>>      ',
 ])->create_image;
 
 my $vert_ship_image = ImageData( $palette, [
-'   >   ',
-'   #   ',
-'   >   ',
-'<> = <>',
-'<>=#=<>',
-'<>   <>',
+'    >>    ',
+'    ##    ',
+'    >>    ',
+'>>  ==  >>',
+'<<==##==<<',
+'>>      >>',
 ])->create_image;
 
 # ...
-
-my $sky_gradient = Gradient(
-    Color( 0.01, 0.01, 0.02 ),
-    Color( 0.33, 0.33, 0.99 ),
-);
 
 
 ## ----------------------------------------------------------------------------
@@ -76,28 +71,30 @@ protocol *StarField => sub {
     event *Draw       => ();
 };
 
-sub StarField (%args) {
+sub StarField ( $display ) {
 
-    my sub make_star () { rand() < 0.01 ? '*' : ' ' }
+    my sub make_star       () {       rand() < 0.01 ? '*' : ' '              }
+    my sub make_star_row   () { [ map make_star(),     1 .. $display->cols ] }
+    my sub make_star_field () {   map make_star_row(), 1 .. $display->rows   }
 
-    my $display  = $args{display};
-    my $gradient = $args{gradient};
+    my $gradient = Gradient(
+        Color( 0.01, 0.01, 0.02 ),
+        Color( 0.33, 0.33, 0.99 ),
+        ($display->rows * 4)
+    );
 
-    my $steps       = $display->area->height * 4;
-    my $step_offset = $display->area->height;
+    my $step_offset = $gradient->steps / 2;
 
     my $ship;
     my @stars;
 
-    my $scroll_dir = *Left;
+    my $scroll_dir;
 
     receive[*StarField] => +{
         *Init => sub ($this) {
-            @stars = map {
-                [ map make_star(), 1 .. $display->cols ]
-            } 1 .. $display->rows;
-
-            $ship = $horz_ship_image;
+            @stars      = make_star_field();
+            $ship       = $horz_ship_image;
+            $scroll_dir = *Left;
         },
         *OnKeyPress => sub ($this, $direction) {
             match[*Direction, $direction] => +{
@@ -125,12 +122,12 @@ sub StarField (%args) {
             match[*Direction, $scroll_dir] => +{
                 *Down    => sub {
                     shift @stars;
-                    push @stars => [ map make_star(), 1 .. $display->cols ];
+                    push @stars => make_star_row();
                     $step_offset++;
                 },
                 *Up  => sub {
                     pop @stars;
-                    unshift @stars => [ map make_star(), 1 .. $display->cols ];
+                    unshift @stars => make_star_row();
                     $step_offset--;
                 },
                 *Left  => sub {},
@@ -144,7 +141,7 @@ sub StarField (%args) {
                 $display->poke(
                     Point(0, $i),
                     CharPixel(
-                        $gradient->calculate_at( ($i + $step_offset) / $steps ),
+                        $gradient->calculate_at( $i + $step_offset ),
                         $White,
                         (join '' => @$line)
                     )
@@ -187,11 +184,14 @@ my $d = Display(
 
 $d->clear_screen( $Black );
 $d->hide_cursor;
+$d->enable_alt_buffer;
 
 $SIG{INT} = sub {
+    $d->disable_alt_buffer;
     $d->show_cursor;
     $d->end_cursor;
-    die "\n\n\nEnded";
+    say "\n\n\nInteruptted!";
+    die "Goodbye";
 };
 
 
@@ -199,29 +199,24 @@ $SIG{INT} = sub {
 
 sub init ($this, $msg=[]) {
 
-    my $f = $this->spawn(
-        StarField(
-            display  => $d,
-            gradient => $sky_gradient,
-        )
-    );
+    my $f = $this->spawn( StarField( $d ) );
 
     $this->send( $f, [ *Init ] );
 
+    # animation loop ...
     my $i1 = interval( $this, 0.0366, sub {
         $this->send( $f, [ *Draw ] );
     });
 
+    # input loop ...
     on_keypress( $this, *STDIN, 0.01, sub ($key) {
         my $direction;
         $direction = *Up    if $key eq "\e[A";
         $direction = *Left  if $key eq "\e[D";
         $direction = *Down  if $key eq "\e[B";
         $direction = *Right if $key eq "\e[C";
-
         $this->send( $f, [ *OnKeyPress => $direction ] ) if $direction;
     });
-
 }
 
 ELO::Loop->run( \&init );
