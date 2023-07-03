@@ -71,23 +71,29 @@ protocol *StarField => sub {
     event *Draw       => ();
 };
 
-sub StarField ( $display ) {
+sub StarField ( $display, $height, $width ) {
 
-    my sub make_star       () {       rand() < 0.01 ? '*' : ' '              }
-    my sub make_star_row   () { [ map make_star(),     1 .. $display->cols ] }
-    my sub make_star_field () {   map make_star_row(), 1 .. $display->rows   }
+    my $star_density = 0.01;
+
+    my sub make_star       () {   rand() < $star_density ? '*' : ' ' }
+    my sub make_star_row   () { [ map make_star(),     1 .. $width ] }
+    my sub make_star_field () {   map make_star_row(), 1 .. $height  }
 
     my $gradient = Gradient(
         Color( 0.01, 0.01, 0.02 ),
         Color( 0.33, 0.33, 0.99 ),
-        ($display->rows * 4)
+        # make the gradient 4x the height
+        # of the field, this will spread
+        # the gradient over several screen
+        # scrolls
+        ($height * 4)
     );
 
+    # start in the middle of the gradient ...
     my $step_offset = $gradient->steps / 2;
 
     my $ship;
     my @stars;
-
     my $scroll_dir;
 
     receive[*StarField] => +{
@@ -98,48 +104,66 @@ sub StarField ( $display ) {
         },
         *OnKeyPress => sub ($this, $direction) {
             match[*Direction, $direction] => +{
-                *Down  => sub {
+                *Down => sub {
                     $scroll_dir = *Down;
-                    $ship = $vert_ship_image->flip;
+                    $ship       = $vert_ship_image->flip;
                 },
-                *Up    => sub {
+                *Up => sub {
                     $scroll_dir = *Up;
-                    $ship = $vert_ship_image;
+                    $ship       = $vert_ship_image;
                 },
                 # invert these for the scroll dir
                 *Left  => sub {
                     $scroll_dir = *Right;
-                    $ship = $horz_ship_image->mirror;
+                    $ship       = $horz_ship_image->mirror;
                 },
                 *Right => sub {
                     $scroll_dir = *Left;
-                    $ship = $horz_ship_image;
+                    $ship       = $horz_ship_image;
                 },
             };
         },
         *Draw => sub ($this) {
 
+            # see if we are doing up/down
+            # and apply changes accordingly
             match[*Direction, $scroll_dir] => +{
                 *Down    => sub {
+                    # remove the first row of stars
                     shift @stars;
+                    # and add a new one to the end
                     push @stars => make_star_row();
-                    $step_offset++;
+
+                    $step_offset++;          # increase the gradient step offset
+                    $star_density -= 0.0001; # lower the star density
                 },
                 *Up  => sub {
+                    # remove the last row of stars
                     pop @stars;
+                    # and add a new one to the beginning
                     unshift @stars => make_star_row();
-                    $step_offset--;
+
+                    $step_offset--;          # decrease the gradient step offset
+                    $star_density += 0.0001; # increase the star density
                 },
+                # these are handled below, but
+                # need to be ignored here
                 *Left  => sub {},
                 *Right => sub {},
             };
 
+            # the stars are actually rows
+            # of the star field
             foreach my $i ( 0 .. $#stars ) {
-
                 my $line = $stars[$i];
 
+                # display the row
                 $display->poke(
                     Point(0, $i),
+                    # FIXME:
+                    # We use CharPixel here, but we can only
+                    # get away with it because *Char is just an
+                    # alias to *Str, this needs it's own thing
                     CharPixel(
                         $gradient->calculate_at( $i + $step_offset ),
                         $White,
@@ -147,22 +171,30 @@ sub StarField ( $display ) {
                     )
                 );
 
+                # now handle any left/right scrolling
                 match[*Direction, $scroll_dir] => +{
+                    # same as above, ignore these here
                     *Up    => sub {},
                     *Down  => sub {},
+                    # handle left/right
                     *Left  => sub {
+                        # remove char from the start of the line
                         shift @$line;
+                        # add one to the back of the line
                         push @$line => make_star();
                     },
                     *Right => sub {
+                        # remove char from the end of the line
                         pop @$line;
+                        # add one to the back of the line
                         unshift @$line => make_star();
                     },
                 };
             }
 
+            # draw the spaceship at the center of field
             $display->poke_block(
-                $display->area->center->sub(
+                Point( $width / 2, $height / 2 )->sub(
                     Point( $ship->width / 2, $ship->height / 2 )
                 ),
                 $ship
@@ -199,7 +231,7 @@ $SIG{INT} = sub {
 
 sub init ($this, $msg=[]) {
 
-    my $f = $this->spawn( StarField( $d ) );
+    my $f = $this->spawn( StarField( $d, 60, 200 ) );
 
     $this->send( $f, [ *Init ] );
 
