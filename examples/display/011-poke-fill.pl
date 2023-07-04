@@ -28,12 +28,14 @@ my $d = Display(
     $d->clear_screen( Color( 0, 0.7, 1.0 ) );
 
     # use the hi-res mode to make a smoother vertical gradient
+    my $r1 = $d->area->inset_by( Point( 4, 2 ) );
     $d->poke_fill(
         GradientFillHGR(
-            $d->area->inset_by( Point( 4, 2 ) ),
+            $r1,
             Gradient(
                 Color( 0.5, 0.3, 0.9 ),
                 Color( 0.0, 1.0, 0.4 ),
+                $r1->height * 2,
             ),
             Vertical()
         ),
@@ -41,24 +43,28 @@ my $d = Display(
 
     # horizontal gradients don't really matter, they're the same
     # in GR and HGR
+    my $r2 = $d->area->inset_by( Point( 14, 7 ) );
     $d->poke_fill(
         GradientFill(
-            $d->area->inset_by( Point( 14, 7 ) ),
+            $r2,
             Gradient(
                 Color( 1.0, 0.1, 0.2 ),
                 Color( 0.5, 0.5, 0.5 ),
+                $r2->width,
             ),
             Horizontal()
         ),
     );
 
     # GR gradients can be used if banding is desired
+    my $r3 = $d->area->inset_by( Point( 22, 12 ) );
     $d->poke_fill(
         GradientFill(
-            $d->area->inset_by( Point( 22, 12 ) ),
+            $r3,
             Gradient(
                 Color( 0.9, 0.6, 0.1 ),
                 Color( 0.1, 0.6, 0.9 ),
+                $r3->height,
             ),
             Vertical()
         ),

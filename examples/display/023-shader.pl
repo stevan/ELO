@@ -55,6 +55,7 @@ my $frames = 0;
 my $gradient = Gradient(
     Color( 0.2, 0.1, 0.3 ),
     Color( 1.0, 0.2, 0.5 ),
+    1
 );
 
 while ($frames <= $F) {
@@ -91,7 +92,7 @@ while ($frames <= $F) {
                 #   min( 1.0, $color[2] ),
                 #;
 
-                return $gradient->calculate_at( max( 0, min( 1.0, $at ) ) );
+                return $gradient->calculate_at( $at );
             }
         )
     );

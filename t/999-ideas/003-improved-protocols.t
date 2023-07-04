@@ -44,6 +44,7 @@ event *GetNext     => ( *Process );
 
 # Protocols ...
 
+=pod
 
 protocol *Observer => sub {
     accepts *OnNext,
@@ -74,8 +75,6 @@ protocol *Publisher => sub {
         returns *OnNext, *OnComplete,
         raises *OnError;
 };
-
-=pod
 
 =cut
 

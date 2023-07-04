@@ -109,11 +109,12 @@ my $d = Display(
     sleep($DELAY);
 
     $d->poke_fill(
-        GradientFill(
+        GradientFillHGR(
             $d->area->inset_by( Point( 5, 10 ) ),
             Gradient(
                 Color( 0.5, 0.3, 0.9 ),
                 Color( 0.0, 1.0, 0.4 ),
+                20, # 2x since it is HGR
             ),
             Vertical()
         ),
@@ -141,6 +142,7 @@ my $d = Display(
             Gradient(
                 Color( 1.0, 0.1, 0.2 ),
                 Color( 0.5, 0.5, 0.5 ),
+                10,
             ),
             Horizontal()
         ),

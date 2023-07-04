@@ -57,21 +57,21 @@ typeclass[*Fill] => sub {
 
     method create_pixels => {
         GradientFill => sub ( $area, $gradient, $direction ) {
-            my $steps = $direction->is_horz ? $area->width : $area->height;
+            my $height = $direction->is_horz ? $area->width : $area->height;
 
-            map ColorPixel( $gradient->calculate_at( $_ / $steps) ), (1 .. $steps);
+            map ColorPixel( $gradient->calculate_at( $_ ) ), (1 .. $height);
         },
         GradientFillHGR => sub ( $area, $gradient, $direction ) {
-            my $steps = $direction->is_horz ? $area->width : $area->height;
+            my $height = $direction->is_horz ? $area->width : $area->height;
 
             if ( $direction->is_vert ) {
-                $steps *= 2;
+                $height *= 2;
 
                 my @pixels;
-                foreach my ($s1, $s2) (1 .. $steps) {
+                foreach my ($s1, $s2) (1 .. $height) {
                     push @pixels => CharPixel(
-                        $gradient->calculate_at( $s2 / $steps ),
-                        $gradient->calculate_at( $s1 / $steps ),
+                        $gradient->calculate_at( $s2 ),
+                        $gradient->calculate_at( $s1 ),
                         '▀',
                     );
                 }
@@ -79,7 +79,7 @@ typeclass[*Fill] => sub {
                 return @pixels;
             }
             else {
-                return map ColorPixel( $gradient->calculate_at( $_ / $steps) ), (1 .. $steps);
+                return map ColorPixel( $gradient->calculate_at( $_ ) ), (1 .. $height);
             }
         }
     };
