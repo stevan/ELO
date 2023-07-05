@@ -20,7 +20,6 @@ use ELO::Graphics;
 
 my $HEIGHT  = $ARGV[0] // 30;
 my $WIDTH   = $ARGV[1] // 90;
-my $LINES   = $ARGV[2] // 10;
 
 my $d = Display(
     *STDOUT,
@@ -56,48 +55,6 @@ my $a = 10;
 my $f = 0.03;
 my $b = 0;
 
-sub poke_line ( $d, $p1, $p2, $pixel ) {
-
-    my $x0 = $p1->x;
-    my $x1 = $p2->x;
-
-    my $y0 = $p1->y;
-    my $y1 = $p2->y;
-
-    my $dx = abs($x1 - $x0);
-    my $sx = $x0 < $x1 ? 1 : -1;
-    my $dy = -abs($y1 - $y0);
-    my $sy = $y0 < $y1 ? 1 : -1;
-
-    my $error = $dx + $dy;
-
-    while (1) {
-        $d->poke( Point( $x0, $y0 ), $pixel );
-
-        last if $x0 == $x1 && $y0 == $y1;
-
-        my $e2 = 2 * $error;
-
-        if ($e2 >= $dy) {
-            last if ($x0 == $x1);
-
-            $error = $error + $dy;
-
-            $x0 = $x0 + $sx;
-        }
-
-        if ($e2 <= $dx) {
-            last if $y0 == $y1;
-
-            $error = $error + $dx;
-
-            $y0 = $y0 + $sy;
-        }
-
-        #sleep(0.006);
-    }
-}
-
 sub poke_waves ( $x ) {
     my $sin_y = $a * sin( 2 * $PI * $f * $x + $b );
     my $cos_y = $a * cos( 2 * $PI * $f * $x + $b );
@@ -114,7 +71,7 @@ $d->clear_screen( $Background );
     while (1) {
         sleep(0.03);
 
-        foreach ( 5 .. 25 ) {
+        foreach ( (($HEIGHT / 2) - $a) .. (($HEIGHT / 2) + $a) ) {
             $d->move_cursor( Point( 0, $_ ) );
             print "\e[48;2;77;77;77;m\e[@";
             $d->move_cursor( Point( $d->width + 1, $_ ) );
