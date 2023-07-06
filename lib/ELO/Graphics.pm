@@ -9,6 +9,7 @@ use ELO::Graphics::Pixels;
 use ELO::Graphics::Images;
 use ELO::Graphics::Fills;
 use ELO::Graphics::Shaders;
+use ELO::Graphics::Scrollers;
 use ELO::Graphics::Displays;
 
 ## ----------------------------------------------------------------------------
@@ -24,6 +25,7 @@ our @EXPORT = (
       @ELO::Graphics::Images::EXPORT,
        @ELO::Graphics::Fills::EXPORT,
      @ELO::Graphics::Shaders::EXPORT,
+   @ELO::Graphics::Scrollers::EXPORT,
     @ELO::Graphics::Displays::EXPORT,
 );
 
