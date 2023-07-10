@@ -100,6 +100,9 @@ typeclass[*Display] => sub {
 
     my sub format_pixel ($p) { format_colors( $p->colors ).($p->char) }
 
+    # TODO:
+    # normalize the values here such that
+    # we cannot move outside the screen area
     my sub format_goto ($p) { sprintf "\e[%d;%dH" => map $_+1, $p->yx }
 
     my sub out ($d, @str) { $d->output->print( @str ); $d }
@@ -148,11 +151,23 @@ typeclass[*Display] => sub {
 
     method move_cursor  => sub ($d, $p) { out( $d => format_goto( $p) ) };
 
+    # TODO:
+    # add for cursor movement
+    # - up, down, forward, backward
+    # - next line, preceding line
+    # - column/row movement (preserving current row/column)
+
+
     method hide_cursor  => sub ($d) { out( $d => $HIDE_CURSOR ) };
     method show_cursor  => sub ($d) { out( $d => $SHOW_CURSOR ) };
 
     method enable_alt_buffer  => sub ($d) { out( $d => $ENABLE_ALT_BUF  ) };
     method disable_alt_buffer => sub ($d) { out( $d => $DISABLE_ALT_BUF ) };
+
+    #TODO:
+    # add for scroller ...
+    # - insert & delete character
+    # - insert & delete lines
 
     method poke => sub ($d, $coord, $pixel) {
         out( $d => (
