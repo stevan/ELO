@@ -18,7 +18,7 @@ use ELO::Graphics;
 
 # ...
 
-my $HEIGHT  = $ARGV[0] // 30;
+my $HEIGHT  = $ARGV[0] // 40;
 my $WIDTH   = $ARGV[1] // 90;
 
 my $d = Display(
@@ -52,7 +52,7 @@ $d->clear_screen( $Background );
 
     my $scroller = SideScroller(
         $d,
-        $d->area->inset_by( Point( 10, 10 )),
+        $d->area->inset_by( Point( 2, 2 )),
         $Background->add( Color( 0.1, 0.1, 0.1 ) ),
         sub ( $d, $x, $t ) {
             state $w = Wave( 10, 0.03, 0 );
@@ -69,7 +69,7 @@ $d->clear_screen( $Background );
             foreach my $method (qw[ cosec tan sec cot sin cos ]) {
                 my $y = $w->$method( $t );
 
-                if ($y <= 20 && $y > -20) {
+                if ($y <= 18 && $y > -18) {
                     $d->poke( Point( $x, $y )->add($shift_by), ColorPixel( $colors{$method} ));
                     #warn "$method => $y \n" ;
                 }
