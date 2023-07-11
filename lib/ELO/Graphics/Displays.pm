@@ -165,7 +165,7 @@ typeclass[*Display] => sub {
     method disable_alt_buffer => sub ($d) { out( $d => $DISABLE_ALT_BUF ) };
 
     #TODO:
-    # add for scroller ...
+    # add for destructive scrollers ...
     # - insert & delete character
     # - insert & delete lines
 
