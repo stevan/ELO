@@ -178,19 +178,24 @@ typeclass[*VRAM] => sub {
     $vram->draw();
 
     foreach my $start ( 0 .. $vram->rows - 2 ) {
-        my $end   = $start + 2;
+        my $end = $start + 2;
+
         foreach my $x ( $start .. $end ) {
             foreach my $y ( $start .. $end ) {
                 $vram->poke( $x, $y, $Red );
             }
         }
         $vram->update();
-        sleep(0.05);
+        sleep(0.1);
+
+        # clear the old one
         foreach my $x ( $start .. $end ) {
             foreach my $y ( $start .. $end ) {
                 $vram->poke( $x, $y, undef );
             }
         }
+        #$vram->update();
+        #sleep(0.1);
     }
 
 }
