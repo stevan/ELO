@@ -102,6 +102,7 @@ datatype *Sink => sub {
 
 typeclass[*Sink] => sub {
 
+    # FIXME: conver to arg checking form
     method drip => sub ($s, $drop) {
         match[ *Sink => $s ], +{
             SinkToCallback => sub ($callback) { $callback->($drop, *SinkDrop) },

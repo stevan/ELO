@@ -43,27 +43,27 @@ typeclass[*Wave] => sub {
     method frequency => *Frequency;
     method period    => *Period;
 
-    method sin => sub ($w, $x) {
+    method sin => [ *Num ] => sub ($w, $x) {
         $w->amplitude * sin( 2 * pi * $w->frequency * $x + $w->period )
     };
 
-    method cos => sub ($w, $x) {
+    method cos => [ *Num ] => sub ($w, $x) {
         $w->amplitude * cos( 2 * pi * $w->frequency * $x + $w->period )
     };
 
-    method tan => sub ($w, $x) {
+    method tan => [ *Num ] => sub ($w, $x) {
         $w->amplitude * tan( 2 * pi * $w->frequency * $x + $w->period )
     };
 
-    method cot => sub ($w, $x) {
+    method cot => [ *Num ] => sub ($w, $x) {
         $w->amplitude * cot( 2 * pi * $w->frequency * $x + $w->period )
     };
 
-    method sec => sub ($w, $x) {
+    method sec => [ *Num ] => sub ($w, $x) {
         $w->amplitude * sec( 2 * pi * $w->frequency * $x + $w->period )
     };
 
-    method cosec => sub ($w, $x) {
+    method cosec => [ *Num ] => sub ($w, $x) {
         $w->amplitude * cosec( 2 * pi * $w->frequency * $x + $w->period )
     };
 };
@@ -86,7 +86,7 @@ typeclass[*SideScroller] => sub {
     method bg_color  => *BgColor;
     method procedure => *Procedure;
 
-    method scroll => sub ($s, $t) {
+    method scroll => [ *Num ] => sub ($s, $tick) {
         my $d        = $s->display;
         my $area     = $s->area;
         my $bg_color = $s->bg_color;
@@ -97,7 +97,7 @@ typeclass[*SideScroller] => sub {
             $d->poke( Point( $area->corner->x, $y ), CmdPixel( $bg_color, "\e[P" ) );
         }
 
-        $s->procedure->( $d, $area->origin->x, $t );
+        $s->procedure->( $d, $area->origin->x, $tick );
     }
 
 };

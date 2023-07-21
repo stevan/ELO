@@ -42,19 +42,18 @@ typeclass[*Color] => sub {
 
     my sub __ ($x) { max(0, min(1.0, $x)); } # $x > 1.0 ? 1.0 : $x < 0.0 ? 0.0 : $x }
 
-    method add => sub ($c1, $c2) { Color( __($c1->r + $c2->r), __($c1->g + $c2->g), __($c1->b + $c2->b) ) };
-    method sub => sub ($c1, $c2) { Color( __($c1->r - $c2->r), __($c1->g - $c2->g), __($c1->b - $c2->b) ) };
-    method mul => sub ($c1, $c2) { Color( __($c1->r * $c2->r), __($c1->g * $c2->g), __($c1->b * $c2->b) ) };
+    method add => [ *Color ] => sub ($c1, $c2) { Color( __($c1->r + $c2->r), __($c1->g + $c2->g), __($c1->b + $c2->b) ) };
+    method sub => [ *Color ] => sub ($c1, $c2) { Color( __($c1->r - $c2->r), __($c1->g - $c2->g), __($c1->b - $c2->b) ) };
+    method mul => [ *Color ] => sub ($c1, $c2) { Color( __($c1->r * $c2->r), __($c1->g * $c2->g), __($c1->b * $c2->b) ) };
 
-    method alpha => sub ($c, $a) { Color( __($c->r * $a), __($c->g * $a), __($c->b * $a) ) };
-
-    method factor => sub ($c, $factor) { Color( __($c->r * $factor), __($c->g * $factor), __($c->b * $factor) ) };
+    method alpha  => [ *Num ] => sub ($c, $a) { Color( __($c->r * $a), __($c->g * $a), __($c->b * $a) ) };
+    method factor => [ *Num ] => sub ($c, $factor) { Color( __($c->r * $factor), __($c->g * $factor), __($c->b * $factor) ) };
 
     # TODO:
     # merge colors
     #   - http://www.java2s.com/example/java-utility-method/color-merge/mergecolors-color-a-float-fa-color-b-float-fb-9e963.html
 
-    method equals => sub ($c1, $c2) {
+    method equals => [ *Color ] => sub ($c1, $c2) {
         return 1 if $c1->r == $c2->r && $c1->g == $c2->g && $c1->b == $c2->b;
         return 0;
     };
@@ -78,7 +77,7 @@ typeclass[*Gradient] => sub {
     method end_color   => *EndColor;
     method steps       => *Steps;
 
-    method calculate_at => sub ($g, $value) {
+    method calculate_at => [ *Num ] => sub ($g, $value) {
         my $start = $g->start_color;
         my $end   = $g->end_color;
         my $steps = $g->steps;

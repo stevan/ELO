@@ -19,12 +19,12 @@ use ok 'ELO::Types',  qw[
 
 # ...
 
+=pod
+
 type *X => *Int;
 type *Y => *Int;
 
 datatype [ Point => *Point ] => ( *X, *Y );
-
-=pod
 
 Here is one option, where we specify the signature in the method definition
 though I am not sure it would work for tagged unions, maybe like this::

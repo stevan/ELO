@@ -23,18 +23,18 @@ datatype *Tree => sub {
 typeclass[ *Tree ], sub {
 
     method is_leaf => {
-        Node => sub ($, $, $) { 0 },
-        Leaf => sub ()        { 1 },
+        Node => sub { 0 },
+        Leaf => sub { 1 },
     };
 
     method is_node => {
-        Node => sub ($, $, $) { 1 },
-        Leaf => sub ()        { 0 },
+        Node => sub { 1 },
+        Leaf => sub { 0 },
     };
 
     method get_value => {
-        Node => sub ($x, $, $) { $x },
-        Leaf => sub ()         { () },
+        Node => *Scalar,
+        Leaf => sub { () },
     };
 
     method get_left => {
@@ -47,7 +47,18 @@ typeclass[ *Tree ], sub {
         Leaf => sub ()             { die "Cannot call get_right on Node" },
     };
 
-    method traverse => sub ($t, $f, $depth=0) {
+    method traverse => [ *CodeRef, *Int ] => +{
+        Node =>  sub ($t, $f, $depth) {
+            $f            ->($t->get_value, $depth);
+            $t->get_left  ->traverse ($f, $depth+1);
+            $t->get_right ->traverse ($f, $depth+1);
+        },
+        Leaf => sub ($, $f, $depth=0) {
+            $f -> (undef, $depth);
+        },
+    };
+
+    method traverse2 => sub ($t, $f, $depth=0) {
         match[ *Tree => $t ], +{
             Node => sub ($x, $left, $right) {
                 $f     -> ($x, $depth);
@@ -107,12 +118,30 @@ subtest '... check the tagged union' => sub {
     is($tree->get_right->get_right->is_node, 0, '... the tree->right->right is not a node');
     is($tree->get_right->get_right->get_value, undef, '... the tree->right->right value is as expected');
 
-    my @out;
+    my @out1;
     $tree->traverse(sub ($arg, $depth) {
-        push @out => (('  ' x $depth).($arg && "Node($arg)" // "Leaf" ));
+        push @out1 => (('  ' x $depth).($arg && "Node($arg)" // "Leaf" ));
+    }, 1); # << NOTE the 1 here ;)
+    is(
+        (join "\n" => @out1),
+q[  Node(5)
+    Node(1)
+      Leaf
+      Leaf
+    Node(3)
+      Node(4)
+        Leaf
+        Leaf
+      Leaf],
+          '... got the expected output from traverse'
+    );
+
+    my @out2;
+    $tree->traverse2(sub ($arg, $depth) {
+        push @out2 => (('  ' x $depth).($arg && "Node($arg)" // "Leaf" ));
     });
     is(
-        (join "\n" => @out),
+        (join "\n" => @out2),
 q[Node(5)
   Node(1)
     Leaf
@@ -122,7 +151,7 @@ q[Node(5)
       Leaf
       Leaf
     Leaf],
-        '... got the expected output from traverse'
+        '... got the expected output from traverse2'
     );
 
     my $result = $tree->dump;
@@ -144,53 +173,43 @@ datatype *Option => sub {
 typeclass[*Option] => sub {
 
     method get => {
-        Some => sub ($value) { $value },
-        None => sub ()       { die 'Cannot call get on None' },
+        Some => *Scalar,
+        None => sub () { die 'Cannot call get on None' },
     };
 
-    method get_or_else => sub ($o, $f) {
-        match[ *Option, $o ] => {
-            Some => sub ($value) { $value },
-            None => sub ()       { $f->() },
-        }
+    method get_or_else => [ *CodeRef ] => +{
+        Some => sub ($o, $) { $o->get },
+        None => sub ($, $f) { $f->() },
     };
 
-    method or_else => sub ($o, $f) {
-        match[ *Option, $o ] => {
-            Some => sub ($value) { Some($value) },
-            None => sub ()       { $f->() },
-        }
+    method or_else => [ *CodeRef ] => +{
+        Some => sub ($o, $) { Some($o->get) },
+        None => sub ($, $f) { $f->() },
     };
 
     method is_defined => {
-        Some => sub ($) { 1 },
-        None => sub ()  { 0 },
+        Some => sub { 1 },
+        None => sub { 0 },
     };
 
     method is_empty => {
-        Some => sub ($) { 0 },
-        None => sub ()  { 1 },
+        Some => sub { 0 },
+        None => sub { 1 },
     };
 
-    method map => sub ($o, $f) {
-        match[ *Option, $o ] => {
-            Some => sub ($value) { Some( $f->($value) ) },
-            None => sub ()       { None() },
-        }
+    method map => [ *CodeRef ] => +{
+        Some => sub ($o, $f) { Some($f->($o->get)) },
+        None => sub ($,   $) { None() },
     };
 
-    method filter => sub ($o, $f) {
-        match[ *Option, $o ] => {
-            Some => sub ($value) { $f->($value) ? Some($value) : None() },
-            None => sub ()       { None() },
-        }
+    method filter => [ *CodeRef ] => +{
+        Some => sub ($o, $f) { $f->($o->get) ? Some($o->get) : None() },
+        None => sub ($,   $) { None() },
     };
 
-    method foreach => sub ($o, $f) {
-        match[ *Option, $o ] => {
-            Some => sub ($value) { $f->( $value ) },
-            None => sub ()       {},
-        }
+    method foreach => [ *CodeRef ] => +{
+        Some => sub ($o, $f) { $f->($o->get) },
+        None => sub ($,   $) { () },
     };
 
 };
@@ -217,7 +236,6 @@ subtest '... testing the Option type' => sub {
         );
     }
 };
-
 
 done_testing;
 

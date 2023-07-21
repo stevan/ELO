@@ -10,6 +10,8 @@ use ELO::Graphics::Colors;
 use ELO::Graphics::Geometry;
 use ELO::Graphics::Pixels;
 use ELO::Graphics::Fills;
+use ELO::Graphics::Images;
+use ELO::Graphics::Shaders;
 
 ## ----------------------------------------------------------------------------
 ## Environment Variables
@@ -110,7 +112,7 @@ typeclass[*Display] => sub {
     # ...
     # these should all return $self
 
-    method clear_screen => sub ($d, $bg_color) {
+    method clear_screen => [ *Color ] => sub ($d, $bg_color) {
         $d->home_cursor;
         out( $d => (
             $CLEAR_SCREEN,   # clear the screen first
@@ -149,7 +151,7 @@ typeclass[*Display] => sub {
     method home_cursor  => sub ($d) { out( $d => $HOME_CURSOR ) };
     method end_cursor   => sub ($d) { out( $d => "\e[".($d->rows)."H"  ) };
 
-    method move_cursor  => sub ($d, $p) { out( $d => format_goto( $p) ) };
+    method move_cursor  => [ *Point ] => sub ($d, $p) { out( $d => format_goto( $p) ) };
 
     # TODO:
     # add for cursor movement
@@ -169,7 +171,7 @@ typeclass[*Display] => sub {
     # - insert & delete character
     # - insert & delete lines
 
-    method poke => sub ($d, $coord, $pixel) {
+    method poke => [ *Point, *Pixel ] => sub ($d, $coord, $pixel) {
         out( $d => (
             format_goto(  $coord ),
             format_pixel( $pixel ),
@@ -177,7 +179,7 @@ typeclass[*Display] => sub {
         ));
     };
 
-    method poke_rectangle => sub ($d, $rectangle, $bg_color) {
+    method poke_rectangle => [ *Rectangle, *Color ] => sub ($d, $rectangle, $bg_color) {
 
         my $h = $rectangle->height + 1;
         my $w = $rectangle->width  + 1;
@@ -197,7 +199,7 @@ typeclass[*Display] => sub {
         ));
     };
 
-    method poke_fill => sub ($d, $fill) {
+    method poke_fill => [ *Fill ] => sub ($d, $fill) {
 
         my $area = $fill->area;
         my $h    = $area->height; # FIXME - this likely need + 1
@@ -230,7 +232,7 @@ typeclass[*Display] => sub {
         ));
     };
 
-    method poke_block => sub ($d, $coord, $image) {
+    method poke_block => [ *Point, *Image ] => sub ($d, $coord, $image) {
 
         #die split // => join '' => (map { map { format_colors( $_->colors ).($_->char) } $_->@* } $image->get_all_rows);
 
@@ -257,7 +259,7 @@ typeclass[*Display] => sub {
         ));
     };
 
-    method poke_shader => sub ($d, $shader) {
+    method poke_shader => [ *Shader ] => sub ($d, $shader) {
 
         my $area = $shader->area;
         my $cols = $area->width + 1;

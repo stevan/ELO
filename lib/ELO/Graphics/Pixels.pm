@@ -70,6 +70,12 @@ typeclass[*Pixel] => sub {
         # I am already encoding data here about spacees with ColorPixel
     };
 
+
+    # FIXME:
+    # either ditch these two methods, or convert them to
+    # the arg checking form, ... these are the only ones
+    # left.
+
     method lighten => sub ($p, $lighten_by) {
         match[*Pixel, $p] => +{
             TransPixel => sub ()                { TransPixel() },

@@ -262,8 +262,10 @@ sub typeclass ($t, $body) {
 
         my %cases  = $type->cases->%*;
 
-        $method = sub ($name, $table) {
+        $method = sub ($name, $table, @rest) {
 
+            # If we get a CODE ref, then we install it
+            # in all the classes in the union
             if ( ref $table eq 'CODE' ) {
                 foreach my $constructor_symbol ( keys %cases ) {
                     no strict 'refs';
@@ -273,7 +275,17 @@ sub typeclass ($t, $body) {
                     );
                 }
             }
-            elsif ( ref $table eq 'HASH' ) {
+            # If we get a HASH ref, then we loop over
+            # the keys (the classes in the union) and
+            # install each method variant accordingly
+            elsif ( ref $table eq 'HASH' || ref $table eq 'ARRAY' ) {
+
+                my $has_args;
+                if (ref $table eq 'ARRAY') {
+                    $has_args = $table;
+                    $table = $rest[0];
+                }
+
                 foreach my $type_name ( keys %$table ) {
                     my $constructor_symbol = "${symbol}::${type_name}";
                        $constructor_symbol =~ s/main//;
@@ -288,6 +300,12 @@ sub typeclass ($t, $body) {
 
                     my $handler = $table->{$type_name};
 
+                    # If do not get a CODE ref value, then we
+                    # expect it to be a GLOB ref that refers to
+                    # one of the elements in the particular
+                    # classes constructor definition. It will
+                    # look this up and create an appropriate
+                    # method for accessing it
                     if (ref $handler ne 'CODE') {
                         my @definitions = $constructor->definition;
 
@@ -303,10 +321,26 @@ sub typeclass ($t, $body) {
                         # encapsulation ;)
                         $body = sub ($_t) { $_t->[$i] };
                     }
+                    # otherwise it is a method, and we can just
+                    # make a small wrapper around it to do the
+                    # destructuring
                     else {
                         set_subname( "${constructor_symbol}::${name}" => $handler );
 
-                        $body = sub ($_t) { $handler->( @$_t ) }
+                        if ( $has_args ) {
+                            my $arg_types = resolve_types( $has_args );
+                            $body = sub ($_t, @args) {
+                                check_types( $arg_types, \@args )
+                                    || confess "Typecheck failed for $constructor_symbol with ("
+                                                .(join ', ' => map $_//'undef', @args).') expected('
+                                                .(join ', ' => map $_, @$has_args).')';
+                                $handler->( $_t, @args )
+                            };
+                        }
+                        else {
+                            # XXX: consider using `goto &sub` here
+                            $body = sub ($_t) { $handler->( @$_t ) };
+                        }
                     }
 
                     no strict 'refs';
@@ -317,6 +351,10 @@ sub typeclass ($t, $body) {
                     );
                 }
             }
+            # if we get a GLOB ref, then we loop through
+            # all the varients, locate the type specified
+            # by the GLOB and install accessor methods
+            # accordingly
             elsif ( ref((my $x = \$table)) eq 'GLOB' ) {
 
                 foreach my $constructor_symbol ( keys %cases ) {
@@ -358,20 +396,51 @@ sub typeclass ($t, $body) {
 
         my @definitions = $type->definition;
 
-        $method = sub ($name, $body) {
+        # This is easier, if it gets a CODE ref
+        # then it installs it, otherwise it
+        # should be a GLOB ref and then we look
+        # for the type definition and build the
+        # method accordingly
+
+        $method = sub ($name, $body, @rest) {
             no strict 'refs';
             if (ref $body ne 'CODE') {
-                my $i;
-                for ($i = 0; $i < $#definitions; $i++) {
-                    #warn "$body ==? ".$definitions[$i]->symbol;
-                    last if $body eq $definitions[$i]->symbol;
+
+                # if it is not a CODE ref, then it needs to
+                # be an ARRAY ref or a GLOB, if we have an
+                # ARRAY it means we want to check the arg types
+                if (ref $body eq 'ARRAY') {
+
+                    # grab the args, and grab the CODE ref
+                    my $has_args = $body;
+                    my $handler  = $rest[0];
+
+                    my $arg_types = resolve_types( $has_args );
+
+                    # replace the body now ...
+                    $body = sub ($_t, @args) {
+                        check_types( $arg_types, \@args )
+                            || confess "Typecheck failed for $constructor_symbol with ("
+                                        .(join ', ' => map $_//'undef', @args).') expected('
+                                        .(join ', ' => map $_, @$has_args).')';
+                        $handler->( $_t, @args )
+                    };
+
                 }
+                # otherwise we have a GLOB and it is an accessor
+                else {
+                    my $i;
+                    for ($i = 0; $i < $#definitions; $i++) {
+                        #warn "$body ==? ".$definitions[$i]->symbol;
+                        last if $body eq $definitions[$i]->symbol;
+                    }
 
-                confess 'Could not find symbol('.$body.') in type definition tuple['.$type->symbol.']'
-                    unless defined $i;
+                    confess 'Could not find symbol('.$body.') in type definition tuple['.$type->symbol.']'
+                        unless defined $i;
 
-                # encapsulation ;)
-                $body = sub ($_t) { $_t->[$i] };
+                    # encapsulation ;)
+                    $body = sub ($_t) { $_t->[$i] };
+                }
             }
 
             #warn "[tuple] &: ${constructor_symbol}::${name}\n";

@@ -42,8 +42,8 @@ typeclass[*Image] => sub {
     method height => sub ($i) { scalar $i->bitmap->@*      };
     method width  => sub ($i) { scalar $i->bitmap->[0]->@* };
 
-    method get_all_rows => sub ($i)        { $i->bitmap->@* };
-    method get_row      => sub ($i, $idx)  { $i->bitmap->[ $idx ]->@* };
+    method get_all_rows => sub ($i) { $i->bitmap->@* };
+    method get_row      => [ *Int ] => sub ($i, $idx)  { $i->bitmap->[ $idx ]->@* };
 
     # NOTE:
     # the below methods will copy the
@@ -58,11 +58,11 @@ typeclass[*Image] => sub {
         Image([ map { [ @$_ ] } reverse $i->get_all_rows ])
     };
 
-    method map => sub ($i, $f) {
+    method map => [ *CodeRef ] => sub ($i, $f) {
         Image([ map { [ map $f->($_), @$_ ] } $i->get_all_rows ])
     };
 
-    method lighten => sub ($i, $lighten_by) {
+    method lighten => [ *Num ] => sub ($i, $lighten_by) {
         my $lightener = Color( $lighten_by, $lighten_by, $lighten_by );
         Image([
             map { [
@@ -71,7 +71,7 @@ typeclass[*Image] => sub {
         ])
     };
 
-    method darken => sub ($i, $darken_by) {
+    method darken => [ *Num ] => sub ($i, $darken_by) {
         my $darkener = Color( $darken_by, $darken_by, $darken_by );
         Image([
             map { [
@@ -120,7 +120,7 @@ typeclass[ *ImageData ] => sub {
     method raw_data => *RawImageData;
 
     method get_all_rows => sub ($i)        { $i->raw_data->@* };
-    method get_row      => sub ($i, $idx)  { $i->raw_data->[ $idx ]->@* };
+    method get_row      => [ *Int ] => sub ($i, $idx)  { $i->raw_data->[ $idx ]->@* };
 
     method create_image => sub ($img) {
         my $p = $img->palette;

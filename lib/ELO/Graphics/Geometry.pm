@@ -42,34 +42,34 @@ typeclass[*Point] => sub {
     method xy => sub ($p) { ($p->x, $p->y) };
     method yx => sub ($p) { ($p->y, $p->x) };
 
-    method add => sub ($p1, $p2) { Point( $p1->x + $p2->x, $p1->y + $p2->y ) };
-    method sub => sub ($p1, $p2) { Point( $p1->x - $p2->x, $p1->y - $p2->y ) };
-    method mul => sub ($p1, $p2) { Point( $p1->x * $p2->x, $p1->y * $p2->y ) };
+    method add => [ *Point ] => sub ($p1, $p2) { Point( $p1->x + $p2->x, $p1->y + $p2->y ) };
+    method sub => [ *Point ] => sub ($p1, $p2) { Point( $p1->x - $p2->x, $p1->y - $p2->y ) };
+    method mul => [ *Point ] => sub ($p1, $p2) { Point( $p1->x * $p2->x, $p1->y * $p2->y ) };
 
-    method min => sub ($p1, $p2) {
+    method min => [ *Point ] => sub ($p1, $p2) {
         # returns the top-left corner defined by rectangle of $p1 x $p2
         return $p1 if $p1->x <= $p2->x && $p1->y <= $p2->y; # $p1 is above and to the to the left of $p2
         return $p2 if $p2->x <= $p1->x && $p2->y <= $p1->y; # $p2 is below and to the to the right of $p1
     };
 
-    method max => sub ($p1, $p2) {
+    method max => [ *Point ] => sub ($p1, $p2) {
         # returns the bottom-right corner defined by rectangle of $p1 x $p2
         return $p1 if $p1->x >= $p2->x && $p1->y >= $p2->y; # $p1 is below and to the to the right of $p2
         return $p2 if $p2->x >= $p1->x && $p2->y >= $p1->y; # $p2 is below and to the to the right of $p1
     };
 
-    method equals => sub ($p1, $p2) {
+    method equals => [ *Point ] => sub ($p1, $p2) {
         return 1 if $p1->x == $p2->x && $p1->y == $p2->y;
         return 0;
     };
 
-    method scale_by_point => sub ($p1, $p2) { $p1->mul( $p2 ) };
+    method scale_by_point => [ *Point ] => sub ($p1, $p2) { $p1->mul( $p2 ) };
 
-    method scale_by_factor => sub ($p, $factor) {
+    method scale_by_factor => [ *Num ] => sub ($p, $factor) {
         Point( ceil( $p->x * $factor ), ceil( $p->y * $factor ) )
     };
 
-    method scale_by_factors => sub ($p, $x_factor, $y_factor) {
+    method scale_by_factors => [ *Num, *Num ] => sub ($p, $x_factor, $y_factor) {
         Point( ceil( $p->x * $x_factor ), ceil( $p->y * $y_factor ) )
     };
 
@@ -77,9 +77,9 @@ typeclass[*Point] => sub {
     # translate_by (delta)
 
     # Rectangle constructors
-    method rect_with_extent => sub ($p, $extent) { Rectangle( $p, $p->add( $extent ) ) };
-    method rect_to_corner   => sub ($p, $corner) { Rectangle( $p, $corner ) };
-    method rect_from_center => sub ($p, $extent) {
+    method rect_with_extent => [ *Point ] => sub ($p, $extent) { Rectangle( $p, $p->add( $extent ) ) };
+    method rect_to_corner   => [ *Point ] => sub ($p, $corner) { Rectangle( $p, $corner ) };
+    method rect_from_center => [ *Point ] => sub ($p, $extent) {
         $p->sub( $extent->scale_by_factor( 0.5 ) )->rect_with_extent( $extent );
     };
 };
@@ -113,7 +113,7 @@ typeclass[*Rectangle] => sub {
         $r->origin->add( $r->extent->scale_by_factor( 0.5 ) )
     };
 
-    method inset_by => sub ($r, $inset_by) {
+    method inset_by => [ *Point ] => sub ($r, $inset_by) {
         Rectangle(
             $r->origin->add( $inset_by ),
             $r->corner->sub( $inset_by ),
@@ -133,7 +133,7 @@ typeclass[*Rectangle] => sub {
     # areasOutside (Rect)  -> Array[Rect]
     # translate_by (delta) -> Rect
 
-    method equals => sub ($r1, $r2) {
+    method equals => [ *Rectangle ] => sub ($r1, $r2) {
         return 1 if $r1->origin->equals( $r2->origin )
                  && $r1->corner->equals( $r2->corner );
         return 0;
