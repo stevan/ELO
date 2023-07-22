@@ -87,6 +87,7 @@ class ActorSystem {
 
     method despawn ($actor_ref) {
         push @deferred => sub {
+            say "Despawning ".$actor_ref->pid;
             delete $actor_refs{ $actor_ref->pid };
         };
     }
@@ -95,51 +96,25 @@ class ActorSystem {
         push @msg_queue => $message;
     }
 
-    method loop ($delay=undef) {
-        state $tail = ('-' x 60);
+    method drain_messages {
+        my @msgs   = @msg_queue;
+        @msg_queue = ();
+        return @msgs;
+    }
 
-        say "init $tail";
-        $init->( $self->spawn( Actor->new ) );
+    method add_to_dead_letter ($reason, $message) {
+        push @dead_letter_queue => [ $reason, $message ];
+    }
 
-        say "start $tail";
-        while (1) {
-            say "tick $tail";
 
-            my @msgs   = @msg_queue;
-            @msg_queue = ();
+    method run_deferred ($phase) {
+        return unless @deferred;
+        say ">>> deferred[ $phase ]";
+        (shift @deferred)->() while @deferred
+    }
 
-            while (@msgs) {
-                my $msg = shift @msgs;
-
-                if ( my $actor_ref = $actor_refs{ $msg->to->pid } ) {
-                    my $a = $actor_ref->actor;
-                    if ( $a->can_apply( $msg ) ) {
-                        $a->apply( $actor_ref, $msg );
-                    }
-                    else {
-                        push @dead_letter_queue => [ 'LABEL NOT FOUND', $msg ];
-                    }
-                }
-                else {
-                    push @dead_letter_queue => [ 'ACTOR NOT FOUND', $msg ];
-                }
-            }
-
-            if ( @deferred ) {
-                say "idle $tail";
-                (shift @deferred)->() while @deferred;
-            }
-
-            last unless @msg_queue;
-            sleep($delay) if defined $delay;
-        }
-
-        if ( @deferred ) {
-            say "cleanup $tail";
-            (shift @deferred)->() while @deferred;
-        }
-
-        say "exit $tail";
+    method exit_loop {
+        say "<<<< exiting";
 
         if ( @dead_letter_queue ) {
             say "Dead Letter Queue";
@@ -152,6 +127,49 @@ class ActorSystem {
             say "Zombies";
             say join ", " => sort { $a <=> $b } keys %actor_refs;
         }
+    }
+
+    method loop ($delay=undef) {
+        state $tail = ('-' x 60);
+
+        say "init $tail";
+        my $init_ctx = $self->spawn( Actor->new );
+        $init->( $init_ctx );
+        $self->despawn($init_ctx);
+
+        say "start $tail";
+        while (1) {
+            say "tick $tail";
+
+            my @msgs = $self->drain_messages;
+
+            while (@msgs) {
+                my $msg = shift @msgs;
+
+                if ( my $actor_ref = $actor_refs{ $msg->to->pid } ) {
+                    my $a = $actor_ref->actor;
+                    if ( $a->can_apply( $msg ) ) {
+                        $a->apply( $actor_ref, $msg );
+                    }
+                    else {
+                        $self->add_to_dead_letter( EVENT_NOT_FOUND => $msg );
+                    }
+                }
+                else {
+                    $self->add_to_dead_letter( ACTOR_NOT_FOUND => $msg );
+                }
+            }
+
+            $self->run_deferred('idle');
+
+            last unless @msg_queue;
+            sleep($delay) if defined $delay;
+        }
+
+        $self->run_deferred('cleanup');
+        $self->exit_loop;
+
+        return;
     }
 
 }
