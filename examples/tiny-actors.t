@@ -23,11 +23,10 @@ sub despawn ($a) {
     }
 }
 
-my @Q, @DLQ;
+my @Q;
+my @DLQ;
 
-sub send_msg ($msg) {
-    push @Q => $msg;
-}
+sub send_msg ($msg) { push @Q => $msg }
 
 sub loop ($init, $delay=undef) {
     state $tail = ('-' x 60);
@@ -120,7 +119,7 @@ sub PingPong ($state) {
 }
 
 sub init () {
-    foreach ( 1 .. 100 ) {
+    foreach ( 1 .. 10 ) {
         my $max = int(rand(10));
         my $Ping = spawn( \&PingPong, { name => "Ping($_)", pong => 0, max => $max } );
         my $Pong = spawn( \&PingPong, { name => "Pong($_)", ping => 0, max => $max } );
@@ -131,6 +130,7 @@ sub init () {
 
 loop( \&init, 0.5 );
 
+1;
 
 
 
