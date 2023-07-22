@@ -4,11 +4,11 @@ use v5.38;
 
 use Time::HiRes qw[ sleep ];
 
-my $PIDS = 0;
 my %TABLE;
 my @IDLE;
 
 sub spawn ($builder, @args) {
+    state $PIDS = 0;
     my $a = $builder->( @args );
     $TABLE{ ($a->{pid} = ++$PIDS) } = $a;
     say "Spawning (".$a->{pid}.")";
@@ -23,8 +23,7 @@ sub despawn ($a) {
     }
 }
 
-my @Q;
-my @DLQ;
+my @Q, @DLQ;
 
 sub send_msg ($msg) {
     push @Q => $msg;
