@@ -30,10 +30,9 @@ sub send_msg ($msg) { push @Q => $msg }
 
 sub loop ($init, $delay=undef) {
     state $tail = ('-' x 60);
-    say "start $tail";
-
+    say "init $tail";
     $init->();
-
+    say "start $tail";
     while (1) {
         say "tick $tail";
 
