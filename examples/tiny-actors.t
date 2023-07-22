@@ -188,7 +188,7 @@ class PingPong :isa(Actor) {
 
             $ctx->send(
                 $message->from,
-                Event->new( symbol  => 'pong' )
+                Event->new( symbol  => *pong )
             );
 
             $pings++;
@@ -206,7 +206,7 @@ class PingPong :isa(Actor) {
 
             $ctx->send(
                 $message->from,
-                Event->new( symbol  => 'ping' )
+                Event->new( symbol  => *ping )
             );
 
             $pongs++;
@@ -226,7 +226,7 @@ sub init ($ctx) {
         my $Ping = $ctx->spawn( PingPong->new( name => "Ping($_)", max => $max ) );
         my $Pong = $ctx->spawn( PingPong->new( name => "Pong($_)", max => $max ) );
 
-        $Ping->send( $Pong, Event->new( symbol => 'pong' ) );
+        $Ping->send( $Pong, Event->new( symbol => *pong ) );
     }
 }
 
